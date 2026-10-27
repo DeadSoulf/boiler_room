@@ -69,7 +69,17 @@ int main(){
  assert(!strcmp(lv_label_get_text(tempValue[0]),"--.-"));
  sensorDetails(0);step();save("history_test_fixture");bounds(lv_layer_top());dismiss();measurements[0]=Measurement{};
  // Exercise real LVGL pointer gestures and Home event callback.
- swipe(true);assert(page==1);swipe(true);assert(page==2);clickAt(398,45);assert(page==0);
+ swipe(true);assert(page==1);swipe(true);assert(page==2);
+ save("before_home_click");
+ lv_point_t homePoint={398,45};auto* hit=lv_indev_search_obj(lv_scr_act(),&homePoint);
+ printf("HOME BEFORE page=%d rendered=%d pending=%d rebuild=%d overlay=%p sleeping=%d consume=%d clicks=%lu hit=%p header=%p hit-button=%d\n",page,renderedPage,pendingPage,int(rebuild),(void*)overlay,int(displayIdle.sleeping),int(displayIdle.consumeTouch),(unsigned long)clicks,(void*)hit,(void*)header,int(hit && lv_obj_check_type(hit,&lv_btn_class)));fflush(stdout);
+ clickAt(398,45);
+ if(page!=0){
+   auto* in=lv_indev_get_next(nullptr);
+   printf("HOME FAIL page=%d rendered=%d pending=%d rebuild=%d close=%d overlay=%p sleeping=%d consume=%d clicks=%lu input-state=%d wait-release=%d now=%lu\n",page,renderedPage,pendingPage,int(rebuild),int(closeDialog),(void*)overlay,int(displayIdle.sleeping),int(displayIdle.consumeTouch),(unsigned long)clicks,in?int(in->proc.state):-1,in?int(in->proc.wait_until_release):-1,(unsigned long)fakeMillis);fflush(stdout);
+   save("home_failure");
+ }
+ assert(page==0);
  for(int p=0;p<4;p++){page=p;view=0;render();step();std::string n="page"+std::to_string(p);save(n.c_str());bounds(root);}
  page=2;for(int v=1;v<=4;v++){view=v;render();step();std::string n="settings"+std::to_string(v);save(n.c_str());bounds(root);}
  clickAt(200,292);assert(panel_radio::lastCommand.job==Job::SetDisplayTimeout);
