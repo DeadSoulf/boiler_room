@@ -1,0 +1,11 @@
+.build/
+artifacts/
+.pio/
+__pycache__/
+*.pyc
+*.log
+*.elf
+*.bin
+.env
+.env.*
+boiler_backups/

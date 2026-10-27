@@ -1,0 +1,44 @@
+name: Boiler panel build and tests
+on:
+  push:
+    paths: ['src/**', 'tests/**', 'ci/**', 'apply_update.py', '.github/workflows/boiler-build.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: boiler-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: bash ci/bootstrap.sh host
+      - if: always()
+        run: mkdir -p artifacts && python3 ci/manifest.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: native-tests-${{ github.sha }}
+          path: artifacts/
+          retention-days: 14
+  firmware:
+    needs: native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - run: bash ci/bootstrap.sh firmware
+      - if: always()
+        run: mkdir -p artifacts && python3 ci/manifest.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: esp32p4-build-${{ github.sha }}
+          path: artifacts/
+          retention-days: 14
