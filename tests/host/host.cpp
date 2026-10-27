@@ -4,6 +4,7 @@
 #include <fstream>
 #include "Arduino.h"
 #include "panel_radio.h"
+#include "panel_screen.h"
 uint32_t fakeMillis=1000;SerialStub Serial;ESPStub ESP;
 namespace panel_radio {
 panel::RadioState fixture;
@@ -21,7 +22,7 @@ void flush(lv_disp_drv_t* drv,const lv_area_t* a,lv_color_t* data){
  lv_disp_flush_ready(drv);
 }
 int mx=0,my=0;bool down=false;
-void pointer(lv_indev_drv_t*,lv_indev_data_t* d){d->point.x=mx;d->point.y=my;d->state=down?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
+void pointer(lv_indev_drv_t*,lv_indev_data_t* d){d->point.x=mx;d->point.y=my;d->state=panel_screen_touch_ready() && panel_screen_filter_touch(down)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
 void step(int ms=200){for(int i=0;i<ms;i+=10){fakeMillis+=10;lv_tick_inc(10);lv_timer_handler();}}
 void save(const char* name){
  lv_obj_invalidate(lv_scr_act());lv_refr_now(nullptr);
@@ -62,15 +63,15 @@ int main(){
  snprintf(panel_radio::fixture.wifiMessage,150,"Не подключено");snprintf(panel_radio::fixture.bleMessage,150,"Нажмите Поиск. Устройства не подключаются");
  auto* root=lv_scr_act();lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_style_pad_all(root,0,0);
  lv_obj_add_event_cb(root,gesture,LV_EVENT_GESTURE,nullptr);panel_radio::snapshot(radio);
- installDisplayTouch();assert(touchWakeAvailable);lv_timer_create(refresh,100,nullptr);page=0;render();step();save("home");bounds(root);
+ panel_screen::begin(true);assert(panel_screen::touchReady());lv_timer_create(refresh,100,nullptr);page=0;render();step();save("home");bounds(root);
  // First physical gesture wakes only, even when over an actionable card.
  panel_radio::fixture.displayTimeoutSec=30;++panel_radio::fixture.revision;step(1100);step(31000);
- assert(!displayIdle.sleeping && hostBacklight); // No blank until a touch has actually worked this boot.
- clickAt(30,745);assert(wakeTouchSeen);step(31000);
- assert(displayIdle.sleeping && !hostBacklight);const auto beforeClicks=clicks;
+ assert(!!panel_screen::awake() && hostBacklight); // No blank until a touch has actually worked this boot.
+ clickAt(30,745);assert(panel_screen::awake());step(31000);
+ assert(!panel_screen::awake() && !hostBacklight);const auto beforeClicks=clicks;
  mx=100;my=210;down=true;step(1500);
- assert(hostBacklight && !displayIdle.sleeping && !overlay && clicks==beforeClicks);
- mx=400;step(1500);down=false;step(150);assert(!overlay && page==0 && clicks==beforeClicks);
+ assert(hostBacklight && !!panel_screen::awake() && !overlay && clicks==beforeClicks);
+ mx=400;step(1500);down=false;step(200);assert(!overlay && page==0 && clicks==beforeClicks);
  clickAt(100,210);assert(overlay && dialogKind==3);swipe(true);assert(page==0);dismiss();
  panel_radio::fixture.displayTimeoutSec=0;++panel_radio::fixture.revision;step(1100);
  measurements[0].put(10,fakeMillis);measurements[0].put(12,fakeMillis+1);step(1100);
@@ -86,17 +87,17 @@ int main(){
  swipe(true);assert(page==1);swipe(true);assert(page==2);
  save("before_home_click");
  lv_point_t homePoint={398,45};auto* hit=lv_indev_search_obj(lv_scr_act(),&homePoint);
- printf("HOME BEFORE page=%d rendered=%d pending=%d rebuild=%d overlay=%p sleeping=%d consume=%d clicks=%lu hit=%p header=%p hit-button=%d\n",page,renderedPage,pendingPage,int(rebuild),(void*)overlay,int(displayIdle.sleeping),int(displayIdle.consumeTouch),(unsigned long)clicks,(void*)hit,(void*)header,int(hit && lv_obj_check_type(hit,&lv_btn_class)));fflush(stdout);
+ printf("HOME BEFORE page=%d rendered=%d pending=%d rebuild=%d overlay=%p sleeping=%d consume=%d clicks=%lu hit=%p header=%p hit-button=%d\n",page,renderedPage,pendingPage,int(rebuild),(void*)overlay,int(!panel_screen::awake()),int(false),(unsigned long)clicks,(void*)hit,(void*)header,int(hit && lv_obj_check_type(hit,&lv_btn_class)));fflush(stdout);
  clickAt(398,45);
  if(page!=0){
    auto* in=lv_indev_get_next(nullptr);
-   printf("HOME FAIL page=%d rendered=%d pending=%d rebuild=%d close=%d overlay=%p sleeping=%d consume=%d clicks=%lu input-state=%d wait-release=%d now=%lu\n",page,renderedPage,pendingPage,int(rebuild),int(closeDialog),(void*)overlay,int(displayIdle.sleeping),int(displayIdle.consumeTouch),(unsigned long)clicks,in?int(in->proc.state):-1,in?int(in->proc.wait_until_release):-1,(unsigned long)fakeMillis);fflush(stdout);
+   printf("HOME FAIL page=%d rendered=%d pending=%d rebuild=%d close=%d overlay=%p sleeping=%d consume=%d clicks=%lu input-state=%d wait-release=%d now=%lu\n",page,renderedPage,pendingPage,int(rebuild),int(closeDialog),(void*)overlay,int(!panel_screen::awake()),int(false),(unsigned long)clicks,in?int(in->proc.state):-1,in?int(in->proc.wait_until_release):-1,(unsigned long)fakeMillis);fflush(stdout);
    save("home_failure");
  }
  assert(page==0);
  for(int p=0;p<4;p++){page=p;view=0;render();step();std::string n="page"+std::to_string(p);save(n.c_str());bounds(root);}
  page=2;for(int v=1;v<=4;v++){view=v;render();step();std::string n="settings"+std::to_string(v);save(n.c_str());bounds(root);}
- clickAt(200,292);assert(panel_radio::lastCommand.job==Job::SetDisplayTimeout);
+ clickAt(100,310);assert(panel_radio::lastCommand.job==Job::SetDisplayTimeout);
  assert(panel_radio::lastCommand.displayTimeoutSec==30);
  credentials(nullptr);step();save("wifi_keyboard");bounds(lv_layer_top());
  lv_textarea_set_text(ssidField,"TestNetwork");lv_textarea_set_text(passwordField,"Password123");

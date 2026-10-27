@@ -1,35 +1,46 @@
 #!/usr/bin/env python3
-"""Update BoilerPanel v0.1/v0.2/v0.3 to Swipe v0.4.0, preserving the working BSP.
-Default: read-only. --apply: timestamped backup, then install application sources.
-No network access, firmware flashing, C6 update, new fonts or flash erasure.
+"""Offline BoilerPanel v0.3.0/v0.3.1 -> v0.4.0 source update.
+Default read-only. Only exact known complete installations are accepted (UTF-8
+BOM/CRLF tolerated). v0.1/v0.2 and edited/mixed installations are unsupported.
+Caught write failures are rolled back; multi-file updates are NOT power-loss atomic.
+No flashing, networking, NVS/flash erasure, or C6 changes.
 """
 from __future__ import annotations
-
-import argparse
-import ast
+import argparse, ast, configparser, hashlib, json, os, re, sys
 from datetime import datetime
-import hashlib
-import json
-import os
 from pathlib import Path
-import re
-import shutil
-import sys
 
-OLD_MAIN_SHA256 = "927a25ad9be9b33d91a6a8d849898d38b8feb8de11003b400c16ed931ce6dc1b"
-OLD_V02_SHA256 = "6356eb3c1bdbd2a2ea9dd7efeebd45de89410306695c0c96d56430a22ad84fa1"
-OLD_V03 = {'panel_radio.cpp': '693c3b5cd19da17184671a0dd31f60ad1a87fcee2cea10ef725767c62a6cd6e6', 'panel_types.h': 'ae9d11b2c13ca295b93916938dbff06957aaf4532e7ba8ef4d528da4921ecd2e', 'main.cpp': 'f3b868683746c7902129618cc374fad61698d22c4562efc04db7a768948f48ff', 'panel_radio.h': 'e673b8dc7628e82277a4933a0a53f9def74fa7090deda9256e7a4eb83c64a88c'}
-FILES = ("main.cpp", "panel_types.h", "panel_radio.h", "panel_radio.cpp", "display_idle.h")
+FILES = ('main.cpp','panel_types.h','panel_radio.h','panel_radio.cpp',
+         'screen_state.h','panel_screen.h','panel_screen.cpp')
+RETIRED = ('display_idle.h',)
+MARKER='/* BOILER_SCREEN_031: deferred touch and wake filter. */'
 
+def digest(data): return hashlib.sha256(data).hexdigest()
+def sha(path): return digest(path.read_bytes())
+def text(path): return path.read_text(encoding='utf-8-sig').replace('\r\n','\n')
+def normalized_sha(path): return digest(text(path).encode())
 
-def sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def normalized_sha(path: Path) -> str:
-    content = path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
+KNOWN_RELEASES = {'v03': {'main.cpp': 'f3b868683746c7902129618cc374fad61698d22c4562efc04db7a768948f48ff',
+         'panel_radio.cpp': '693c3b5cd19da17184671a0dd31f60ad1a87fcee2cea10ef725767c62a6cd6e6',
+         'panel_radio.h': 'e673b8dc7628e82277a4933a0a53f9def74fa7090deda9256e7a4eb83c64a88c',
+         'panel_types.h': 'ae9d11b2c13ca295b93916938dbff06957aaf4532e7ba8ef4d528da4921ecd2e'},
+ 'v031': {'main.cpp': '86ed146c2ec9c5be37efc6a71ad694a6590071080e7d50afb474d4d2b46077d4',
+          'panel_radio.cpp': '693c3b5cd19da17184671a0dd31f60ad1a87fcee2cea10ef725767c62a6cd6e6',
+          'panel_radio.h': 'e673b8dc7628e82277a4933a0a53f9def74fa7090deda9256e7a4eb83c64a88c',
+          'panel_screen.cpp': '15b35a3c9e503037da7a7b7f88ce2cbf6df3dcbc18c0f8ba43df57be988c979a',
+          'panel_screen.h': '0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647',
+          'panel_types.h': '729c81814084a6d192353bc0887d1809a54ea71c78ccea8c92309b41d2b06178',
+          'screen_state.h': '3e6c61cbc58abcf4979086e332054b8793b4d39b19aa825743060989faf9362c'},
+ 'v04_early': {'display_idle.h': 'be138fb88983cc53bca7a0fc4bdcf38da8a52bef12f9226d40a59b864d328962',
+               'main.cpp': '7e1bc7bd3a584cfc759539b4ec270a4cdb43f7490a020dc5c5a4fbb78b59130d',
+               'panel_radio.cpp': 'fd291e5895b1adaed1757ca2c4a767141acef4849ff787e6c25f139b7ba4e045',
+               'panel_radio.h': '85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7',
+               'panel_types.h': '4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c'}}
+GLUE_INPUTS = {'21f57f84236abf46aa7b612ee08a5ab10c1b28cc18d375b14bb4045c35e56f3b': '9f4731067dbc35d9fa4b6de74d74c514d033b10e42a1547d967e8ec3a9c02b42',
+ 'd24840d05fd756805d70fc8f6980a3d35068706ab275aaaf24ff7e7b5cfae535': '83c1004b49d99913194f144b0eff6006d793aa7770788b757c844768ff83d478'}
+BOARD_HASH = 'b6837425c6562a83b6ed1995a348470ef51e2ee886911663498c2a43a3d50898'
+HEADER_HASH = 'a2f5be55891c0b56020692ddcdbc262d50c0c9df7c4c2855b47ef68df82ce69b'
+FONT_HASH = '2bc21156983acec91e8bb89f992302057a25b09b38e600c6da258b3d2c82ea9f'
 
 def required_codepoints(source: str) -> set[int]:
     # Strip comments before enumerating ordinary C/C++ string literals.
@@ -60,129 +71,236 @@ def verify_fonts(path: Path, needed: set[int]) -> None:
             raise ValueError(f"Installed font {size} is missing {codes}. No files changed.")
 
 
-def preflight(root: Path, package: Path) -> tuple[Path, dict[str, str]]:
-    example = root / "examples" / "LvglUi"
-    src = example / "src"
-    main = src / "main.cpp"
-    glue = src / "lvgl_glue.c"
-    fonts = src / "boiler_fonts.c"
-    ini = example / "platformio.ini"
-    board = root / "boards" / "jc4880p4.json"
-    for path in (main, glue, fonts, ini, board):
-        if not path.is_file():
-            raise ValueError(f"Required existing project file not found: {path}")
-    for name in FILES:
-        if not (package / "src" / name).is_file():
-            raise ValueError(f"Missing update payload: {name}")
+def _patch_glue_known(s):
+    checks=(r'#define\s+LV_HOR\s+PANEL_NATIVE_W\b',r'#define\s+LV_VER\s+PANEL_NATIVE_H\b')
+    if not all(re.search(x,s) for x in checks) or 'board_p4_flush_region' not in s:
+        raise ValueError('Portrait LVGL adapter not recognized; nothing changed.')
+    if MARKER in s:
+        if s.count('panel_screen_filter_touch(pressed)')!=1 or s.count('panel_screen_touch_ready()')!=1 or 'board_p4_touch_init()' in s:
+            raise ValueError('Incomplete or edited screen adapter; nothing changed.')
+        return s
+    if 'panel_screen' in s:raise ValueError('An unknown screen patch already exists.')
+    if s.count('#include "board_p4.h"')!=1:raise ValueError('Unexpected glue includes.')
+    s=s.replace('#include "board_p4.h"','#include "board_p4.h"\n#include "panel_screen.h"\n'+MARKER)
+    # Only defer the known GT911 startup block. No pin, timing or flush changes.
+    pattern=r'    if \(board_p4_touch_init\(\) != ESP_OK\) \{\n        ESP_LOGW\(TAG, [^\n]+\);\n    \}'
+    s,n=re.subn(pattern,'    /* GT911 is initialized by main AFTER the first displayed frame. */',s)
+    if n!=1:raise ValueError('Unexpected GT911 initialization block; nothing changed.')
+    call='    board_p4_touch_read(&px, &py, &pressed);'
+    if s.count(call)!=1:raise ValueError('Unexpected touch callback; nothing changed.')
+    s=s.replace(call,'''    /* No read while main initializes GT911 outside the LVGL mutex. */
+    if (!panel_screen_touch_ready()) {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+    board_p4_touch_read(&px, &py, &pressed);
+    if (!panel_screen_filter_touch(pressed)) {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }''')
+    return s
 
-    payload_main = package / "src" / "main.cpp"
-    current_sha = normalized_sha(main)
-    if current_sha not in (OLD_MAIN_SHA256, OLD_V02_SHA256, OLD_V03["main.cpp"], normalized_sha(payload_main)):
-        raise ValueError("main.cpp differs from the supplied v0.1/v0.2/v0.3 or this update. "
-                         "Stopped to preserve your edits. No files changed.")
-    # Accept only complete known v0.3 or v0.4 sets, not mixed versions.
-    if current_sha == OLD_V03["main.cpp"]:
-        for name in FILES[1:]:
-            target=src/name
-            if name in OLD_V03:
-                if not target.is_file() or normalized_sha(target)!=OLD_V03[name]:
-                    raise ValueError(f"Edited/incomplete v0.3 file: {name}. No files changed.")
-            elif target.exists():
-                raise ValueError(f"Unrelated {name} already exists. No files changed.")
-    else:
-        for name in FILES[1:]:
-            target=src/name
-            if target.exists() and normalized_sha(target)!=normalized_sha(package/"src"/name):
-                raise ValueError(f"An unrelated or edited {name} exists. No files changed.")
-            if current_sha==normalized_sha(payload_main) and not target.is_file():
-                raise ValueError(f"Incomplete current release: {name}. No files changed.")
-
-    variant = json.loads(board.read_text(encoding="utf-8-sig")).get("build", {}).get("chip_variant")
-    if variant != "esp32p4_es":
-        raise ValueError(f"Expected esp32p4_es for the confirmed chip v1.3; found {variant!r}. "
-                         "The updater will not alter the board configuration.")
-    glue_text = glue.read_text(encoding="utf-8-sig")
-    checks = (r"#define\s+LV_HOR\s+PANEL_NATIVE_W\b", r"#define\s+LV_VER\s+PANEL_NATIVE_H\b")
-    if not all(re.search(pattern, glue_text) for pattern in checks) or "board_p4_flush_region" not in glue_text:
-        raise ValueError("The existing portrait adapter was not recognized. No files changed.")
-    needed: set[int] = set()
-    for name in FILES:
-        needed.update(required_codepoints((package / "src" / name).read_text(encoding="utf-8")))
-    verify_fonts(fonts, needed)
-    protected = {str(path): sha(path) for path in (glue, fonts, ini, board)}
-    return src, protected
+def patch_glue(s):
+    """Transform only the two exact, pinned portrait adapters, never substrings."""
+    h = digest(s.encode())
+    if h in GLUE_INPUTS.values(): return s
+    if h not in GLUE_INPUTS:
+        raise ValueError('Unknown or edited LVGL glue; preserved. No files changed.')
+    result = _patch_glue_known(s)
+    if digest(result.encode()) != GLUE_INPUTS[h]:
+        raise ValueError('Screen adapter transformation verification failed.')
+    return result
 
 
-def atomic_write(path: Path, content: bytes) -> None:
-    temporary = path.with_name(path.name + ".standalone-update.tmp")
-    created = False
+def verify_ini(s):
+    """Read configuration, never rewrite it. Reject ambiguous overrides."""
+    cfg=configparser.ConfigParser(interpolation=None,strict=True,inline_comment_prefixes=(';',))
+    try: cfg.read_string(s)
+    except configparser.Error as e: raise ValueError('Invalid platformio.ini: '+str(e)) from e
+    if set(cfg.sections())!={'platformio','env:jc4880p4'} or cfg.defaults():
+        raise ValueError('Expected one explicit env:jc4880p4; config inheritance unsupported.')
+    env=cfg['env:jc4880p4']
+    required={'platform':'https://github.com/pioarduino/platform-espressif32/releases/download/55.03.36-1/platform-espressif32.zip',
+              'board':'jc4880p4','framework':'arduino','board_build.partitions':'default_16MB.csv',
+              'board_build.f_cpu':'360000000L','board_build.flash_size':'16MB',
+              'board_upload.flash_size':'16MB','board_build.flash_mode':'qio'}
+    for key,value in required.items():
+        if env.get(key,'').strip()!=value:
+            raise ValueError('platformio.ini requires '+key+' = '+value+'; preserved unchanged. Configure and retry.')
+    for key in ('extends','extra_configs','extra_scripts','build_unflags'):
+        if any(cfg.has_option(section,key) for section in cfg.sections()):
+            raise ValueError('Unsupported configuration override: '+key)
+    flags=env.get('build_flags','')
+    definitions=re.findall(r'(?:-D|-U)\s*CORE_DEBUG_LEVEL\b(?:\s*=\s*[^\s;]+)?',flags)
+    if definitions!=['-DCORE_DEBUG_LEVEL=0']:
+        raise ValueError('Require exactly -DCORE_DEBUG_LEVEL=0; platformio.ini preserved.')
+    if 'CORE_DEBUG_LEVEL' in env.get('build_src_flags',''):
+        raise ValueError('Conflicting CORE_DEBUG_LEVEL override.')
+    if cfg['platformio'].get('boards_dir','').strip()!='../../boards':
+        raise ValueError('Unknown board definition location.')
+
+
+
+def safe_path(root, relative):
+    p = root / relative
+    if Path(relative).is_absolute() or '..' in Path(relative).parts:
+        raise ValueError('Unsafe relative path: '+str(relative))
+    for candidate in (p, *p.parents):
+        if candidate == root.parent: break
+        if candidate.is_symlink(): raise ValueError('Symlink not supported: '+str(candidate))
+    if p.exists() and not p.is_file(): raise ValueError('Expected regular file: '+str(p))
+    return p
+
+
+def preflight(root, package):
+    prefix = 'examples/LvglUi/src/'
+    src = root / prefix
+    managed = {prefix+n for n in (*FILES, *RETIRED)}
+    protected = {'examples/LvglUi/platformio.ini','boards/jc4880p4.json',
+                 'src/board_p4.h',prefix+'lvgl_glue.c',prefix+'boiler_fonts.c'}
+    for n in managed | protected: safe_path(root,n)
+    for n in protected:
+        if not (root/n).is_file(): raise ValueError('Missing required project file: '+n)
+    for n in FILES:
+        if not (package/'src'/n).is_file(): raise ValueError('Missing update payload: '+n)
+    manifest = package/'SHA256SUMS.json'
+    if manifest.exists():
+        sums=json.loads(text(manifest))
+        for n in FILES:
+            if sums.get('src/'+n)!=sha(package/'src'/n): raise ValueError('Corrupt update payload: '+n)
+    actual = {n:normalized_sha(src/n) for n in (*FILES,*RETIRED) if (src/n).exists()}
+    current = {n:normalized_sha(package/'src'/n) for n in FILES}
+    version = next((v for v,files in KNOWN_RELEASES.items() if actual==files),None)
+    if actual==current: version='v04_current'
+    if version is None:
+        raise ValueError('Unsupported, edited, incomplete or mixed source set. Only complete known '
+                         'v0.3.0/v0.3.1/earlier v0.4.0 accepted. No files changed.')
+    for n,expected in [('boards/jc4880p4.json',BOARD_HASH),('src/board_p4.h',HEADER_HASH),
+                       (prefix+'boiler_fonts.c',FONT_HASH)]:
+        if normalized_sha(root/n)!=expected: raise ValueError('Unknown or modified BSP/font file: '+n)
+    glue=root/prefix/'lvgl_glue.c';ini=root/'examples/LvglUi/platformio.ini'
+    glue_s=text(glue); ini_s=text(ini)
+    verify_ini(ini_s)
+    if version in ('v031','v04_current'):
+        if digest(glue_s.encode()) not in GLUE_INPUTS.values():
+            raise ValueError('Incomplete/mismatched installed screen adapter or CPU/debug configuration.')
+    elif digest(glue_s.encode()) not in GLUE_INPUTS:
+        raise ValueError('Mismatched baseline adapter/configuration. No files changed.')
+    needed=set()
+    for n in FILES: needed.update(required_codepoints(text(package/'src'/n)))
+    verify_fonts(src/'boiler_fonts.c',needed)
+    edits={prefix+n:(package/'src'/n).read_bytes() for n in FILES}
+    # Keep already-correct glue/config byte-for-byte, including BOM and line endings.
+    if digest(glue_s.encode()) in GLUE_INPUTS: edits[prefix+'lvgl_glue.c']=patch_glue(glue_s).encode()
+    for n in RETIRED:
+        if (src/n).exists(): edits[prefix+n]=None
+    observed={n:(root/n).read_bytes() if (root/n).exists() else None for n in managed|protected}
+    edits={n:b for n,b in edits.items() if observed[n]!=b}
+    return src, {'version':version,'edits':edits,'observed':observed}
+
+
+def atomic_write(path, content):
+    temporary=path.with_name(path.name+'.standalone-update.tmp')
+    created=False
     try:
-        with temporary.open("xb") as out:
-            created = True
-            out.write(content)
-            out.flush()
-            os.fsync(out.fileno())
-        os.replace(temporary, path)
+        with temporary.open('xb') as out:
+            created=True;out.write(content);out.flush();os.fsync(out.fileno())
+        os.replace(temporary,path)
     finally:
-        if created and temporary.exists():
-            temporary.unlink()
+        if created and temporary.exists(): temporary.unlink()
 
 
-def apply(src: Path, root: Path, package: Path, protected: dict[str, str]) -> None:
-    new_files = {name: (package / "src" / name).read_bytes() for name in FILES}
-    if all((src / name).exists() and (src / name).read_bytes() == data for name, data in new_files.items()):
-        print("ALREADY CURRENT: Swipe v0.4.0. No changes made.")
-        return
-    backup = root / "boiler_backups" / datetime.now().strftime("before_swipe_%Y%m%d_%H%M%S_%f")
-    backup.mkdir(parents=True, exist_ok=False)
-    previous: dict[str, bytes | None] = {}
-    for name in FILES:
-        target = src / name
-        previous[name] = target.read_bytes() if target.exists() else None
-        if target.exists():
-            shutil.copy2(target, backup / name)
-    manifest = {"version": "Swipe v0.4.0", "created": datetime.now().isoformat(),
-                "target": str(src), "new_files": [k for k, v in previous.items() if v is None],
-                "unchanged_files_sha256": protected}
-    (backup / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+def current_bytes(root,n):
+    p=safe_path(root,n)
+    return p.read_bytes() if p.exists() else None
+
+
+def transaction(root,plan,operation='update'):
+    edits=plan['edits'];observed=plan['observed']
+    for n,b in observed.items():
+        if current_bytes(root,n)!=b: raise RuntimeError('Concurrent edit before update: '+n)
+    if not edits:
+        print('ALREADY CURRENT: v0.4.0. No changes made.' if operation=='update' else 'ALREADY RESTORED. No changes made.');return None
+    backup_parent=root/'boiler_backups'
+    if backup_parent.is_symlink(): raise ValueError('Symlink backup directory refused.')
+    backup=backup_parent/(operation+'_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
+    backup.mkdir(parents=True,exist_ok=False)
+    previous={n:observed[n] for n in edits}
+    for n,b in previous.items():
+        if b is not None:
+            dest=backup/n;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b)
+    meta={'root':str(root.resolve()),'version':'v0.4.0','from':plan.get('version'),
+          'state':'prepared','power_loss_atomic':False,'files':{
+        n:{'old_sha256':None if previous[n] is None else digest(previous[n]),
+           'new_sha256':None if b is None else digest(b)} for n,b in edits.items()}}
+    def save(): (backup/'manifest.json').write_text(json.dumps(meta,indent=2)+'\n')
+    save();written=[]
     try:
-        for name, content in new_files.items():
-            atomic_write(src / name, content)
-        for filename, expected in protected.items():
-            if sha(Path(filename)) != expected:
-                raise RuntimeError(f"Protected file changed concurrently: {filename}")
-    except Exception:
-        for name, content in previous.items():
-            if content is None:
-                (src / name).unlink(missing_ok=True)
-            else:
-                atomic_write(src / name, content)
+        for n,b in edits.items():
+            if current_bytes(root,n)!=previous[n]: raise RuntimeError('Concurrent edit: '+n)
+            if b is None: (root/n).unlink()
+            else: atomic_write(root/n,b)
+            written.append(n)
+        for n,b in observed.items():
+            expected=edits.get(n,b)
+            if current_bytes(root,n)!=expected: raise RuntimeError('Concurrent edit after update: '+n)
+        meta['state']='applied';save()
+    except Exception as failure:
+        errors=[]
+        for n in reversed(written):
+            try:
+                if current_bytes(root,n)!=edits[n]: raise RuntimeError('Concurrent edit; refusing overwrite: '+n)
+                if previous[n] is None: (root/n).unlink(missing_ok=True)
+                else: atomic_write(root/n,previous[n])
+            except Exception as e: errors.append(str(e))
+        meta['state']='rollback_failed' if errors else 'rolled_back'
+        meta['errors']=errors;save()
+        if errors: raise RuntimeError('Rollback incomplete; preserve backup '+str(backup)+': '+ '; '.join(errors)) from failure
         raise
-    print("SUCCESS: Swipe v0.4.0 source installed.")
-    print("BACKUP:", backup)
-    print("UNCHANGED: display driver, touch adapter, fonts, platformio.ini, board config.")
-    print("NOT FLASHED. Compile first, then upload using your existing PlatformIO project.")
+    print('SUCCESS: source '+operation+'. No device flashed. Backup: '+str(backup))
+    return backup
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("bsp", type=Path, help="Existing guition-jc4880p4-bsp directory")
-    parser.add_argument("--apply", action="store_true", help="Back up and install the UI source update")
-    args = parser.parse_args()
-    root = args.bsp.expanduser().resolve()
-    package = Path(__file__).resolve().parent
+def apply(src,root,package,plan):
+    return transaction(root,plan)
+
+
+def restore(root,backup):
+    """Restore complete or interrupted update only when each byte is still known."""
+    if backup.is_symlink(): raise ValueError('Symlink backup refused.')
+    meta=json.loads(text(backup/'manifest.json'))
+    if Path(meta['root']).resolve()!=root.resolve(): raise ValueError('Backup belongs to another project.')
+    allowed={'examples/LvglUi/src/'+n for n in (*FILES,*RETIRED,'lvgl_glue.c')}
+    allowed.add('examples/LvglUi/platformio.ini')
+    edits={};observed={}
+    for n,sums in meta['files'].items():
+        if n not in allowed: raise ValueError('Unsafe backup path: '+n)
+        current=current_bytes(root,n);h=None if current is None else digest(current)
+        if h not in (sums['old_sha256'],sums['new_sha256']): raise ValueError('File changed since update: '+n)
+        old=None
+        if sums['old_sha256'] is not None:
+            old=safe_path(backup,n).read_bytes()
+            if digest(old)!=sums['old_sha256']: raise ValueError('Corrupt backup: '+n)
+        observed[n]=current
+        if current!=old: edits[n]=old
+    return transaction(root,{'edits':edits,'observed':observed,'version':'restore'},'restore')
+
+
+def main():
+    ap=argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('bsp',type=Path);ap.add_argument('--apply',action='store_true')
+    ap.add_argument('--restore',type=Path,help='Restore known complete/interrupted update backup; requires --apply')
+    a=ap.parse_args();root=a.bsp.expanduser().resolve();pkg=Path(__file__).resolve().parent
     try:
-        src, protected = preflight(root, package)
-        print("CHECK OK: installed v0.1/v0.2/v0.3/Swipe source, portrait BSP, esp32p4_es, text glyphs.")
-        if args.apply:
-            apply(src, root, package, protected)
-        else:
-            print("READ-ONLY CHECK. Add --apply to install the update.")
-    except (OSError, ValueError, RuntimeError, SyntaxError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-    return 0
+        if a.restore:
+            if not a.apply: raise ValueError('Restore requires --apply.')
+            restore(root,a.restore.absolute());return 0
+        src,plan=preflight(root,pkg)
+        print('CHECK OK: '+plan['version']+'; changed files: '+str(len(plan['edits'])))
+        if a.apply: apply(src,root,pkg,plan)
+        else: print('READ-ONLY CHECK. Add --apply to install. Nothing flashed.')
+        return 0
+    except (OSError,ValueError,RuntimeError,SyntaxError,KeyError) as e:
+        print('ERROR: '+str(e),file=sys.stderr);return 1
 
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__=='__main__': raise SystemExit(main())

@@ -1,2 +1,0 @@
-PASS: radio admission, priority, secrets, timeout/reason, cancellation, persistence failures, display timeout commands (host mocks only)
-PASS: no-radio, Wi-Fi+BLE, BLE-only optional branch smoke (host mocks only)

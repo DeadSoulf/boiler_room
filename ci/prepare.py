@@ -1,5 +1,5 @@
 from pathlib import Path
-import shutil,json,re
+import shutil,json,re,importlib.util
 from portrait import transform
 root=Path(__file__).resolve().parents[1]
 bsp=root/'.build/bsp'; example=bsp/'examples/LvglUi'
@@ -17,11 +17,16 @@ assert 'board_build.f_cpu' not in s
 s=s.replace('board = jc4880p4','board = jc4880p4\nboard_build.f_cpu = 360000000L')
 ini.write_text(s)
 glue=example/'src/lvgl_glue.c'; glue.write_text(transform(glue.read_text()))
-# Optional app-owned adapter applies display sleep/wake interception after portrait.
-adapter=root/'ci/display_glue.py'
-if adapter.exists():
- import runpy
- runpy.run_path(str(adapter),run_name='__main__')
+# Reuse exactly the installer's checked v0.3.1 touch-ready/wake adapter.
+spec=importlib.util.spec_from_file_location('boiler_updater',root/'apply_update.py')
+updater=importlib.util.module_from_spec(spec);spec.loader.exec_module(updater)
+glue.write_text(updater.patch_glue(glue.read_text()))
+assert glue.read_text().count('panel_screen_filter_touch(pressed)')==1
+assert glue.read_text().count('panel_screen_touch_ready()')==1
+assert 'board_p4_touch_init()' not in glue.read_text()
+assert re.search(r'^board_build\.f_cpu\s*=\s*360000000L$',s,re.M)
+assert s.count('-DCORE_DEBUG_LEVEL=0')==1
+shutil.copy2(glue,root/'artifacts/lvgl_glue.c')
 for p in (root/'src').iterdir():
  if p.is_file(): shutil.copy2(p,example/'src'/p.name)
 shutil.copy2(ini,root/'artifacts/platformio.ini')

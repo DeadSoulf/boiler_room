@@ -6,3 +6,5 @@ inline bool hostBacklight=true;
 inline bool hostTouchAvailable=true;
 inline void board_p4_backlight(bool on){hostBacklight=on;}
 inline void* board_p4_get_touch_handle(){return hostTouchAvailable?reinterpret_cast<void*>(1):nullptr;}
+
+inline int board_p4_touch_init(){return hostTouchAvailable?ESP_OK:-1;}

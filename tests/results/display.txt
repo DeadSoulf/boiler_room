@@ -1,1 +1,0 @@
-PASS: display never/timeout/wraparound/wake-gesture consumption/held touch/radio-independent state

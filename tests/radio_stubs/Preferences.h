@@ -1,12 +1,14 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
+#include <string>
 class Preferences {public:
- bool writes=true,autoValue=false,credentialKey=false;unsigned credentialWrites=0,displayWrites=0;uint16_t displayValue=0;
- bool begin(const char*,bool){return true;}
+ std::string lastNamespace,lastKey;bool opens=true;
+ bool writes=true,autoValue=false,credentialKey=false;unsigned credentialWrites=0,displayWrites=0;uint32_t displayValue=0;
+ bool begin(const char* name,bool){lastNamespace=name;return opens;}
  unsigned char getUChar(const char*,unsigned char x){return x;}
- uint16_t getUShort(const char*,uint16_t){return displayValue;}
- size_t putUShort(const char*,uint16_t v){++displayWrites;if(!writes)return 0;displayValue=v;return sizeof(v);}
+ uint32_t getUInt(const char* key,uint32_t){lastKey=key;return displayValue;}
+ size_t putUInt(const char* key,uint32_t v){lastKey=key;++displayWrites;if(!writes)return 0;displayValue=v;return sizeof(v);}
  size_t getBytesLength(const char*){return 0;}
  size_t getBytes(const char*,void*,size_t){return 0;}
  bool getBool(const char*,bool){return autoValue;}

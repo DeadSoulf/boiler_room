@@ -10,7 +10,7 @@
 #include "board_p4.h"
 #include "lvgl_glue.h"
 #include "panel_radio.h"
-#include "display_idle.h"
+#include "panel_screen.h"
 #if !LV_USE_BTNMATRIX || !LV_USE_TEXTAREA
 #error "BoilerPanel requires LV_USE_BTNMATRIX=1 and LV_USE_TEXTAREA=1 in the existing lv_conf.h"
 #endif
@@ -39,9 +39,8 @@ lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText
 int renderedPage=-1,renderedView=-1,detailChannel=-1;
 uint32_t activityStart=0,detailRevision=0;
 AccessPoint displayedAps[MAX_AP];uint8_t displayedApCount=0;
-DisplayIdle displayIdle;bool touchWakeAvailable=false,displaySettingsLoaded=false,wakeTouchSeen=false;
+bool displaySettingsLoaded=false;
 uint16_t appliedDisplayTimeout=0;
-void (*originalTouchRead)(lv_indev_drv_t*,lv_indev_data_t*)=nullptr;
 void info(const char* title,const char* description);
 lv_obj_t *header=nullptr,*body=nullptr,*clockLabel=nullptr,*dateLabel=nullptr,*footer=nullptr;
 lv_obj_t *overlay=nullptr,*dialogError=nullptr,*ssidField=nullptr,*passwordField=nullptr,*timeField=nullptr,*activeField=nullptr,*keyboard=nullptr;
@@ -83,7 +82,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Temp0=40,Temp1,Temp2,Temp3,Ap0=100};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,Ap0=100};
 void action(lv_event_t* e);
 lv_obj_t* button(lv_obj_t* parent,const char* title,int x,int y,int w,int h,uintptr_t code,uint32_t fill=0x214258,bool enabled=true){
   auto* o=lv_btn_create(parent);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,w,h);
@@ -205,7 +204,7 @@ void sensorDetails(unsigned i){
   label(overlay,"История хранится в ОЗУ до перезапуска.\nНет демо-значений и управления выходами.",20,557,440,&boiler_font_14,MUTED);
   button(overlay,"Закрыть",20,650,440,54,Cancel);
 }
-const uint16_t DISPLAY_TIMEOUTS[]={0,30,60,120,300,600};
+const uint16_t DISPLAY_TIMEOUTS[]={0,30,60,120,300,600,1800};
 void action(lv_event_t* e){
   ++clicks;const uintptr_t code=reinterpret_cast<uintptr_t>(lv_event_get_user_data(e));
   Command cmd;
@@ -215,7 +214,7 @@ void action(lv_event_t* e){
   if(code>=Temp0 && code<=Temp3){
     sensorDetails(unsigned(code-Temp0));return;
   }
-  if(code>=Timeout0 && code<=Timeout5){cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=DISPLAY_TIMEOUTS[code-Timeout0];send(cmd);return;}
+  if(code>=Timeout0 && code<=Timeout6){cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=DISPLAY_TIMEOUTS[code-Timeout0];send(cmd);return;}
 
   switch(code){
     case Home:closeDialog=true;pendingPage=0;slideDirection=-1;view=0;break;
@@ -375,25 +374,35 @@ void timePage(){
 void displayPage(){
   subsection("Экран");
   label(body,"Выключать подсветку без касаний",18,78,442,&boiler_font_19);
-  const char* names[]={"Никогда","Через 30 секунд","Через 1 минуту","Через 2 минуты","Через 5 минут","Через 10 минут"};
-  for(unsigned i=0;i<6;i++)button(body,names[i],16,121+int(i)*58,448,48,Timeout0+i,radio.displayTimeoutSec==DISPLAY_TIMEOUTS[i]?0x147C90:0x214258,radio.ready && !radio.busy && touchWakeAvailable);
-  label(body,radio.displayMessage,18,485,442,&boiler_font_14,SKY);
-  label(body,touchWakeAvailable?"Сначала коснитесь экрана после старта.\nПосле выключения первое касание будит,\nследующее нажимает. Радио работает.":"Пробуждение касанием недоступно.\nАвтовыключение отключено для безопасности.",18,535,442,&boiler_font_19,MUTED);
+  const char* names[]={"Никогда","30 секунд","1 минута","2 минуты","5 минут","10 минут","30 минут"};
+  button(body,names[0],16,124,448,50,Timeout0,radio.displayTimeoutSec==0?0x147C90:0x214258,radio.ready && !radio.busy);
+  for(unsigned i=1;i<7;i++)button(body,names[i],16+232*int((i-1)%2),190+64*int((i-1)/2),216,50,Timeout0+i,radio.displayTimeoutSec==DISPLAY_TIMEOUTS[i]?0x147C90:0x214258,radio.ready && !radio.busy && panel_screen::touchReady());
+  label(body,radio.displayMessage,18,402,442,&boiler_font_14,SKY);
+  label(body,panel_screen::touchReady()?"После старта сначала коснитесь экрана.\nПервое касание после выключения будит.\nУберите палец, затем нажимайте кнопки.":"Пробуждение касанием недоступно.\nАвтовыключение отключено для безопасности.",18,475,442,&boiler_font_19,MUTED);
+  label(body,"Wi-Fi и Bluetooth продолжают работать.\nПосле включения питания экран включён.",18,588,442,&boiler_font_14,MUTED);
 }
 void service(){
-  auto* p=box(body,16,22,448,345);char b[128];
-  label(p,"Панель JC4880P443",16,17,414,&boiler_font_25);
-  snprintf(b,sizeof(b),"Версия: %s  /  ESP32-P4",VERSION);label(p,b,16,64,414,&boiler_font_19,SKY);
-  snprintf(b,sizeof(b),"Свободно памяти: %lu КБ",(unsigned long)(ESP.getFreeHeap()/1024U));heapLabel=label(p,b,16,106,414);
-  snprintf(b,sizeof(b),"Работа: %lu с   Нажатий: %lu",(unsigned long)(millis()/1000U),(unsigned long)clicks);uptimeLabel=label(p,b,16,140,414);
-  snprintf(b,sizeof(b),"Wi-Fi Remote: %s",radio.wifiSupported?"доступен":"нет в сборке");label(p,b,16,178,414);
-  snprintf(b,sizeof(b),"Bluetooth LE: %s",radio.bleSupported?"доступен":"нет в сборке");label(p,b,16,212,414);
-  snprintf(b,sizeof(b),"ESP-Hosted: %s",radio.hostVersion[0]?radio.hostVersion:"--");label(p,b,16,250,414);
-  snprintf(b,sizeof(b),"Прошивка C6: %s",radio.c6Version[0]?radio.c6Version:"не прочитана");label(p,b,16,284,414);
-  auto* symbolsBox=box(body,16,384,448,98);label(symbolsBox,"Проверка символов",14,11,416,&boiler_font_19);
-  label(symbolsBox,"+ - --.- 12:34 23.5°C",14,49,416,&boiler_font_25,SKY);
-  button(body,"Обновить сведения",16,502,448,52,ServiceRefresh);
-  label(body,"C6 автоматически не обновляется.\nСписки Wi-Fi и BLE показывают реальные результаты.\nИзмерительных датчиков и выходов пока нет.",18,581,442,&boiler_font_14,MUTED);
+  auto* list=scrollList(10,650);
+  auto* p=box(list,0,0,438,345);char b[160];
+  label(p,"Панель JC4880P443",16,17,404,&boiler_font_25);
+  snprintf(b,sizeof(b),"Версия: %s  /  ESP32-P4",VERSION);label(p,b,16,64,404,&boiler_font_19,SKY);
+  snprintf(b,sizeof(b),"Свободно памяти: %lu КБ",(unsigned long)(ESP.getFreeHeap()/1024U));heapLabel=label(p,b,16,106,404);
+  snprintf(b,sizeof(b),"Работа: %lu с   Нажатий: %lu",(unsigned long)(millis()/1000U),(unsigned long)clicks);uptimeLabel=label(p,b,16,140,404);
+  snprintf(b,sizeof(b),"Wi-Fi Remote: %s",radio.wifiSupported?"доступен":"нет в сборке");label(p,b,16,178,404);
+  snprintf(b,sizeof(b),"Bluetooth LE: %s",radio.bleSupported?"доступен":"нет в сборке");label(p,b,16,212,404);
+  snprintf(b,sizeof(b),"ESP-Hosted: %s",radio.hostVersion[0]?radio.hostVersion:"--");label(p,b,16,250,404);
+  snprintf(b,sizeof(b),"Прошивка C6: %s",radio.c6Version[0]?radio.c6Version:"не прочитана");label(p,b,16,284,404);
+  auto* timing=box(list,0,361,438,166);
+  label(timing,"Запуск экрана",14,12,406,&boiler_font_19,SKY);
+  const auto& t=panel_screen::boot;
+  snprintf(b,sizeof(b),"Начало программы: %lu мс\nДисплей: %lu мс   LVGL: %lu мс\nПервый кадр: %lu мс от старта\nСенсор после кадра: %lu мс",
+    (unsigned long)t.setupAt,(unsigned long)t.displayMs,(unsigned long)t.lvglMs,
+    (unsigned long)t.firstFrameAt,(unsigned long)t.touchMs);
+  label(timing,b,14,48,406,&boiler_font_14,MUTED);
+  auto* symbolsBox=box(list,0,543,438,98);label(symbolsBox,"Проверка символов",14,11,406,&boiler_font_19);
+  label(symbolsBox,"+ - --.- 12:34 23.5°C",14,49,406,&boiler_font_25,SKY);
+  button(list,"Обновить сведения",0,657,438,52,ServiceRefresh);
+  label(list,"Прокрутите вверх / вниз. C6 не обновляется.\nИзмерительных датчиков и выходов пока нет.",14,730,406,&boiler_font_14,MUTED);
 }
 void updateLive(){
   updateDetail();const uint32_t now=millis();char text[120];unsigned fresh=0;
@@ -447,35 +456,15 @@ void gesture(lv_event_t*){
   lastGesture=millis();slideDirection=dir==LV_DIR_LEFT?1:-1;pendingPage=adjacent(page,slideDirection);view=0;
   lv_indev_wait_release(input); // prevents a swipe from also clicking a button.
 }
-void displayTouchRead(lv_indev_drv_t* driver,lv_indev_data_t* data){
-  originalTouchRead(driver,data);
-  if(data->state==LV_INDEV_STATE_PRESSED)wakeTouchSeen=true;
-  const bool wasSleeping=displayIdle.sleeping;
-  const bool pass=displayIdle.touch(data->state==LV_INDEV_STATE_PRESSED,millis());
-  if(wasSleeping && !displayIdle.sleeping){board_p4_backlight(true);lv_obj_invalidate(lv_scr_act());}
-  // Own suppression latch, no wait_release mix: consume entire physical gesture.
-  if(!pass)data->state=LV_INDEV_STATE_RELEASED;
-}
-void installDisplayTouch(){
-  if(!board_p4_get_touch_handle())return;
-  for(auto* input=lv_indev_get_next(nullptr);input;input=lv_indev_get_next(input)){
-    if(lv_indev_get_type(input)!=LV_INDEV_TYPE_POINTER || !input->driver->read_cb)continue;
-    if(input->driver->read_cb==displayTouchRead){touchWakeAvailable=true;return;}
-    originalTouchRead=input->driver->read_cb;input->driver->read_cb=displayTouchRead;touchWakeAvailable=true;return;
-  }
-}
 void refresh(lv_timer_t*){
   if(closeDialog)dismiss();
   const bool wasBusy=radio.busy;panel_radio::snapshot(radio);
   if(radio.busy && !wasBusy)activityStart=millis();
   if(radio.ready && (!displaySettingsLoaded || appliedDisplayTimeout!=radio.displayTimeoutSec)){
     displaySettingsLoaded=true;appliedDisplayTimeout=radio.displayTimeoutSec;
-    const bool wasSleeping=displayIdle.sleeping;
-    displayIdle.configure(touchWakeAvailable?appliedDisplayTimeout:0,millis());
-    if(wasSleeping && !displayIdle.sleeping)board_p4_backlight(true);
+    panel_screen::setTimeout(panel_screen::touchReady()?appliedDisplayTimeout:0);
   }
-  const bool wasSleeping=displayIdle.sleeping;
-  if(touchWakeAvailable && wakeTouchSeen && displayIdle.tick(millis()) && !wasSleeping)board_p4_backlight(false);
+  panel_screen::tick();
   if(pendingPage>=0){page=pendingPage;pendingPage=-1;rebuild=true;}
   if(!overlay && page==2 && (signature()!=renderedSignature || radio.revision!=renderedRevision))rebuild=true;
   bool touching=false;
@@ -487,21 +476,22 @@ void refresh(lv_timer_t*){
 }
 } // namespace
 void setup(){
-  const uint32_t bootStart=millis();Serial.begin(115200);delay(120);
-  Serial.println("[BoilerPanel] v0.4.0 / swipe UI / independent panel");
-  if(board_p4_display_init()!=ESP_OK){Serial.println("[BoilerPanel] DISPLAY INIT FAILED");return;}
-  char timing[100];snprintf(timing,sizeof(timing),"[BoilerPanel] display init elapsed %lu ms",(unsigned long)(millis()-bootStart));Serial.println(timing);
-  board_p4_backlight(true); // Fail-safe startup: never leave a failed UI intentionally dark.
-  if(!lvgl_glue_start(true)){Serial.println("[BoilerPanel] LVGL INIT FAILED");return;}
-  if(!lvgl_glue_lock(0)){Serial.println("[BoilerPanel] LVGL LOCK FAILED");return;}
+  // v0.3.1 startup order: first frame precedes GT911 probing, NVS and radio.
+  panel_screen::boot.setupAt=millis();uint32_t start=millis();
+  if(board_p4_display_init()!=ESP_OK)return;
+  panel_screen::boot.displayMs=millis()-start;board_p4_backlight(true);start=millis();
+  if(!lvgl_glue_start(true))return;
+  panel_screen::boot.lvglMs=millis()-start;
+  if(!lvgl_glue_lock(0))return;
   auto* s=lv_scr_act();lv_obj_clean(s);lv_obj_clear_flag(s,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_style_bg_color(s,c(BG),0);
   lv_obj_set_style_pad_all(s,0,0);lv_obj_add_event_cb(s,gesture,LV_EVENT_GESTURE,nullptr);render();
-  installDisplayTouch();displayIdle.configure(0,millis());
-  lv_refr_now(nullptr);board_p4_backlight(true);
-  snprintf(timing,sizeof(timing),"[BoilerPanel] first LVGL refresh elapsed %lu ms",(unsigned long)(millis()-bootStart));Serial.println(timing);
-  auto* timer=lv_timer_create(refresh,100,nullptr);lvgl_glue_unlock();
-  if(!timer){Serial.println("[BoilerPanel] UI TIMER FAILED");return;}
-  if(!panel_radio::begin())Serial.println("[BoilerPanel] RADIO TASK NOT CREATED; UI remains available");
-  Serial.println("[BoilerPanel] Ready. No sensor/actuator GPIOs assigned. C6 firmware unchanged.");
+  lv_obj_invalidate(s);lv_refr_now(nullptr);board_p4_backlight(true);panel_screen::boot.firstFrameAt=millis();
+  auto* timer=lv_timer_create(refresh,100,nullptr);lvgl_glue_unlock();if(!timer)return;
+  // Existing 0.3.1 glue returns RELEASED until begin publishes touchReady.
+  start=millis();const bool touchOK=board_p4_touch_init()==ESP_OK && board_p4_get_touch_handle()!=nullptr;
+  const uint32_t touchMs=millis()-start;
+  if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
+  panel_radio::begin();Serial.begin(115200);
+  char timing[160];snprintf(timing,sizeof(timing),"[BoilerPanel] v0.4.0 display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
 }
-void loop(){delay(100);}
+void loop(){delay(20);}

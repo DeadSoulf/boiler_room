@@ -42,6 +42,9 @@ SemaphoreHandle_t stateMutex=nullptr;
 RadioState state;
 Preferences prefs;
 bool nvsOK=false;
+// Preserve installed v0.3.1 screen settings without touching Wi-Fi namespace.
+Preferences screenPrefs;
+bool screenNvsOK=false;
 bool pinsReady=false;
 struct Credentials { uint32_t magic=0x42503033; char ssid[33]={}; char password[65]={}; uint8_t open=0; };
 Credentials saved;
@@ -70,19 +73,24 @@ bool takeCommand(Command& cmd) {
   } else {xSemaphoreGive(stateMutex);return false;}
   state.job=cmd.job;state.busy=true;unlock();return true;
 }
-bool validDisplayTimeout(uint16_t seconds) {
-  return seconds==0 || seconds==30 || seconds==60 || seconds==120 || seconds==300 || seconds==600;
+bool validDisplayTimeout(uint32_t seconds) {
+  return seconds==0 || seconds==30 || seconds==60 || seconds==120 || seconds==300 || seconds==600 || seconds==1800;
 }
 uint16_t loadDisplayTimeout() {
-  const uint16_t seconds=nvsOK?prefs.getUShort("displayTimeout",0):0;
-  return validDisplayTimeout(seconds)?seconds:0;
+  const uint32_t seconds=screenNvsOK?screenPrefs.getUInt("off_sec",0):0;
+  // Validate before narrowing: corrupt uint32 values must not become valid timeouts.
+  return validDisplayTimeout(seconds)?uint16_t(seconds):0;
+}
+uint16_t initializeDisplaySettings() {
+  screenNvsOK=screenPrefs.begin("boiler_screen",false);
+  return loadDisplayTimeout();
 }
 void setDisplayTimeout(uint16_t seconds) {
   if(!validDisplayTimeout(seconds))return;
   lock();const uint16_t previous=state.displayTimeoutSec;xSemaphoreGive(stateMutex);
   // Explicit user command only; no periodic writes, and no rewrite for same value.
   if(previous==seconds) return;
-  const bool stored=nvsOK && prefs.putUShort("displayTimeout",seconds)==sizeof(uint16_t);
+  const bool stored=screenNvsOK && screenPrefs.putUInt("off_sec",uint32_t(seconds))==sizeof(uint32_t);
   lock();
   // Keep persisted policy on failure: never claim that an unsaved value survived reboot.
   if(stored)state.displayTimeoutSec=seconds;
@@ -173,7 +181,12 @@ void scanWifi() {
   message("Поиск сетей Wi-Fi 2.4 ГГц...");
   if(!startWifi()) return;
   WiFi.scanDelete();
+  const uint32_t scanStarted=millis();
   const int found=WiFi.scanNetworks(false,true,false,120);
+  const uint32_t scanElapsed=uint32_t(millis()-scanStarted);
+  // Application-level diagnostics remain available with CORE_DEBUG_LEVEL=0.
+  // Numeric outcome/timing only: never log SSIDs, addresses or credentials.
+  Serial.printf("[BoilerPanel][WiFiScan] result=%d elapsed_ms=%lu\n",found,(unsigned long)scanElapsed);
   AccessPoint results[MAX_AP];uint8_t count=0;
   if(found>=0) {
     for(int i=0;i<found && i<256;i++) {
@@ -192,7 +205,7 @@ void scanWifi() {
   }
   WiFi.scanDelete();lock();state.apCount=count;
   for(int i=0;i<count;i++) state.aps[i]=results[i];
-  if(found<0) snprintf(state.wifiMessage,sizeof(state.wifiMessage),"Ошибка поиска. Проверьте журнал C6");
+  if(found<0) snprintf(state.wifiMessage,sizeof(state.wifiMessage),"Ошибка поиска: код %d, %lu мс. Нужен журнал C6",found,(unsigned long)scanElapsed);
   else snprintf(state.wifiMessage,sizeof(state.wifiMessage),"Найдено сетей: %u (до 16 в списке)",unsigned(count));
   unlock();
 }
@@ -290,9 +303,9 @@ void worker(void*) {
     if(!haveCredentials)wipe(&saved,sizeof(saved));
   }
   const bool automatic=nvsOK && haveCredentials && prefs.getBool("autoconnect",false);
-  const uint16_t displayTimeout=loadDisplayTimeout();
+  const uint16_t displayTimeout=initializeDisplaySettings();
   lock();state.displayTimeoutSec=displayTimeout;
-  snprintf(state.displayMessage,sizeof(state.displayMessage),"%s",nvsOK?"":"NVS недоступна: таймаут не сохранится");
+  snprintf(state.displayMessage,sizeof(state.displayMessage),"%s",screenNvsOK?"":"NVS недоступна: таймаут не сохранится");
   state.busy=automatic && PANEL_WIFI;state.job=state.busy?Job::Connect:Job::None;state.zone=zone;state.ready=true;state.hasSaved=haveCredentials;state.autoConnect=automatic;
   state.wifiSupported=PANEL_WIFI;state.bleSupported=PANEL_BLE;
   snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s",PANEL_WIFI?"Wi-Fi не подключён":"Wi-Fi Remote отсутствует в этой сборке");
