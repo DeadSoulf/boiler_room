@@ -38,7 +38,21 @@ void bounds(lv_obj_t* obj,bool scroll=false){
  }
  for(unsigned i=0;i<lv_obj_get_child_cnt(obj);i++)bounds(lv_obj_get_child(obj,i),inScroll);
 }
-void clickAt(int x,int y){mx=x;my=y;down=true;step(60);down=false;step(100);}
+void clickAt(int x,int y){
+ mx=x;my=y;down=true;step(60);down=false;
+ // Physical release is sampled by the indev timer BEFORE the app's 100 ms
+ // refresh consumes deferred navigation/dialog actions. A fixed 100 ms wait
+ // races those independent timers; bound and assert completion instead.
+ for(unsigned elapsed=10;elapsed<=250;elapsed+=10){
+  step(10);auto* input=lv_indev_get_next(nullptr);
+  if(input && input->proc.state==LV_INDEV_STATE_RELEASED && pendingPage<0 && !closeDialog && !rebuild){
+   if(elapsed>100)printf("CLICK settled in %u ms after release\n",elapsed);
+   return;
+  }
+ }
+ fprintf(stderr,"CLICK timeout: pending=%d close=%d rebuild=%d\n",pendingPage,int(closeDialog),int(rebuild));
+ assert(false && "UI did not settle within 250 ms after physical release");
+}
 void swipe(bool left){mx=left?400:80;my=650;down=true;step(70);for(int i=0;i<7;i++){mx+=(left?-40:40);step(35);}down=false;step(300);}
 int main(){
  lv_init();static lv_color_t draw[480*40];static lv_disp_draw_buf_t buf;lv_disp_draw_buf_init(&buf,draw,nullptr,480*40);
