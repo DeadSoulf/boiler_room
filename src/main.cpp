@@ -383,7 +383,8 @@ void displayPage(){
 }
 void service(){
   auto* list=scrollList(10,650);
-  auto* p=box(list,0,0,438,345);char b[160];
+  // Five uint32 values plus Russian UTF-8 text need more than 160 bytes.
+  auto* p=box(list,0,0,438,345);char b[320];
   label(p,"Панель JC4880P443",16,17,404,&boiler_font_25);
   snprintf(b,sizeof(b),"Версия: %s  /  ESP32-P4",VERSION);label(p,b,16,64,404,&boiler_font_19,SKY);
   snprintf(b,sizeof(b),"Свободно памяти: %lu КБ",(unsigned long)(ESP.getFreeHeap()/1024U));heapLabel=label(p,b,16,106,404);

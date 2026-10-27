@@ -96,6 +96,21 @@ int main(){
  }
  assert(page==0);
  for(int p=0;p<4;p++){page=p;view=0;render();step();std::string n="page"+std::to_string(p);save(n.c_str());bounds(root);}
+ // Verify complete UTF-8 boot diagnostics, including the last field and worst-case widths.
+ for(uint32_t value:{uint32_t(0),UINT32_MAX}){
+  panel_screen::boot.setupAt=panel_screen::boot.displayMs=panel_screen::boot.lvglMs=panel_screen::boot.firstFrameAt=panel_screen::boot.touchMs=value;
+  page=3;view=0;render();step();
+  auto* timing=lv_obj_get_child(resultList,1);auto* timingText=lv_obj_get_child(timing,1);
+  char expected[512];const auto v=static_cast<unsigned long>(value);
+  const int bytes=snprintf(expected,sizeof(expected),"Начало программы: %lu мс\nДисплей: %lu мс   LVGL: %lu мс\nПервый кадр: %lu мс от старта\nСенсор после кадра: %lu мс",v,v,v,v,v);
+  assert(bytes>0 && size_t(bytes)<sizeof(expected));
+  assert(!strcmp(lv_label_get_text(timingText),expected));
+  assert(!strchr(lv_label_get_text(timingText),'?'));
+  bounds(timing); // Check this fixed card even though its ancestor is scrollable.
+  lv_obj_scroll_to_y(resultList,350,LV_ANIM_OFF);step();
+  save(value?"service_timing_max_test_fixture":"service_timing_zero");
+ }
+ panel_screen::boot={};
  page=2;for(int v=1;v<=4;v++){view=v;render();step();std::string n="settings"+std::to_string(v);save(n.c_str());bounds(root);}
  clickAt(100,310);assert(panel_radio::lastCommand.job==Job::SetDisplayTimeout);
  assert(panel_radio::lastCommand.displayTimeoutSec==30);
