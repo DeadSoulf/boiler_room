@@ -1,0 +1,14 @@
+[
+  {
+    "name": "repro_wifi_transition",
+    "returncode": 0,
+    "stdout": "disconnect_failure: actual_connected=1 ui_connected=1 message=Wi-Fi отключён. Автоподключение выключено\nswitch_failure: requested_ssid=requested-new-network actual_ssid=test credential_writes=1 saved_ssid=requested-new-network elapsed_ms=0 message=Подключено. Время синхронизируется\n",
+    "stderr": ""
+  },
+  {
+    "name": "repro_ble",
+    "returncode": 0,
+    "stdout": "start_called=1 actual_start_success=0\nble_count=0 message=Поиск завершён. Только BLE, без подключения\n",
+    "stderr": ""
+  }
+]

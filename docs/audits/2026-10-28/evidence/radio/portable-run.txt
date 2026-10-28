@@ -1,0 +1,20 @@
+Invocation from the unmodified audited checkout:
+python3 <probe>/run.py --repo . --output /tmp/boiler-audit-radio
+
+Сборка: /usr/bin/g++ -std=c++17 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -UNDEBUG -I '<probe>/stubs' -I '<repo>/src' '<probe>/repro_wifi_transition.cpp' -o '<output>/repro_wifi_transition'
+disconnect_failure: actual_connected=1 ui_connected=1 message=Wi-Fi отключён. Автоподключение выключено
+switch_failure: requested_ssid=requested-new-network actual_ssid=test credential_writes=1 saved_ssid=requested-new-network elapsed_ms=0 message=Подключено. Время синхронизируется
+Дефект воспроизведён: сбой отключения и перехода на новую сеть выдан за успех.
+Сборка: /usr/bin/g++ -std=c++17 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -UNDEBUG -I '<probe>/stubs' -I '<repo>/src' '<probe>/repro_wifi_begin_failure.cpp' -o '<output>/repro_wifi_begin_failure'
+begin_failed_without_old_connection: begin_calls=1 connected=0 credential_writes=0 elapsed_ms=20000 message=Таймаут Wi-Fi: нет IP за 20 с. Проверьте журнал C6
+Дефект воспроизведён: немедленный отказ begin выдан за таймаут; credentials не записаны.
+Сборка: /usr/bin/g++ -std=c++17 -Wall -Wextra -Werror -g -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -UNDEBUG -I '<probe>/stubs' -I '<repo>/src' -DCONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=1 -DCONFIG_NIMBLE_ENABLED=1 -DCONFIG_BT_NIMBLE_ROLE_OBSERVER=1 '<probe>/repro_ble.cpp' -o '<output>/repro_ble'
+start_called=1 actual_start_success=0
+ble_count=0 message=Поиск завершён. Только BLE, без подключения
+Дефект воспроизведён: отказ запуска BLE-сканирования выдан за завершённый поиск.
+Результаты: /tmp/boiler-audit-radio/results.json
+Все три ожидаемых сценария: дефект воспроизведён. Exit 0 не означает исправную прошивку.
+
+STDERR:
+
+Runner exit code: 0

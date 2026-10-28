@@ -1,0 +1,26 @@
+{
+  "commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "fault": "OS RLIMIT_FSIZE=512 after the second successful source replacement; SIGXFSZ ignored to return EFBIG",
+  "apply": {
+    "error_type": "OSError",
+    "error": "[Errno 27] File too large"
+  },
+  "backup_manifest_bytes": 512,
+  "applied_source_files": [
+    "examples/LvglUi/src/main.cpp",
+    "examples/LvglUi/src/panel_types.h"
+  ],
+  "original_source_files": [
+    "examples/LvglUi/src/panel_radio.h",
+    "examples/LvglUi/src/panel_radio.cpp",
+    "examples/LvglUi/src/screen_state.h",
+    "examples/LvglUi/src/panel_screen.cpp"
+  ],
+  "backup_data_intact": true,
+  "backup_manifest_parseable": false,
+  "parse_error": "Unterminated string starting at: line 13 column 21 (char 493)",
+  "documented_restore_after_fault_removed": {
+    "error_type": "JSONDecodeError",
+    "error": "Unterminated string starting at: line 13 column 21 (char 493)"
+  }
+}
