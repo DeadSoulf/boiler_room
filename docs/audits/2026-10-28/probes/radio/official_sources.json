@@ -1,0 +1,41 @@
+[
+  {
+    "url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/BLE/src/BLEScan.cpp",
+    "blob_sha": "54e60a2e4235f98d1d7aacf55d6dabb9b57444a5",
+    "encoding": "utf-8",
+    "excerpt": {
+      "path": "stubs/ble_scan_blocking_wrapper.inc",
+      "start_line": 790,
+      "end_line": 809,
+      "sha256": "9ce88464f34ad596e4d08c4b2f81bba42548ec85afa6925530b503e8343c13f4",
+      "modification": "none"
+    },
+    "relevant_url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/BLE/src/BLEScan.cpp#L734-L809"
+  },
+  {
+    "url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/WiFi/src/WiFiScan.cpp",
+    "blob_sha": "b9978d8e0ade2c751942ea46398ff75fda0e7348",
+    "encoding": "utf-8"
+  },
+  {
+    "url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/WiFi/src/STA.cpp",
+    "blob_sha": "36577a38b832635a8400ecf3ffd108ae527ebbfb",
+    "encoding": "utf-8",
+    "relevant_url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/WiFi/src/STA.cpp#L363-L423"
+  },
+  {
+    "url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/WiFi/src/WiFiSTA.cpp",
+    "blob_sha": "b956e35ba26f4186d5fdb53cf663a827720c421f",
+    "encoding": "utf-8",
+    "relevant_url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/WiFi/src/WiFiSTA.cpp#L83-L92"
+  },
+  {
+    "url": "https://github.com/espressif/arduino-esp32/blob/3.3.6/libraries/BLE/LICENSE",
+    "blob_sha": "4558f79ff9be236d994ebe8ea55ed382832b4d48",
+    "encoding": "utf-8",
+    "license": "Apache-2.0",
+    "local_copy": "UPSTREAM_BLE_LICENSE.txt",
+    "local_copy_sha256": "7d8319b3fa758be565e482754bc39b191853d68b030ff6e5fbc0c0b4cd18db6c",
+    "local_copy_git_blob_sha1": "4558f79ff9be236d994ebe8ea55ed382832b4d48"
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "reference_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "updater_sha256": "d7ae1f43a44d5165778f695f284ba26c555f4dc10421ac3a1b64e467fc82ffc3",
+  "explicit_repo_from_other_cwd_exit_code": 0,
+  "default_repo_from_relocated_checkout_with_spaces_exit_code": 0,
+  "relocated_checkout_unchanged_after_probes": true,
+  "temporary_control_with_one_defect_rejected_exit_code": 1,
+  "missing_repo_exit_code": 2,
+  "original_source_snapshot_unchanged": true,
+  "saved_evidence_has_no_absolute_workspace_or_tmp_paths": true,
+  "temporary_directories_cleaned": true,
+  "probe_files_sha256": {
+    "README.md": "ce3ae1ba753a464f88c399c40a65be567f26c8e88e8dc49aa9d7b272de77e766",
+    "config_validation_probe.py": "84638f0a964532d4295021c59647842cb3e32cc78f24c403d681f3edb5b77515",
+    "persistent_write_failure_probe.py": "d7e9bf8715ba9878896ecda12e6c89b51e3818adca2634e066dd881fabc09455",
+    "probe_support.py": "5d89e3d095e6ca1c44297ea8beea241e5b092f0bc8ed6ab98c32adf9e6b9f1d6",
+    "run.py": "165c97107ce2472337fe9ba7fb4fdbdea03a704871216614fb533e19caec25bf"
+  },
+  "output_option_check": {
+    "exit_code": 0,
+    "output_file": "results.json",
+    "saved_json_matches_stdout": true,
+    "both_expected_defects_reproduced": true,
+    "source_snapshot_unchanged": true
+  }
+}

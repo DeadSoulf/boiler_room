@@ -1,0 +1,456 @@
+{
+  "repository": "DeadSoulf/boiler_room",
+  "commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "files": [
+    {
+      "path": ".github/workflows/boiler-build.yml",
+      "git_blob_sha1": "0a94d3355e47b1a8cb93dbfffed92800fe9e589f",
+      "sha256": "713632772703be5ab8306157ae14766f3059b76706a804a9abff732b51cdd0c7",
+      "bytes": 1367
+    },
+    {
+      "path": ".gitignore",
+      "git_blob_sha1": "7a48b426cf160619cc2b288e1f7e355fdadcf40b",
+      "sha256": "242fd5cb87adcee5ef1a6a173aeb4583e5b5532bfaee9914de1e207c825e1b1b",
+      "bytes": 90
+    },
+    {
+      "path": "AUDIT_RU.md",
+      "git_blob_sha1": "f4fab305da7a7b78ef5c7e9b643b0bfcd555480f",
+      "sha256": "94d6e1eef9df30a72028358e2bb18ddc90a6e3a5703e1bb53909053fa85ce654",
+      "bytes": 4777
+    },
+    {
+      "path": "README.md",
+      "git_blob_sha1": "71ef30df7f3bba87707b3f87a323c7052e6a8413",
+      "sha256": "3240676f1b96bc3544aceae7f213b00ffe90b0f38601823338125f23eab8df66",
+      "bytes": 1492
+    },
+    {
+      "path": "README_RU.md",
+      "git_blob_sha1": "e592c05e660e265893f49e6f563ff40d1ef3e2a1",
+      "sha256": "c3d391afb95c448f48b3f1154e093f60b215e69a8d98a40b73f329a983354d10",
+      "bytes": 15239
+    },
+    {
+      "path": "apply_update.py",
+      "git_blob_sha1": "bacd7115298eae86da4c54c5f981c3a81e4833de",
+      "sha256": "d7ae1f43a44d5165778f695f284ba26c555f4dc10421ac3a1b64e467fc82ffc3",
+      "bytes": 16888
+    },
+    {
+      "path": "ci/README.md",
+      "git_blob_sha1": "784098b336809ea4f007b5383486e5631b5133bc",
+      "sha256": "7030bd7708046846a3e81faf02b78288f3cb411921be48107194b606ebc2292c",
+      "bytes": 1762
+    },
+    {
+      "path": "ci/bootstrap.sh",
+      "git_blob_sha1": "78b6fa7da30cf76477226541317eeae151fe93f9",
+      "sha256": "7ee4fd8e581f77d4883753564a44647775fbedf23aa8131182ccf4bc3cf9f99c",
+      "bytes": 2367
+    },
+    {
+      "path": "ci/manifest.py",
+      "git_blob_sha1": "e3b20d44b5ae9042bfdfd101a3bf407eaed827fe",
+      "sha256": "6709cb30f0dbcfb8dc33a261adf1b4046858e7f3f2c41d4cb6a2c7686b7f029a",
+      "bytes": 798
+    },
+    {
+      "path": "ci/portrait.py",
+      "git_blob_sha1": "143bab76bea4b7eece0a7540b3bcdd72bd6f5f30",
+      "sha256": "f56d4f57b2fe82a83a78b05755efb50f46f38181cbee109e37d634d1e74c37c1",
+      "bytes": 1670
+    },
+    {
+      "path": "ci/prepare.py",
+      "git_blob_sha1": "a982384f92b1436ca24dae17b1f505fa5d28b9c1",
+      "sha256": "321ae244fa9847b8317431c74c1b73a491b1aab33d1fc0d27534f4a37bcc6fee",
+      "bytes": 1757
+    },
+    {
+      "path": "ci/verify_binary.py",
+      "git_blob_sha1": "7675056352d20255b9541748f8fa6e8016026e03",
+      "sha256": "0a951929843638f826d8798ed813f6a1c212798cad78aa3164c98c4d7184985e",
+      "bytes": 1495
+    },
+    {
+      "path": "licenses/FONT_PROVENANCE.md",
+      "git_blob_sha1": "2d515188189adb3202fedec7bc8830aec780dcc7",
+      "sha256": "2986209d3b8763ae6554be9e5c4e4760f1a97b831e6a2b9c86a90199029cd691",
+      "bytes": 454
+    },
+    {
+      "path": "licenses/NotoSansDisplay-OFL.txt",
+      "git_blob_sha1": "e84168f94cb6536e58c5b1f35640d95fa1bad1e6",
+      "sha256": "1fc976953931b0ab7898c8cb5225ab223c9f59d0e7237232c063e9b3479fd06d",
+      "bytes": 4351
+    },
+    {
+      "path": "licenses/guition-jc4880p4-bsp-LICENSE.txt",
+      "git_blob_sha1": "e7a14869f4503620f5332fc65a8acc35b7dbed35",
+      "sha256": "dd85d0f4e5b178c2948f8675ae09ad8a2dafa587e6ffb8d68a051ec44836aac5",
+      "bytes": 1066
+    },
+    {
+      "path": "src/boiler_fonts.c",
+      "git_blob_sha1": "d97bf7b46a2e8bd1cb002e9ad05159dc1c1b29f0",
+      "sha256": "2bc21156983acec91e8bb89f992302057a25b09b38e600c6da258b3d2c82ea9f",
+      "bytes": 746050
+    },
+    {
+      "path": "src/main.cpp",
+      "git_blob_sha1": "aaa53c5b30cb396c41efeaf6bb8bf3c38cc686ac",
+      "sha256": "724fa4a275696fa2c6e9a9d831f511b6645554c9fbe24844145ed72f0b8f3c47",
+      "bytes": 39433
+    },
+    {
+      "path": "src/panel_radio.cpp",
+      "git_blob_sha1": "e2d3305aae58e17cb638d2fc6046e3dbef3e5517",
+      "sha256": "49a38d2cf26a0d115cf8dd251381457adb65ea89ced513a5e02ad5bb99c883a4",
+      "bytes": 20831
+    },
+    {
+      "path": "src/panel_radio.h",
+      "git_blob_sha1": "0441a79efc7f515c68f61986d7daf49e78c58aca",
+      "sha256": "85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7",
+      "bytes": 452
+    },
+    {
+      "path": "src/panel_screen.cpp",
+      "git_blob_sha1": "5a3ee1eece6a703691acf2a30bc784ecf23ae4e5",
+      "sha256": "7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767",
+      "bytes": 1420
+    },
+    {
+      "path": "src/panel_screen.h",
+      "git_blob_sha1": "fc10876ef6e2df76df0d8e79be0436549b79a99c",
+      "sha256": "0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647",
+      "bytes": 624
+    },
+    {
+      "path": "src/panel_types.h",
+      "git_blob_sha1": "e3e90acb9abd0651476d86577903219bbcdf3331",
+      "sha256": "4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c",
+      "bytes": 4250
+    },
+    {
+      "path": "src/screen_state.h",
+      "git_blob_sha1": "19c3c3dd5d3490f4df5f46c860816442e014b335",
+      "sha256": "ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba",
+      "bytes": 1902
+    },
+    {
+      "path": "tests/display_idle_tests.cpp",
+      "git_blob_sha1": "0be1a8ea496a056da7b539daaeac7a6575aeafec",
+      "sha256": "45d47226cf98fe02946d4f66a6bb96600d4550e1afb507bed5b670f5203c1367",
+      "bytes": 2061
+    },
+    {
+      "path": "tests/fixtures/README.md",
+      "git_blob_sha1": "ad43bc8b4de31a4ed5a2ab871dd154b11986e8e6",
+      "sha256": "562dfec9d571855ab24f4b6f87aa39231a35486e5936efd1e1657647d7e8c197",
+      "bytes": 1557
+    },
+    {
+      "path": "tests/fixtures/bsp/LICENSE",
+      "git_blob_sha1": "fa8df16bdf288f9b5ab6f0017c739b5d2540eeca",
+      "sha256": "23d8f6e09950562ded33d9e354247376dd46cf8be57d23759d7c40c1dba5459a",
+      "bytes": 1065
+    },
+    {
+      "path": "tests/fixtures/bsp/board_p4.h",
+      "git_blob_sha1": "e9e466ab8b4d0df1ee2e560b28eed4d65b3aaff2",
+      "sha256": "a2f5be55891c0b56020692ddcdbc262d50c0c9df7c4c2855b47ef68df82ce69b",
+      "bytes": 7166
+    },
+    {
+      "path": "tests/fixtures/bsp/ci_portrait.c",
+      "git_blob_sha1": "b320ecbb83c7da27e325aa993364d6042e159333",
+      "sha256": "21f57f84236abf46aa7b612ee08a5ab10c1b28cc18d375b14bb4045c35e56f3b",
+      "bytes": 7998
+    },
+    {
+      "path": "tests/fixtures/bsp/ci_screen031.c",
+      "git_blob_sha1": "1c2848faeaed9bc96efa12910586a090d456b2d8",
+      "sha256": "9f4731067dbc35d9fa4b6de74d74c514d033b10e42a1547d967e8ec3a9c02b42",
+      "bytes": 8315
+    },
+    {
+      "path": "tests/fixtures/bsp/jc4880p4.json",
+      "git_blob_sha1": "f28276eec6a6341039d8449a06fc2c0125966faa",
+      "sha256": "b6837425c6562a83b6ed1995a348470ef51e2ee886911663498c2a43a3d50898",
+      "bytes": 784
+    },
+    {
+      "path": "tests/fixtures/bsp/lvgl_glue.c",
+      "git_blob_sha1": "f390f44fc1d1b25fdeae3f2b4aa077d544a8f159",
+      "sha256": "af6b7cfa14d72554f75838aa9fe1537e3eddd2c177b92253b7c122d1c9b33ed1",
+      "bytes": 8697
+    },
+    {
+      "path": "tests/fixtures/bsp/platformio.ini",
+      "git_blob_sha1": "83a5ee752e6104a0bca5670d1b26e1031428b2f0",
+      "sha256": "22fe8a5e5a4dffa1daa7d90bebbfe11918956ad33f46c01a96059d6b5e49b77f",
+      "bytes": 1736
+    },
+    {
+      "path": "tests/fixtures/bsp/portrait.c",
+      "git_blob_sha1": "976bff6d84c5c5709080037f603eb70a4bfc260c",
+      "sha256": "d24840d05fd756805d70fc8f6980a3d35068706ab275aaaf24ff7e7b5cfae535",
+      "bytes": 8068
+    },
+    {
+      "path": "tests/fixtures/bsp/screen031.c",
+      "git_blob_sha1": "996c4f15bfcd4d5d28ad2b629ea6605c8b37b137",
+      "sha256": "83c1004b49d99913194f144b0eff6006d793aa7770788b757c844768ff83d478",
+      "bytes": 8385
+    },
+    {
+      "path": "tests/fixtures/bsp/screen031.ini",
+      "git_blob_sha1": "b37fc614dc4f7286d51459403cc0477760f5da4a",
+      "sha256": "554517fe2079c4d22cdcaa641d5b556c0568d17129a1d78c4a7b02ab8ee9b280",
+      "bytes": 1767
+    },
+    {
+      "path": "tests/fixtures/v01/main.cpp",
+      "git_blob_sha1": "8ab69f6ace90131cb871304484c5d313b72f11be",
+      "sha256": "927a25ad9be9b33d91a6a8d849898d38b8feb8de11003b400c16ed931ce6dc1b",
+      "bytes": 13121
+    },
+    {
+      "path": "tests/fixtures/v03/main.cpp",
+      "git_blob_sha1": "f289288abb55f2b6b57a74805013631b891d510a",
+      "sha256": "f3b868683746c7902129618cc374fad61698d22c4562efc04db7a768948f48ff",
+      "bytes": 29981
+    },
+    {
+      "path": "tests/fixtures/v03/panel_radio.cpp",
+      "git_blob_sha1": "523580115432a9b64626a9bbdbce43301e7d6b87",
+      "sha256": "693c3b5cd19da17184671a0dd31f60ad1a87fcee2cea10ef725767c62a6cd6e6",
+      "bytes": 13901
+    },
+    {
+      "path": "tests/fixtures/v03/panel_radio.h",
+      "git_blob_sha1": "ea8926ef26a19d07d7dfc0737bbac75ae9483d1b",
+      "sha256": "e673b8dc7628e82277a4933a0a53f9def74fa7090deda9256e7a4eb83c64a88c",
+      "bytes": 222
+    },
+    {
+      "path": "tests/fixtures/v03/panel_types.h",
+      "git_blob_sha1": "b7cf8b0936143516668204d85e2c9657182a334a",
+      "sha256": "ae9d11b2c13ca295b93916938dbff06957aaf4532e7ba8ef4d528da4921ecd2e",
+      "bytes": 3155
+    },
+    {
+      "path": "tests/fixtures/v031/main.cpp",
+      "git_blob_sha1": "f4e0bf8cc0bd09bf050370044079cd319262928d",
+      "sha256": "86ed146c2ec9c5be37efc6a71ad694a6590071080e7d50afb474d4d2b46077d4",
+      "bytes": 32862
+    },
+    {
+      "path": "tests/fixtures/v031/panel_radio.cpp",
+      "git_blob_sha1": "523580115432a9b64626a9bbdbce43301e7d6b87",
+      "sha256": "693c3b5cd19da17184671a0dd31f60ad1a87fcee2cea10ef725767c62a6cd6e6",
+      "bytes": 13901
+    },
+    {
+      "path": "tests/fixtures/v031/panel_radio.h",
+      "git_blob_sha1": "ea8926ef26a19d07d7dfc0737bbac75ae9483d1b",
+      "sha256": "e673b8dc7628e82277a4933a0a53f9def74fa7090deda9256e7a4eb83c64a88c",
+      "bytes": 222
+    },
+    {
+      "path": "tests/fixtures/v031/panel_screen.cpp",
+      "git_blob_sha1": "93d381bd430662d7426f0d0571388e1a793494d5",
+      "sha256": "15b35a3c9e503037da7a7b7f88ce2cbf6df3dcbc18c0f8ba43df57be988c979a",
+      "bytes": 2478
+    },
+    {
+      "path": "tests/fixtures/v031/panel_screen.h",
+      "git_blob_sha1": "fc10876ef6e2df76df0d8e79be0436549b79a99c",
+      "sha256": "0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647",
+      "bytes": 624
+    },
+    {
+      "path": "tests/fixtures/v031/panel_types.h",
+      "git_blob_sha1": "58730d15c387a4ef3fbeaeaca982b41d04084691",
+      "sha256": "729c81814084a6d192353bc0887d1809a54ea71c78ccea8c92309b41d2b06178",
+      "bytes": 3155
+    },
+    {
+      "path": "tests/fixtures/v031/screen_state.h",
+      "git_blob_sha1": "2b5cf8589b83edfab206f4ab7ba52933b2716691",
+      "sha256": "3e6c61cbc58abcf4979086e332054b8793b4d39b19aa825743060989faf9362c",
+      "bytes": 1720
+    },
+    {
+      "path": "tests/fixtures/v04_early/display_idle.h",
+      "git_blob_sha1": "6f599ffedb7cb99bf7739ea4d2e1a01b28cda3b4",
+      "sha256": "be138fb88983cc53bca7a0fc4bdcf38da8a52bef12f9226d40a59b864d328962",
+      "bytes": 985
+    },
+    {
+      "path": "tests/fixtures/v04_early/main.cpp",
+      "git_blob_sha1": "eaf4f6a0f09e342d7851ae00fe11b2598862dfeb",
+      "sha256": "7e1bc7bd3a584cfc759539b4ec270a4cdb43f7490a020dc5c5a4fbb78b59130d",
+      "bytes": 39884
+    },
+    {
+      "path": "tests/fixtures/v04_early/panel_radio.cpp",
+      "git_blob_sha1": "c2a0deefa3ca06d34a267292d2969c92e8842621",
+      "sha256": "fd291e5895b1adaed1757ca2c4a767141acef4849ff787e6c25f139b7ba4e045",
+      "bytes": 20029
+    },
+    {
+      "path": "tests/fixtures/v04_early/panel_radio.h",
+      "git_blob_sha1": "0441a79efc7f515c68f61986d7daf49e78c58aca",
+      "sha256": "85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7",
+      "bytes": 452
+    },
+    {
+      "path": "tests/fixtures/v04_early/panel_types.h",
+      "git_blob_sha1": "e3e90acb9abd0651476d86577903219bbcdf3331",
+      "sha256": "4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c",
+      "bytes": 4250
+    },
+    {
+      "path": "tests/host/CMakeLists.txt",
+      "git_blob_sha1": "8dc54c8ba98cfcc34b1f07707a628fc67a766ded",
+      "sha256": "e7dc06008b59c7b6789bc3e14a2662bbff566a1238b50b038125e489c5a84c48",
+      "bytes": 686
+    },
+    {
+      "path": "tests/host/host.cpp",
+      "git_blob_sha1": "34639e5360446cd007156db28036e3f5f22cfaa6",
+      "sha256": "fbd3929f77966cc9a04c36cfe6231531de0967fa2c0198dcbf5dc86225e96f39",
+      "bytes": 10819
+    },
+    {
+      "path": "tests/host/lv_conf.h",
+      "git_blob_sha1": "4c3a353ead43b5a5778d6321290e03fdd98d0c97",
+      "sha256": "6a7fe672685c077b79a32d05d5a6d8072ca6406d0ace2386858fac11afe9e244",
+      "bytes": 500
+    },
+    {
+      "path": "tests/host/stubs/Arduino.h",
+      "git_blob_sha1": "73f938cf302279c1acd1c21f6476ca6529c12d7f",
+      "sha256": "0e58614ce12f805864338d4b9c65ec15cc12468e6cb9278208ad44c0a263d72a",
+      "bytes": 333
+    },
+    {
+      "path": "tests/host/stubs/board_p4.h",
+      "git_blob_sha1": "d67219f51c1a4b0390314738a0d693898136229b",
+      "sha256": "fd8afcd79b57080e418f113e4cef8019005f83bc0fb5451bc91c35ca0ca4d735",
+      "bytes": 386
+    },
+    {
+      "path": "tests/host/stubs/lvgl_glue.h",
+      "git_blob_sha1": "08bc0602aa676bff37e56ca67941f88f628d01f3",
+      "sha256": "2112506fe89958c8a64f44f98564c83fc330811ac16ee68ad2fea86381c66c74",
+      "bytes": 140
+    },
+    {
+      "path": "tests/model_tests.cpp",
+      "git_blob_sha1": "c2f23883a191e237902d6cf235fe7f95dfd9d323",
+      "sha256": "7b875953eab28bc10517fb367bc482de96c64a44db6ba481045921f85942f91a",
+      "bytes": 2128
+    },
+    {
+      "path": "tests/radio_smoke.cpp",
+      "git_blob_sha1": "e3d736079244485145032cf53557171ef334dd3f",
+      "sha256": "223a2b8a4465f3ada98e6382724db8471e856cf44df023a3d770a3b13278de65",
+      "bytes": 326
+    },
+    {
+      "path": "tests/radio_stubs/Arduino.h",
+      "git_blob_sha1": "8533ae33d66768b72becfe56b304602866956aba",
+      "sha256": "b09c3c6c8bcfd4c62e0ab45d0a214c0bec9008b310ec76badb908f9f1db93ff2",
+      "bytes": 452
+    },
+    {
+      "path": "tests/radio_stubs/BLEAdvertisedDevice.h",
+      "git_blob_sha1": "e06f127b941e74cb2d7596912c66785c9aa67a85",
+      "sha256": "c24ea1ec71bb9e5de500d2cd1efd30dcd2a40d05b0ab9eb9d9943273faa4b5a1",
+      "bytes": 23
+    },
+    {
+      "path": "tests/radio_stubs/BLEDevice.h",
+      "git_blob_sha1": "bfeb0d39fa7942e58a3741ad98ed3b3658206854",
+      "sha256": "153789270cad72a2f1b4bea65d8464ee40c2160d679404bb04837a2e26e9ae83",
+      "bytes": 671
+    },
+    {
+      "path": "tests/radio_stubs/BLEScan.h",
+      "git_blob_sha1": "e06f127b941e74cb2d7596912c66785c9aa67a85",
+      "sha256": "c24ea1ec71bb9e5de500d2cd1efd30dcd2a40d05b0ab9eb9d9943273faa4b5a1",
+      "bytes": 23
+    },
+    {
+      "path": "tests/radio_stubs/Preferences.h",
+      "git_blob_sha1": "647f6d6c755eb78e195917119b7c73355a3d464d",
+      "sha256": "4c2998bdc5aece1078572f79f747d1ec2fd011eca720e545a68aa807bccc8ffc",
+      "bytes": 1146
+    },
+    {
+      "path": "tests/radio_stubs/WiFi.h",
+      "git_blob_sha1": "7a0bdadbf13d02dcd673b768ead844468da136a1",
+      "sha256": "4c3fcee0a153166927ef68dc98a57e27fa2434a651c5a72dfc7313361f09ec09",
+      "bytes": 1516
+    },
+    {
+      "path": "tests/radio_stubs/esp32-hal-hosted.h",
+      "git_blob_sha1": "ad97b75497b3a2a62824a4dfd72abbbada6091d0",
+      "sha256": "61e50dd999ff8733455f582a89bc5e0d9b19fbfc0a96f3b9a8b86881a6a9da2b",
+      "bytes": 233
+    },
+    {
+      "path": "tests/radio_stubs/freertos/FreeRTOS.h",
+      "git_blob_sha1": "b29b31ea96cc1e17bd14d389fee0c9169486c833",
+      "sha256": "6991448f0dd66b1b4853035229e59b0ab01882deb4eaa6d56e688277cecaee27",
+      "bytes": 109
+    },
+    {
+      "path": "tests/radio_stubs/freertos/semphr.h",
+      "git_blob_sha1": "bf94ca7d13741471d4d2b986cac37d6f3e4f3421",
+      "sha256": "9143cd010ab9bc6c2c5c5a04233d872ae9f87be3c50511f8e2cc7d81c97a3f98",
+      "bytes": 315
+    },
+    {
+      "path": "tests/radio_stubs/freertos/task.h",
+      "git_blob_sha1": "219e46be2c9a8493df38d96e08dfe17463b8904f",
+      "sha256": "899332854d57734fde5835a3c4eeb88aec7f24c780a0cda3b88caa49b9c698a8",
+      "bytes": 272
+    },
+    {
+      "path": "tests/radio_stubs/sdkconfig.h",
+      "git_blob_sha1": "0ba01e83baf44e08a74d913469a63c147cfa605b",
+      "sha256": "ed657232ebf4810c19495139e2346eb6fd85addf34e02fe79fbe3dd3d5781e34",
+      "bytes": 87
+    },
+    {
+      "path": "tests/radio_stubs/soc/soc_caps.h",
+      "git_blob_sha1": "6f70f09beec2219624baeca92e2cd7deaa104fb4",
+      "sha256": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201",
+      "bytes": 13
+    },
+    {
+      "path": "tests/run_radio_tests.sh",
+      "git_blob_sha1": "fbae86f28082e512a32e85abae07de9719882da3",
+      "sha256": "b80b9532c2db0acc08fa1d34b6649a8d2ad7fb6a9a51b71b9717128a0c03ab42",
+      "bytes": 782
+    },
+    {
+      "path": "tests/test_radio.cpp",
+      "git_blob_sha1": "04bba81d087bcdf07b83834571251102dd82ff6e",
+      "sha256": "b4c56573b7289d64ed40648a3b3eb860af8ddfe56ac5f6df27a8cb5716c29a0e",
+      "bytes": 5528
+    },
+    {
+      "path": "tests/updater_tests.py",
+      "git_blob_sha1": "2a649f93f9c9b32018613fa9f55193da395e3ea6",
+      "sha256": "b57d1ddd73db120069766d8d888454c94533c6d69572d52c29667bf5b0906285",
+      "bytes": 10535
+    }
+  ]
+}

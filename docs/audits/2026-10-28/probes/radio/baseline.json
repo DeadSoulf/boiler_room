@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/DeadSoulf/boiler_room",
+  "commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "note": "Only an exact file-hash match confirms this source baseline; later revisions can be checked but may no longer reproduce the defects.",
+  "sha256": {
+    "src/panel_radio.cpp": "49a38d2cf26a0d115cf8dd251381457adb65ea89ced513a5e02ad5bb99c883a4",
+    "src/panel_radio.h": "85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7",
+    "src/panel_types.h": "4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c"
+  },
+  "stub_origin": "tests/radio_stubs at the same commit; WiFi.h, Preferences.h and BLE headers replaced or extended for failure injection"
+}
