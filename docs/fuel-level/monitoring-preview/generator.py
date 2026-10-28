@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create six static 480x800 monitoring mockups and an inline-SVG Canva HTML.
+"""Create eight static 480x800 monitoring mockups and an inline-SVG Canva HTML.
 
 No firmware, hardware, screenshots or PDFs are produced. Pillow is used only to
 measure the installed DejaVu Sans font and validate text geometry.
@@ -76,12 +76,12 @@ class Page:
         for i, line in enumerate(lines): self.text(x, y+i*leading, line, size, color, bold=bold, max_width=width)
         return len(lines)
 
-    def button(self, x, y, w, h, label, fill=BUTTON):
+    def button(self, x, y, w, h, label, fill=BUTTON, ink=TXT, enabled=True):
         assert h >= 44
-        self.rect(x, y, w, h, fill, 12, None)
-        box = self.text(x+w/2, y+h/2+6.5, label, 19, anchor='middle', max_width=w-24)
+        self.rect(x, y, w, h, fill if enabled else CARD, 12, None if enabled else LINE)
+        box = self.text(x+w/2, y+h/2+6.5, label, 19, ink if enabled else MUTED, anchor='middle', max_width=w-24)
         assert box[0] >= x+8 and box[2] <= x+w-8 and box[1] >= y+4 and box[3] <= y+h-4
-        self.buttons.append({'label': label, 'width': w, 'height': h})
+        self.buttons.append({'label': label, 'width': w, 'height': h, 'enabled': enabled})
 
     def header(self, title, subtitle=None, home=True):
         self.text(18, 48, title, 26, max_width=318)
@@ -129,38 +129,56 @@ def temperature_card(p, x, y, name, accent):
 
 
 def reed_row(p, y, upper, reached, reached_color=GREEN):
-    p.rect(16, y, 448, 82)
+    p.rect(16, y, 448, 64)
     color = reached_color if reached else MUTED
-    p.dot(38, y+28, color, 5)
-    p.text(58, y+34, 'Верхний уровень' if upper else 'Нижний уровень', 19, max_width=222)
-    p.text(58, y+62, 'Герконовый датчик', 14, MUTED)
-    p.text(446, y+35, 'Достигнут' if reached else 'Не достигнут', 19, color, anchor='end', max_width=166)
+    p.dot(38, y+23, color, 5)
+    p.text(58, y+29, 'Верхний уровень' if upper else 'Нижний уровень', 19, max_width=222)
+    p.text(58, y+52, 'Герконовый датчик', 14, MUTED)
+    p.text(446, y+30, 'Достигнут' if reached else 'Не достигнут', 19, color, anchor='end', max_width=166)
 
 
-def fuel_page(number, upper):
+def fuel_page(number, upper, control_state='unavailable'):
+    assert control_state in ('unavailable', 'off', 'enabled')
     title = 'Топливо — верхний рабочий уровень' if upper else 'Топливо — рабочий диапазон'
+    slug = 'fuel-upper' if upper else 'fuel-working'
+    if control_state == 'off':
+        title, slug = 'Подогрев — доступна кнопка включения', 'heating-off'
+    elif control_state == 'enabled':
+        title, slug = 'Подогрев — доступна кнопка выключения', 'heating-enabled'
     notes = 'Демонстрационный макет мониторинга. Нижний порог достигнут; '+('верхний достигнут.' if upper else 'верхний не достигнут.')
-    notes += ' Предусмотрен подогрев до 80 °C по сообщению пользователя. Температура и состояние подогрева неизвестны. Это не назначение аварийного предела или алгоритма управления.'
-    p = Page(number, 'fuel-upper' if upper else 'fuel-working', title, notes)
-    p.header('Топливо', 'Уровень и подогрев топлива')
-    p.rect(16, 126, 448, 113, CARD, 18, SKY if upper else GREEN)
-    p.text(32, 153, 'Уровень топлива', 14, MUTED)
-    p.text(32, 189, 'Верхний уровень достигнут' if upper else 'Рабочий диапазон', 25, SKY if upper else GREEN, max_width=416)
-    p.text(32, 220, 'Оба порога подтверждены' if upper else 'Нижний достигнут · верхний ещё нет', 14, MUTED, max_width=416)
-    reed_row(p, 250, True, upper, SKY if upper else GREEN)
-    reed_row(p, 344, False, True)
-    p.rect(16, 440, 448, 192)
-    p.text(32, 470, 'Подогрев топлива', 19)
-    p.text(446, 470, 'до 80 °C', 19, SKY, anchor='end')
-    p.text(32, 504, 'Температура', 14, MUTED)
-    p.text(446, 507, '--.- °C', 25, TXT, anchor='end')
-    p.text(32, 539, 'Состояние', 14, MUTED)
-    p.text(446, 540, 'Нет данных', 19, MUTED, anchor='end')
-    p.text(32, 568, 'Ожидание показаний температуры', 14, MUTED, max_width=416)
-    p.button(32, 578, 416, 44, 'История температуры')
-    p.button(16, 648, 216, 48, 'Журнал')
-    p.button(248, 648, 216, 48, 'Диагностика')
-    p.button(16, 714, 448, 48, 'Назад')
+    notes += ' Предусмотрен подогрев до 80 °C по сообщению пользователя. Это не назначение аварийного предела или алгоритма управления.'
+    if control_state == 'unavailable':
+        notes += ' Температура и режим неизвестны; управление не подключено; обе кнопки видимы и недоступны.'
+    else:
+        notes += ' Отдельный пример доступного управления; температура и подтверждённый режим демонстрационные. Кнопки запрашивают разрешение или запрет подогрева. Фактическая работа нагревателя неизвестна.'
+    p = Page(number, slug, title, notes)
+    p.header('Топливо')
+    p.text(18, 94, 'Уровень и подогрев топлива', 19, MUTED, max_width=444)
+    p.rect(16, 111, 448, 96, CARD, 18, SKY if upper else GREEN)
+    p.text(32, 136, 'Уровень топлива', 14, MUTED)
+    p.text(32, 170, 'Верхний уровень достигнут' if upper else 'Рабочий диапазон', 25, SKY if upper else GREEN, max_width=416)
+    p.text(32, 194, 'Оба порога подтверждены' if upper else 'Нижний достигнут · верхний ещё нет', 14, MUTED, max_width=416)
+    reed_row(p, 219, True, upper, SKY if upper else GREEN)
+    reed_row(p, 295, False, True)
+    p.rect(16, 371, 448, 280)
+    p.text(32, 399, 'Подогрев топлива', 19)
+    p.text(446, 399, 'до 80 °C', 19, SKY, anchor='end')
+    temperatures = {'unavailable': '--.- °C', 'off': '36.0 °C', 'enabled': '62.5 °C'}
+    modes = {'unavailable': 'Нет данных', 'off': 'Отключён', 'enabled': 'Разрешён'}
+    p.text(32, 433, 'Температура', 14, MUTED)
+    p.text(446, 437, temperatures[control_state], 25, TXT, anchor='end')
+    p.text(32, 466, 'Режим подогрева', 14, MUTED)
+    p.text(446, 469, modes[control_state], 19, GREEN if control_state == 'enabled' else MUTED, anchor='end')
+    p.text(32, 497, 'Нагреватель', 14, MUTED)
+    p.text(446, 500, 'Нет данных', 19, MUTED, anchor='end')
+    p.button(32, 514, 202, 48, 'Включить', fill=GREEN, ink=BG, enabled=control_state == 'off')
+    p.button(246, 514, 202, 48, 'Выключить', enabled=control_state == 'enabled')
+    hint = 'Управление не подключено' if control_state == 'unavailable' else 'Демонстрация доступного управления'
+    p.text(32, 586, hint, 14, MUTED, max_width=416)
+    p.button(32, 599, 416, 44, 'История температуры')
+    p.button(16, 663, 216, 44, 'Журнал')
+    p.button(248, 663, 216, 44, 'Диагностика')
+    p.button(16, 719, 448, 44, 'Назад')
     p.badge()
     return p
 
@@ -262,6 +280,7 @@ def build_pages():
     p.button(16, 625, 448, 50, 'Открыть топливо')
     p.text(18, 731, 'Свайп влево / вправо — смена страницы', 14, MUTED)
     p.page_dots(3); p.badge(); pages.append(p)
+    pages.extend([fuel_page(7, False, 'off'), fuel_page(8, False, 'enabled')])
     return pages
 
 

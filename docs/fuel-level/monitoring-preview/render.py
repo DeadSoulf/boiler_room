@@ -12,12 +12,8 @@ from reportlab.lib.colors import HexColor
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT=Path(__file__).resolve().parent
-svgs=sorted(ROOT.glob('screen-*.svg'))
-if len(svgs)!=6:
-    svgs=sorted(ROOT.glob('screens-*.svg'))
-if len(svgs)!=6:
-    svgs=sorted(ROOT.glob('*.svg'))
-assert len(svgs)==6, f'Expected 6 screens, got {len(svgs)}'
+svgs=sorted(ROOT.glob('screens-[0-9][0-9]-*.svg'))
+assert len(svgs)==8, f'Expected 8 screens, got {len(svgs)}'
 pdfmetrics.registerFont(TTFont('PanelSans','/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
 pdfmetrics.registerFont(TTFont('PanelSansBold','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'))
 pdf_path=ROOT/'boiler-fuel-monitoring.pdf'
@@ -53,7 +49,7 @@ for source in svgs:
     vector_pdf.showPage()
 vector_pdf.save()
 combined=fitz.open(pdf_path)
-assert len(combined)==6
+assert len(combined)==len(svgs)
 rows=[]
 for i,(source,p) in enumerate(zip(svgs,combined),1):
     assert abs(p.rect.width-480)<0.1 and abs(p.rect.height-800)<0.1,(source,p.rect)
@@ -68,7 +64,7 @@ combined.close()
 font_path='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 label_font=ImageFont.truetype(font_path,19)
 small_font=ImageFont.truetype(font_path,14)
-labels=['Главная · мало топлива','Топливо · рабочий диапазон','Топливо · верхний уровень','Журнал событий','Диагностика датчиков','Сервис · данные устарели']
+labels=['Главная · мало топлива','Топливо · управление недоступно','Топливо · верхний уровень','Журнал событий','Диагностика датчиков','Сервис · данные устарели','Подогрев · включение','Подогрев · выключение']
 def contact_sheet(indices,name):
     gap=24
     cols=2
@@ -88,7 +84,8 @@ def contact_sheet(indices,name):
         draw.rectangle((x-1,y+41,x+480,y+842),outline='#293D54',width=1)
     sheet.quantize(colors=192,method=Image.Quantize.MEDIANCUT).save(ROOT/name,optimize=True)
 contact_sheet([0,1,3,4],'overview.png')
-contact_sheet([0,1,2,3,4,5],'all-screens.png')
-review={'renderer':'ReportLab SVG primitives with embedded DejaVu Sans -> vector PDF; PyMuPDF PNG; Pillow contact sheets','screens':rows,'pdf_pages':6,'actual_screen_size':[480,800]}
+contact_sheet(list(range(len(svgs))),'all-screens.png')
+contact_sheet([6,7],'heating-controls.png')
+review={'renderer':'ReportLab SVG primitives with embedded DejaVu Sans -> vector PDF; PyMuPDF PNG; Pillow contact sheets','screens':rows,'pdf_pages':len(svgs),'actual_screen_size':[480,800]}
 (ROOT/'render-evidence.json').write_text(json.dumps(review,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-print(json.dumps({'pages':6,'screens':[r['png'] for r in rows],'pdf':'boiler-fuel-monitoring.pdf','overview':'overview.png','all_screens':'all-screens.png'},ensure_ascii=False))
+print(json.dumps({'pages':len(svgs),'screens':[r['png'] for r in rows],'pdf':'boiler-fuel-monitoring.pdf','overview':'overview.png','all_screens':'all-screens.png','controls':'heating-controls.png'},ensure_ascii=False))
