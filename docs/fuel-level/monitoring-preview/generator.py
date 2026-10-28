@@ -129,34 +129,37 @@ def temperature_card(p, x, y, name, accent):
 
 
 def reed_row(p, y, upper, reached, reached_color=GREEN):
-    p.rect(16, y, 448, 92)
+    p.rect(16, y, 448, 82)
     color = reached_color if reached else MUTED
     p.dot(38, y+28, color, 5)
     p.text(58, y+34, 'Верхний уровень' if upper else 'Нижний уровень', 19, max_width=222)
-    p.text(58, y+65, 'Герконовый датчик', 14, MUTED)
+    p.text(58, y+62, 'Герконовый датчик', 14, MUTED)
     p.text(446, y+35, 'Достигнут' if reached else 'Не достигнут', 19, color, anchor='end', max_width=166)
 
 
 def fuel_page(number, upper):
     title = 'Топливо — верхний рабочий уровень' if upper else 'Топливо — рабочий диапазон'
     notes = 'Демонстрационный макет мониторинга. Нижний порог достигнут; '+('верхний достигнут.' if upper else 'верхний не достигнут.')
-    notes += ' Температура не имитируется. Состояния не являются показаниями физического оборудования.'
+    notes += ' Предусмотрен подогрев до 80 °C по сообщению пользователя. Температура и состояние подогрева неизвестны. Это не назначение аварийного предела или алгоритма управления.'
     p = Page(number, 'fuel-upper' if upper else 'fuel-working', title, notes)
-    p.header('Топливо', 'Два герконовых датчика')
+    p.header('Топливо', 'Уровень и подогрев топлива')
     p.rect(16, 126, 448, 113, CARD, 18, SKY if upper else GREEN)
     p.text(32, 153, 'Уровень топлива', 14, MUTED)
     p.text(32, 189, 'Верхний уровень достигнут' if upper else 'Рабочий диапазон', 25, SKY if upper else GREEN, max_width=416)
     p.text(32, 220, 'Оба порога подтверждены' if upper else 'Нижний достигнут · верхний ещё нет', 14, MUTED, max_width=416)
-    reed_row(p, 255, True, upper, SKY if upper else GREEN)
-    reed_row(p, 363, False, True)
-    p.rect(16, 471, 448, 130)
-    p.text(32, 500, 'Температура топлива', 19)
-    p.text(32, 537, '--.- °C', 25, SKY)
-    p.text(185, 534, 'Нет данных температуры', 14, MUTED, max_width=261)
-    p.button(32, 547, 416, 44, 'История температуры')
-    p.button(16, 619, 216, 48, 'Журнал')
-    p.button(248, 619, 216, 48, 'Диагностика')
-    p.text(18, 693, 'Уровень определяется по двум порогам.', 14, MUTED, max_width=444)
+    reed_row(p, 250, True, upper, SKY if upper else GREEN)
+    reed_row(p, 344, False, True)
+    p.rect(16, 440, 448, 192)
+    p.text(32, 470, 'Подогрев топлива', 19)
+    p.text(446, 470, 'до 80 °C', 19, SKY, anchor='end')
+    p.text(32, 504, 'Температура', 14, MUTED)
+    p.text(446, 507, '--.- °C', 25, TXT, anchor='end')
+    p.text(32, 539, 'Состояние', 14, MUTED)
+    p.text(446, 540, 'Нет данных', 19, MUTED, anchor='end')
+    p.text(32, 568, 'Ожидание показаний температуры', 14, MUTED, max_width=416)
+    p.button(32, 578, 416, 44, 'История температуры')
+    p.button(16, 648, 216, 48, 'Журнал')
+    p.button(248, 648, 216, 48, 'Диагностика')
     p.button(16, 714, 448, 48, 'Назад')
     p.badge()
     return p
@@ -165,7 +168,7 @@ def fuel_page(number, upper):
 def build_pages():
     pages = []
     p = Page(1, 'home-low', 'Главная — мало топлива',
-             'Демонстрационный сценарий: оба нормализованных порога не достигнуты. Общее предупреждение о низком уровне видно на Главной. Температуры не поступают; четыре точки пассивны.')
+             'Демонстрационный сценарий: оба нормализованных порога не достигнуты. Общее предупреждение о низком уровне видно на Главной. Предусмотрен подогрев до 80 °C. Температуры не поступают; работа нагревателя не заявляется; четыре точки пассивны.')
     p.header('КОТЕЛЬНАЯ', home=False)
     p.text(18, 77, 'Температура и уровень топлива', 14, MUTED, max_width=302)
     p.text(462, 45, '--:--', 25, SKY, anchor='end')
@@ -181,7 +184,7 @@ def build_pages():
     p.text(x+15, y+76, 'Температура', 14, MUTED)
     p.text(x+158, y+77, '--.-', 25, anchor='end')
     p.text(x+201, y+77, '°C', 19, SKY, anchor='end')
-    p.text(x+15, y+101, 'Нет данных', 14, MUTED)
+    p.text(x+15, y+101, 'Подогрев: до 80 °C', 14, MUTED, max_width=186)
     p.line(x+15, y+113, x+201)
     p.text(x+15, y+135, 'Уровень топлива', 14, MUTED)
     p.text(x+15, y+162, 'Ниже нижнего', 19, AMBER, max_width=186)
@@ -276,7 +279,7 @@ def main():
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Панель котельной — мониторинг топлива, макет</title>
+<title>Панель котельной — топливо и подогрев до 80 °C, макет</title>
 <style>
 html,body{margin:0;padding:0;background:#09121F;color:#F1F6FC;font-family:"DejaVu Sans",Arial,sans-serif}
 .screen{position:relative;width:480px;height:800px;overflow:hidden;margin:0;break-after:page;page-break-after:always}

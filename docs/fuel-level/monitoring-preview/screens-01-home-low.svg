@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="480" height="800" viewBox="0 0 480 800" role="img" aria-label="Главная — мало топлива">
   <title>Главная — мало топлива</title>
-  <desc>Демонстрационный сценарий: оба нормализованных порога не достигнуты. Общее предупреждение о низком уровне видно на Главной. Температуры не поступают; четыре точки пассивны.</desc>
+  <desc>Демонстрационный сценарий: оба нормализованных порога не достигнуты. Общее предупреждение о низком уровне видно на Главной. Предусмотрен подогрев до 80 °C. Температуры не поступают; работа нагревателя не заявляется; четыре точки пассивны.</desc>
   <rect x="0" y="0" width="480" height="800" rx="0" fill="#09121F" />
   <text x="18" y="48" fill="#F1F6FC" font-family="DejaVu Sans" font-size="26" font-weight="400" text-anchor="start">КОТЕЛЬНАЯ</text>
   <text x="18" y="77" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Температура и уровень топлива</text>
@@ -41,7 +41,7 @@
   <text x="263" y="496" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Температура</text>
   <text x="406" y="497" fill="#F1F6FC" font-family="DejaVu Sans" font-size="25" font-weight="400" text-anchor="end">--.-</text>
   <text x="449" y="497" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">°C</text>
-  <text x="263" y="521" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Нет данных</text>
+  <text x="263" y="521" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Подогрев: до 80 °C</text>
   <line x1="263" y1="533" x2="449" y2="533" stroke="#293D54" stroke-width="1" />
   <text x="263" y="555" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Уровень топлива</text>
   <text x="263" y="582" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Ниже нижнего</text>
