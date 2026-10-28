@@ -1,5 +1,6 @@
 /* Boiler Panel v0.4.0 — independent JC4880P443 panel, LVGL 8.3.
- * No assigned sensor hardware, actuator outputs, or borrowed heater logic.
+ * Fuel level accepts normalized upper/lower reed readings; GPIO is not assigned.
+ * No actuator outputs or borrowed heater logic.
  * Uses the existing, working portrait display/touch adapter and fonts.
  */
 #include <Arduino.h>
@@ -24,11 +25,17 @@ extern const lv_font_t boiler_font_55;
 namespace {
 using namespace panel;
 constexpr uint32_t BG=0x09121F, CARD=0x152439, LINE=0x293D54, TXT=0xF1F6FC;
-constexpr uint32_t MUTED=0x96ABC1, SKY=0x62CFFF, GREEN=0x66DDB4, AMBER=0xF4C083;
+constexpr uint32_t MUTED=0x96ABC1, SKY=0x62CFFF, GREEN=0x66DDB4, AMBER=0xF4C083, RED=0xF18F93;
 const char* const PAGES[]={"Главная","Управление","Настройки","Сервис"};
 const char* const SENSOR_NAMES[]={"В котельной","На улице","Теплоноситель","Топливо"};
 const uint32_t ACCENT[]={0x6BDDB5,0x72BDF8,0xF3B876,0xB9A4EF};
 Measurement measurements[CHANNELS]; // Invalid until a future, explicit sensor integration.
+FuelLevel fuelLevel; // No default readings. A hardware adapter must normalize both reeds.
+struct FuelLevelLabels {
+  lv_obj_t *summary=nullptr,*upper=nullptr,*lower=nullptr,*upperDot=nullptr,*lowerDot=nullptr;
+};
+FuelLevelLabels fuelCardLabels,fuelDetailLabels;
+lv_obj_t *fuelDetailHint=nullptr,*fuelTemperatureValue=nullptr,*fuelTemperatureState=nullptr;
 RadioState radio;
 int page=0, pendingPage=-1, slideDirection=0, view=0;
 uint32_t clicks=0, lastGesture=0, lastTick=0, renderedRevision=0, renderedSignature=0;
@@ -44,7 +51,7 @@ uint16_t appliedDisplayTimeout=0;
 void info(const char* title,const char* description);
 lv_obj_t *header=nullptr,*body=nullptr,*clockLabel=nullptr,*dateLabel=nullptr,*footer=nullptr;
 lv_obj_t *overlay=nullptr,*dialogError=nullptr,*ssidField=nullptr,*passwordField=nullptr,*timeField=nullptr,*activeField=nullptr,*keyboard=nullptr;
-int dialogKind=0; // 0 none, 1 Wi-Fi credentials, 2 manual clock, 3 information.
+int dialogKind=0; // 0 none, 1 Wi-Fi credentials, 2 manual clock, 3 information, 4 fuel.
 bool openNetwork=false, upper=false, symbols=false;
 char selectedSsid[33]={};
 bool ssidLocked=false;
@@ -82,7 +89,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,Ap0=100};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,Ap0=100};
 void action(lv_event_t* e);
 lv_obj_t* button(lv_obj_t* parent,const char* title,int x,int y,int w,int h,uintptr_t code,uint32_t fill=0x214258,bool enabled=true){
   auto* o=lv_btn_create(parent);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,w,h);
@@ -98,7 +105,11 @@ void clearSecretFields(){
   ssidField=passwordField=timeField=activeField=keyboard=dialogError=nullptr;
   memset(selectedSsid,0,sizeof(selectedSsid));
 }
-void dismiss(){detailChannel=-1;detailText=detailGraph=nullptr;if(overlay){clearSecretFields();lv_obj_del(overlay);}overlay=nullptr;dialogKind=0;closeDialog=false;}
+void dismiss(){
+  detailChannel=-1;detailText=detailGraph=nullptr;fuelDetailLabels={};
+  fuelDetailHint=fuelTemperatureValue=fuelTemperatureState=nullptr;
+  if(overlay){clearSecretFields();lv_obj_del(overlay);}overlay=nullptr;dialogKind=0;closeDialog=false;
+}
 void error(const char* msg){if(dialogError)lv_label_set_text(dialogError,msg);}
 bool send(Command& command){
   const bool ok=panel_radio::submit(command);
@@ -199,10 +210,91 @@ void updateDetail(){
 }
 void sensorDetails(unsigned i){
   dismiss();dialogKind=3;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
-  label(overlay,SENSOR_NAMES[i],18,24,310,&boiler_font_25);button(overlay,"Домой",350,14,112,50,Home);
+  label(overlay,i==3?"Температура топлива":SENSOR_NAMES[i],18,24,310,&boiler_font_25);button(overlay,"Домой",350,14,112,50,Home);
   detailChannel=int(i);detailText=label(overlay,"",20,112,440,&boiler_font_19,MUTED);updateDetail();
   label(overlay,"История хранится в ОЗУ до перезапуска.\nНет демо-значений и управления выходами.",20,557,440,&boiler_font_14,MUTED);
-  button(overlay,"Закрыть",20,650,440,54,Cancel);
+  button(overlay,i==3?"Назад к топливу":"Закрыть",20,650,440,54,i==3?FuelOverview:Cancel);
+}
+const char* fuelStatusText(FuelLevelStatus status){
+  switch(status){
+    case FuelLevelStatus::BelowLower:return "Ниже нижнего";
+    case FuelLevelStatus::Between:return "Между датчиками";
+    case FuelLevelStatus::UpperReached:return "Верхний достигнут";
+    case FuelLevelStatus::Inconsistent:return "Проверьте датчики";
+    case FuelLevelStatus::Stale:return "Данные устарели";
+    default:return "Нет данных";
+  }
+}
+uint32_t fuelStatusColor(FuelLevelStatus status){
+  switch(status){
+    case FuelLevelStatus::Inconsistent:return RED;
+    case FuelLevelStatus::BelowLower:case FuelLevelStatus::Stale:return AMBER;
+    case FuelLevelStatus::UpperReached:return GREEN;
+    case FuelLevelStatus::Between:return SKY;
+    default:return MUTED;
+  }
+}
+const char* reedStatusText(const ReedLevelReading& reading,uint32_t now){
+  if(!reading.valid)return "Нет данных";
+  if(!reading.fresh(now))return "Устарело";
+  return reading.reached?"Достигнут":"Не достигнут";
+}
+void updateFuelLabels(FuelLevelLabels& labels,uint32_t now){
+  const auto status=fuelLevel.status(now);
+  if(labels.summary){lv_label_set_text(labels.summary,fuelStatusText(status));lv_obj_set_style_text_color(labels.summary,c(fuelStatusColor(status)),0);}
+  const ReedLevelReading* readings[]={&fuelLevel.upper,&fuelLevel.lower};
+  lv_obj_t* texts[]={labels.upper,labels.lower};lv_obj_t* dots[]={labels.upperDot,labels.lowerDot};
+  for(unsigned i=0;i<2;i++){
+    const auto& reading=*readings[i];
+    const uint32_t color=!reading.valid?MUTED:!reading.fresh(now)?AMBER:reading.reached?GREEN:MUTED;
+    if(texts[i]){lv_label_set_text(texts[i],reedStatusText(reading,now));lv_obj_set_style_text_color(texts[i],c(color),0);}
+    if(dots[i])lv_obj_set_style_bg_color(dots[i],c(color),0);
+  }
+}
+void updateFuel(){
+  const uint32_t now=millis();updateFuelLabels(fuelCardLabels,now);updateFuelLabels(fuelDetailLabels,now);
+  if(fuelDetailHint){
+    const char* hint="Для оценки нужны два свежих показания";
+    switch(fuelLevel.status(now)){
+      case FuelLevelStatus::BelowLower:hint="Топливо ниже нижнего датчика";break;
+      case FuelLevelStatus::Between:hint="Нижний достигнут, верхний ещё нет";break;
+      case FuelLevelStatus::UpperReached:hint="Достигнуты оба уровня";break;
+      case FuelLevelStatus::Inconsistent:hint="Верхний достигнут, а нижний - нет";break;
+      case FuelLevelStatus::Stale:hint="Есть устаревшие показания датчиков";break;
+      default:break;
+    }
+    lv_label_set_text(fuelDetailHint,hint);
+  }
+  if(fuelTemperatureValue){
+    char value[24],text[40];temperature(value,sizeof(value),measurements[3],now);
+    snprintf(text,sizeof(text),"%s °C",value);lv_label_set_text(fuelTemperatureValue,text);
+    const auto& m=measurements[3];lv_label_set_text(fuelTemperatureState,m.fresh(now)?"Свежие данные":m.count?"Нет свежих данных":"Нет данных температуры");
+  }
+}
+void fuelDetails(){
+  dismiss();dialogKind=4;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
+  label(overlay,"Топливо",18,24,310,&boiler_font_25);button(overlay,"Домой",350,14,112,50,Home);
+  label(overlay,"Два герконовых датчика уровня",18,89,442,&boiler_font_19,MUTED);
+  auto* status=box(overlay,16,130,448,110);
+  label(status,"Уровень топлива",16,12,414,&boiler_font_14,MUTED);
+  fuelDetailLabels.summary=label(status,"Нет данных",16,37,414,&boiler_font_25);
+  fuelDetailHint=label(status,"",16,78,414,&boiler_font_14,MUTED);
+  for(unsigned i=0;i<2;i++){
+    auto* row=box(overlay,16,258+111*int(i),448,95);
+    auto* dot=box(row,17,23,10,10,MUTED,5);lv_obj_set_style_border_width(dot,0,0);lv_obj_clear_flag(dot,LV_OBJ_FLAG_CLICKABLE);
+    label(row,i==0?"Верхний уровень":"Нижний уровень",42,15,220,&boiler_font_19);
+    label(row,"Герконовый датчик",42,54,230,&boiler_font_14,MUTED);
+    auto* state=label(row,"Нет данных",264,19,166,&boiler_font_19,MUTED);lv_obj_set_style_text_align(state,LV_TEXT_ALIGN_RIGHT,0);
+    if(i==0){fuelDetailLabels.upper=state;fuelDetailLabels.upperDot=dot;}
+    else{fuelDetailLabels.lower=state;fuelDetailLabels.lowerDot=dot;}
+  }
+  auto* temp=box(overlay,16,482,448,155);
+  label(temp,"Температура топлива",16,14,414,&boiler_font_19);
+  fuelTemperatureValue=label(temp,"--.- °C",16,47,150,&boiler_font_25,ACCENT[3]);
+  fuelTemperatureState=label(temp,"Нет данных температуры",171,55,260,&boiler_font_14,MUTED);
+  button(temp,"История температуры",16,98,416,42,FuelHistory);
+  label(overlay,"Два порога показывают диапазон уровня.\nПроценты и объём не вычисляются.",18,658,442,&boiler_font_14,MUTED);
+  button(overlay,"Закрыть",16,720,448,52,Cancel);updateFuel();
 }
 const uint16_t DISPLAY_TIMEOUTS[]={0,30,60,120,300,600,1800};
 void action(lv_event_t* e){
@@ -212,7 +304,7 @@ void action(lv_event_t* e){
     const unsigned i=unsigned(code-Ap0);if(i<displayedApCount){if(displayedAps[i].supported)credentials(&displayedAps[i]);else info("Тип защиты","Эта версия поддерживает открытые сети и WPA2/WPA3 Personal. Корпоративные сети и WEP не поддерживаются.");}return;
   }
   if(code>=Temp0 && code<=Temp3){
-    sensorDetails(unsigned(code-Temp0));return;
+    if(code==Temp3)fuelDetails();else sensorDetails(unsigned(code-Temp0));return;
   }
   if(code>=Timeout0 && code<=Timeout6){cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=DISPLAY_TIMEOUTS[code-Timeout0];send(cmd);return;}
 
@@ -250,6 +342,8 @@ void action(lv_event_t* e){
       if(send(cmd)){closeDialog=true;view=3;rebuild=true;}break;
     case Zone0:case Zone1:case Zone2:cmd.job=Job::Zone;cmd.zone=uint8_t(code-Zone0);send(cmd);break;
     case ServiceRefresh:rebuild=true;break;
+    case FuelHistory:sensorDetails(3);break;
+    case FuelOverview:fuelDetails();break;
     default:break;
   }
 }
@@ -264,7 +358,7 @@ void makeHeader(){
   clockLabel=dateLabel=nullptr;
   header=box(lv_scr_act(),0,0,480,100,BG,0);lv_obj_set_style_border_width(header,0,0);
   label(header,page==0?"КОТЕЛЬНАЯ":PAGES[page],18,21,310,&boiler_font_25);
-  label(header,page==0?"Четыре температурных канала":"Самостоятельная панель",18,62,310,&boiler_font_14,MUTED);
+  label(header,page==0?"Температура и уровень топлива":"Самостоятельная панель",18,62,310,&boiler_font_14,MUTED);
   if(page==0){
     clockLabel=label(header,"--:--",337,18,125,&boiler_font_25,SKY);lv_obj_set_style_text_align(clockLabel,LV_TEXT_ALIGN_RIGHT,0);
     dateLabel=label(header,"Нет времени",326,59,136,&boiler_font_14,MUTED);lv_obj_set_style_text_align(dateLabel,LV_TEXT_ALIGN_RIGHT,0);updateClock();
@@ -289,6 +383,24 @@ void home(){
     auto* mark=box(tile,16,16,30,5,ACCENT[i],3);lv_obj_set_style_border_width(mark,0,0);lv_obj_clear_flag(mark,LV_OBJ_FLAG_CLICKABLE);
     label(tile,SENSOR_NAMES[i],15,34,186,&boiler_font_19);
     char value[24];temperature(value,sizeof(value),measurements[i],millis());
+    if(i==3){
+      label(tile,"Температура",15,67,98,&boiler_font_14,MUTED);
+      tempValue[i]=label(tile,value,113,58,65,&boiler_font_25);label(tile,"°C",180,66,25,&boiler_font_19,ACCENT[i]);
+      tempState[i]=label(tile,"Нет данных",15,89,186,&boiler_font_14,MUTED);
+      auto* track=box(tile,15,112,186,3,LINE,2);lv_obj_set_style_border_width(track,0,0);lv_obj_clear_flag(track,LV_OBJ_FLAG_CLICKABLE);
+      freshBar[i]=box(track,0,0,1,3,ACCENT[i],2);lv_obj_set_style_border_width(freshBar[i],0,0);lv_obj_clear_flag(freshBar[i],LV_OBJ_FLAG_CLICKABLE);
+      label(tile,"Уровень топлива",15,124,186,&boiler_font_14,MUTED);
+      fuelCardLabels.summary=label(tile,"Нет данных",15,145,186,&boiler_font_14);
+      for(unsigned n=0;n<2;n++){
+        const int rowY=171+25*int(n);
+        auto* dot=box(tile,15,rowY+6,7,7,MUTED,4);lv_obj_set_style_border_width(dot,0,0);lv_obj_clear_flag(dot,LV_OBJ_FLAG_CLICKABLE);
+        label(tile,n==0?"Верхний":"Нижний",29,rowY,66,&boiler_font_14,MUTED);
+        auto* state=label(tile,"Нет данных",98,rowY,103,&boiler_font_14,MUTED);lv_obj_set_style_text_align(state,LV_TEXT_ALIGN_RIGHT,0);
+        if(n==0){fuelCardLabels.upper=state;fuelCardLabels.upperDot=dot;}
+        else{fuelCardLabels.lower=state;fuelCardLabels.lowerDot=dot;}
+      }
+      continue;
+    }
     tempValue[i]=label(tile,value,13,80,185,strlen(value)>5?&boiler_font_25:&boiler_font_55);label(tile,"°C",166,146,35,&boiler_font_25,ACCENT[i]);
     tempState[i]=label(tile,"Нет данных",15,168,182,&boiler_font_14,MUTED);
     tempTrend[i]=label(tile,"Истории пока нет",15,194,185,&boiler_font_14,ACCENT[i]);
@@ -406,18 +518,21 @@ void service(){
   label(list,"Прокрутите вверх / вниз. C6 не обновляется.\nИзмерительных датчиков и выходов пока нет.",14,730,406,&boiler_font_14,MUTED);
 }
 void updateLive(){
-  updateDetail();const uint32_t now=millis();char text[120];unsigned fresh=0;
+  updateFuel();updateDetail();const uint32_t now=millis();char text[120];unsigned fresh=0;
   for(unsigned i=0;i<CHANNELS;i++)if(tempValue[i]){
     const auto& m=measurements[i];fresh+=m.fresh(now);temperature(text,sizeof(text),m,now);
-    lv_label_set_text(tempValue[i],text);lv_obj_set_style_text_font(tempValue[i],strlen(text)>5?&boiler_font_25:&boiler_font_55,0);
+    lv_label_set_text(tempValue[i],text);
+    const lv_font_t* font=i==3?(strlen(text)>5?&boiler_font_14:strlen(text)>4?&boiler_font_19:&boiler_font_25):(strlen(text)>5?&boiler_font_25:&boiler_font_55);
+    lv_obj_set_style_text_font(tempValue[i],font,0);
     lv_label_set_text(tempState[i],m.fresh(now)?"Свежие данные":m.count?"Нет свежих данных":"Нет данных");
     if(m.count>=2 && m.fresh(now))snprintf(text,sizeof(text),"Изменение: %+.1f°C",m.delta());
     else snprintf(text,sizeof(text),"%s",m.count?"История: нажмите":"Истории пока нет");
-    lv_label_set_text(tempTrend[i],text);lv_obj_set_width(freshBar[i],1+185*m.freshness(now)/100);
+    if(tempTrend[i])lv_label_set_text(tempTrend[i],text);
+    lv_obj_set_width(freshBar[i],1+185*m.freshness(now)/100);
     lv_obj_set_style_bg_opa(freshBar[i],m.fresh(now)?LV_OPA_COVER:LV_OPA_TRANSP,0);
   }
-  if(sensorSummary){snprintf(text,sizeof(text),"Свежие каналы: %u / 4",fresh);lv_label_set_text(sensorSummary,text);
-    lv_label_set_text(sensorHint,fresh?"Полоса - свежесть отсчёта, не уровень температуры":"Нет реальных измерений. Датчики не подключены");}
+  if(sensorSummary){snprintf(text,sizeof(text),"Свежие температуры: %u / 4",fresh);lv_label_set_text(sensorSummary,text);
+    lv_label_set_text(sensorHint,fresh?"Полосы показывают свежесть температуры":"Свежих температурных данных пока нет");}
   if(liveTime){time_t t=time(nullptr);snprintf(text,sizeof(text),"--:--   Время не установлено");if(t>=time_t(1704067200)){tm local={};localtime_r(&t,&local);strftime(text,sizeof(text),"%H:%M:%S   %d.%m.%Y",&local);}lv_label_set_text(liveTime,text);}
   if(heapLabel){snprintf(text,sizeof(text),"Свободно памяти: %lu КБ",(unsigned long)(ESP.getFreeHeap()/1024U));lv_label_set_text(heapLabel,text);}
   if(uptimeLabel){snprintf(text,sizeof(text),"Работа: %lu с   Нажатий: %lu",(unsigned long)(now/1000U),(unsigned long)clicks);lv_label_set_text(uptimeLabel,text);}
@@ -434,6 +549,7 @@ uint32_t signature(){
 void render(){
   const lv_coord_t scrollY=resultList && renderedPage==page && renderedView==view?lv_obj_get_scroll_y(resultList):0;
   if(body)lv_obj_del(body);
+  fuelCardLabels={};
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;
   sensorSummary=sensorHint=liveTime=activity=activityDot=resultList=heapLabel=uptimeLabel=nullptr;
   body=box(lv_scr_act(),0,100,480,673,BG,0);lv_obj_set_style_border_width(body,0,0);

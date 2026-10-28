@@ -19,8 +19,18 @@ class Tests(unittest.TestCase):
  def tearDown(self):self.temp.cleanup()
  def install(self,version):
   for n in (*u.FILES,*u.RETIRED):(self.src/n).unlink(missing_ok=True)
-  for p in (F/version).iterdir():shutil.copy2(p,self.src/p.name)
-  shutil.copy2(F/'bsp'/('screen031.c' if version=='v031' else 'portrait.c'),self.src/'lvgl_glue.c')
+  if version=='v04_before_fuel':
+   # Only the two changed files need historical copies. Verify the complete
+   # reconstructed baseline so future edits cannot silently change this fixture.
+   for n in u.FILES:
+    source=F/version/n
+    if not source.exists():source=PACKAGE/'src'/n
+    self.assertEqual(u.normalized_sha(source),u.KNOWN_RELEASES[version][n])
+    shutil.copy2(source,self.src/n)
+  else:
+   for p in (F/version).iterdir():shutil.copy2(p,self.src/p.name)
+  patched=version in ('v031','v04_before_fuel')
+  shutil.copy2(F/'bsp'/('screen031.c' if patched else 'portrait.c'),self.src/'lvgl_glue.c')
  def snapshot(self):return {str(p.relative_to(self.root)):p.read_bytes() for p in self.root.rglob('*') if p.is_file() and 'boiler_backups' not in p.parts}
  def apply(self):
   src,plan=u.preflight(self.root,PACKAGE);return u.apply(src,self.root,PACKAGE,plan)
@@ -44,6 +54,35 @@ class Tests(unittest.TestCase):
   self.assertFalse((self.src/'display_idle.h').exists())
   self.assertEqual((backup/'examples/LvglUi/src/display_idle.h').read_bytes(),old)
   u.restore(self.root,backup);self.assertEqual((self.src/'display_idle.h').read_bytes(),old)
+ def test_v04_before_fuel_update_noop_and_exact_restore(self):
+  self.install('v04_before_fuel');before=self.snapshot()
+  src,plan=u.preflight(self.root,PACKAGE)
+  self.assertEqual(plan['version'],'v04_before_fuel')
+  self.assertEqual(set(plan['edits']),{'examples/LvglUi/src/main.cpp','examples/LvglUi/src/panel_types.h'})
+  backup=u.apply(src,self.root,PACKAGE,plan)
+  for n in u.FILES:self.assertEqual((self.src/n).read_bytes(),(PACKAGE/'src'/n).read_bytes())
+  for n in ('examples/LvglUi/platformio.ini','examples/LvglUi/src/lvgl_glue.c'):
+   self.assertEqual((self.root/n).read_bytes(),before[n])
+  _,current=u.preflight(self.root,PACKAGE)
+  self.assertEqual(current['version'],'v04_current');self.assertFalse(current['edits'])
+  self.assertIsNone(self.apply());self.assertEqual(len(list((self.root/'boiler_backups').iterdir())),1)
+  u.restore(self.root,backup);self.assertEqual(self.snapshot(),before)
+ def test_v04_before_fuel_mixed_new_sources_rejected(self):
+  for n in ('main.cpp','panel_types.h'):
+   with self.subTest(file=n):
+    self.install('v04_before_fuel');shutil.copy2(PACKAGE/'src'/n,self.src/n)
+    with self.assertRaises(ValueError):u.preflight(self.root,PACKAGE)
+ def test_v04_before_fuel_unknown_source_rejected(self):
+  self.install('v04_before_fuel');p=self.src/'panel_radio.cpp';p.write_bytes(p.read_bytes()+b'\n// user change\n')
+  with self.assertRaises(ValueError):u.preflight(self.root,PACKAGE)
+ def test_v04_before_fuel_requires_known_patched_glue(self):
+  self.install('v04_before_fuel')
+  shutil.copy2(F/'bsp/portrait.c',self.src/'lvgl_glue.c')
+  with self.assertRaises(ValueError):u.preflight(self.root,PACKAGE)
+  shutil.copy2(F/'bsp/ci_screen031.c',self.src/'lvgl_glue.c')
+  _,plan=u.preflight(self.root,PACKAGE)
+  self.assertEqual(plan['version'],'v04_before_fuel')
+  self.assertNotIn('examples/LvglUi/src/lvgl_glue.c',plan['edits'])
  def test_default_cli_read_only(self):
   before=self.snapshot();result=subprocess.run([sys.executable,str(PACKAGE/'apply_update.py'),str(self.root)],capture_output=True,text=True)
   self.assertEqual(result.returncode,0,result.stderr);self.assertIn('READ-ONLY',result.stdout)

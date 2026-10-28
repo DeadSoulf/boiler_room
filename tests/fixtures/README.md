@@ -7,6 +7,12 @@
 - `v04_early/`: previously published pre-reconciliation v0.4 application; not
   asserted installed by the user. Its display_idle.h is retired only for this
   complete exact set, with backup.
+- `v04_before_fuel/`: exact `main.cpp` and `panel_types.h` from
+  `DeadSoulf/boiler_room` commit `b700ef6f837f5fc1dbd0bad91a569159123c3851`,
+  before adding the two reed-switch fuel-level inputs. The remaining five
+  managed files are unchanged and reused from `src/` when assembling this
+  fixture; their pinned hashes are checked before use. This snapshot requires
+  an already-patched `screen031.c` or `ci_screen031.c` adapter, preserved as-is.
 - `v01/`: historical negative test, not an accepted direct upgrade source.
 - `bsp/`: upstream ultramcu/guition-jc4880p4-bsp at commit
   `324970bade0d1f4e52880fe8016580368bc1e06e`, retrieved via GitHub connector.

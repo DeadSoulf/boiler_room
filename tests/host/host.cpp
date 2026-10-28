@@ -82,7 +82,55 @@ int main(){
  assert(strstr(lv_label_get_text(detailText),"свежие"));dismiss();
  auto* unchangedBody=body;step(31000);assert(body==unchangedBody);
  assert(!strcmp(lv_label_get_text(tempValue[0]),"--.-"));
- sensorDetails(0);step();save("history_test_fixture");bounds(lv_layer_top());dismiss();measurements[0]=Measurement{};
+ sensorDetails(0);step();save("history_test_fixture");bounds(lv_layer_top());dismiss();measurements[0]=Measurement{};step(1100);
+ // Fuel level uses independent normalized reed thresholds; no hardware data is invented.
+ assert(fuelLevel.status(fakeMillis)==FuelLevelStatus::NoData);
+ assert(!strcmp(lv_label_get_text(fuelCardLabels.summary),"Нет данных"));
+ assert(!strcmp(lv_label_get_text(fuelCardLabels.upper),"Нет данных"));
+ assert(!strcmp(lv_label_get_text(fuelCardLabels.lower),"Нет данных"));
+ save("fuel_home_no_data");
+ clickAt(360,440);assert(overlay && dialogKind==4);step();save("fuel_detail_no_data");bounds(lv_layer_top());
+ const auto stableFuelOverlay=overlay;
+ struct FuelCase {bool lower,upper;FuelLevelStatus status;const char* text;const char* screenshot;};
+ const FuelCase fuelCases[]={
+  {false,false,FuelLevelStatus::BelowLower,"Ниже нижнего","fuel_below_test_fixture"},
+  {true,false,FuelLevelStatus::Between,"Между датчиками","fuel_between_test_fixture"},
+  {true,true,FuelLevelStatus::UpperReached,"Верхний достигнут","fuel_upper_test_fixture"},
+  {false,true,FuelLevelStatus::Inconsistent,"Проверьте датчики","fuel_inconsistent_test_fixture"}
+ };
+ for(const auto& sample:fuelCases){
+  fuelLevel.put(sample.lower,sample.upper,fakeMillis);step(1100);
+  assert(overlay==stableFuelOverlay && measurements[3].count==0);
+  assert(fuelLevel.status(fakeMillis)==sample.status);
+  assert(!strcmp(lv_label_get_text(fuelDetailLabels.summary),sample.text));
+  assert(!strcmp(lv_label_get_text(fuelCardLabels.summary),sample.text));
+  assert(!strcmp(lv_label_get_text(fuelDetailLabels.upper),sample.upper?"Достигнут":"Не достигнут"));
+  assert(!strcmp(lv_label_get_text(fuelDetailLabels.lower),sample.lower?"Достигнут":"Не достигнут"));
+  save(sample.screenshot);bounds(lv_layer_top());
+ }
+ fuelLevel.put(true,false,fakeMillis);step(31000);
+ assert(overlay==stableFuelOverlay);
+ assert(!strcmp(lv_label_get_text(fuelDetailLabels.summary),"Данные устарели"));
+ assert(!strcmp(lv_label_get_text(fuelDetailLabels.upper),"Устарело"));
+ save("fuel_stale_test_fixture");bounds(lv_layer_top());
+ fuelLevel.upper.put(true,fakeMillis);step(1100);
+ assert(!strcmp(lv_label_get_text(fuelDetailLabels.summary),"Данные устарели"));
+ assert(!strcmp(lv_label_get_text(fuelDetailLabels.upper),"Достигнут"));
+ fuelLevel.lower.clear();step(1100);
+ assert(!strcmp(lv_label_get_text(fuelDetailLabels.summary),"Нет данных"));
+ assert(!strcmp(lv_label_get_text(fuelDetailLabels.lower),"Нет данных"));
+ fuelLevel.put(true,false,fakeMillis);measurements[3].put(18.4f,fakeMillis);step(1100);
+ assert(!strcmp(lv_label_get_text(fuelTemperatureValue),"18.4 °C"));
+ clickAt(220,600);assert(dialogKind==3 && detailChannel==3);
+ clickAt(200,680);assert(dialogKind==4 && fuelDetailLabels.summary);
+ assert(!strcmp(lv_label_get_text(fuelDetailLabels.summary),"Между датчиками"));
+ clickAt(400,40);assert(!overlay && page==0 && !fuelDetailLabels.summary && !fuelTemperatureValue);
+ assert(!strcmp(lv_label_get_text(tempValue[3]),"18.4"));
+ assert(lv_obj_get_style_text_font(tempValue[3],LV_PART_MAIN)==&boiler_font_25);
+ step();save("fuel_home_between_test_fixture");bounds(root);
+ // Inspect each compact card state after a normal live update, including long status text.
+ for(const auto& sample:fuelCases){fuelLevel.put(sample.lower,sample.upper,fakeMillis);step(1100);bounds(lv_obj_get_parent(fuelCardLabels.summary));}
+ fuelLevel.clear();measurements[3]=Measurement{};step(1100);
  // Exercise real LVGL pointer gestures and Home event callback.
  swipe(true);assert(page==1);swipe(true);assert(page==2);
  save("before_home_click");
@@ -138,6 +186,6 @@ int main(){
  assert(activity && activityDot);save("busy_test_fixture");bounds(lv_scr_act());
  panel_radio::fixture.busy=false;++panel_radio::fixture.revision;step();
  for(int i=0;i<240;i++){page=i%4;view=page==2?(i/4)%4:0;render();step(10);}
- printf("RESULT: pointer swipes, Home, keyboard submit, wake consumption, freshness/history/modal/AP-race/scroll, 240 page rebuilds completed; clipped labels=%d\n",clipped);
+ printf("RESULT: pointer swipes, Home, keyboard submit, wake consumption, freshness/history/modal/AP-race/scroll, fuel thresholds/unknown/stale/history, 240 page rebuilds completed; clipped labels=%d\n",clipped);
  return clipped?1:0;
 }

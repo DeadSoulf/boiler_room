@@ -35,7 +35,15 @@ KNOWN_RELEASES = {'v03': {'main.cpp': 'f3b868683746c7902129618cc374fad61698d22c4
                'main.cpp': '7e1bc7bd3a584cfc759539b4ec270a4cdb43f7490a020dc5c5a4fbb78b59130d',
                'panel_radio.cpp': 'fd291e5895b1adaed1757ca2c4a767141acef4849ff787e6c25f139b7ba4e045',
                'panel_radio.h': '85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7',
-               'panel_types.h': '4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c'}}
+               'panel_types.h': '4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c'},
+ # Exact b700ef6 baseline before the fuel-level UI/model addition.
+ 'v04_before_fuel': {'main.cpp': '724fa4a275696fa2c6e9a9d831f511b6645554c9fbe24844145ed72f0b8f3c47',
+                     'panel_types.h': '4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c',
+                     'panel_radio.h': '85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7',
+                     'panel_radio.cpp': '49a38d2cf26a0d115cf8dd251381457adb65ea89ced513a5e02ad5bb99c883a4',
+                     'screen_state.h': 'ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba',
+                     'panel_screen.h': '0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647',
+                     'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767'}}
 GLUE_INPUTS = {'21f57f84236abf46aa7b612ee08a5ab10c1b28cc18d375b14bb4045c35e56f3b': '9f4731067dbc35d9fa4b6de74d74c514d033b10e42a1547d967e8ec3a9c02b42',
  'd24840d05fd756805d70fc8f6980a3d35068706ab275aaaf24ff7e7b5cfae535': '83c1004b49d99913194f144b0eff6006d793aa7770788b757c844768ff83d478'}
 BOARD_HASH = 'b6837425c6562a83b6ed1995a348470ef51e2ee886911663498c2a43a3d50898'
@@ -181,7 +189,7 @@ def preflight(root, package):
     glue=root/prefix/'lvgl_glue.c';ini=root/'examples/LvglUi/platformio.ini'
     glue_s=text(glue); ini_s=text(ini)
     verify_ini(ini_s)
-    if version in ('v031','v04_current'):
+    if version in ('v031','v04_before_fuel','v04_current'):
         if digest(glue_s.encode()) not in GLUE_INPUTS.values():
             raise ValueError('Incomplete/mismatched installed screen adapter or CPU/debug configuration.')
     elif digest(glue_s.encode()) not in GLUE_INPUTS:
