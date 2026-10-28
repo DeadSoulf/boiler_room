@@ -1,0 +1,8 @@
+{
+  "dist/index.html": "a9134cc20d07cc7e08a345fb62a5a69fa055763b09fe52e5f0015ecfff7342ac",
+  "dist/styles.css": "be78a47e53580f5bcd400e6c64b020f64deed51f4838846798c582cd84dd21b6",
+  "dist/app.js": "7c0c8575f936392d08360f43d4ed27d71b5281dbdfdbdb3b74779461bc063010",
+  "dist/model.js": "50c28b89bec31f99e04f93975155dad9a91048ad76c94113fae35b5f1ea6f454",
+  "dist/favicon.svg": "c57c59e9078c3e6a0548801d3f769bf8ae793c5b4994fa4f0ac8f96ffed188d6",
+  "tests/model.test.mjs": "539759139d137e53ac19168e320939bde81f6f969ad7ad3a2bbac18b272e530d"
+}

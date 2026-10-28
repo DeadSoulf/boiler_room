@@ -1,0 +1,89 @@
+{
+  "responsiveResults": [
+    {
+      "buttonBottom": 665.484375,
+      "navTop": 736,
+      "scrollWidth": 465,
+      "width": 465
+    },
+    {
+      "buttonBottom": 690.890625,
+      "navTop": 736,
+      "scrollWidth": 345,
+      "width": 345
+    }
+  ],
+  "routeChecks": [
+    {
+      "scrollWidth": 345,
+      "title": "Обзор котельной",
+      "width": 345
+    },
+    {
+      "scrollWidth": 345,
+      "title": "История температуры",
+      "width": 345
+    },
+    {
+      "scrollWidth": 360,
+      "title": "Журнал событий",
+      "width": 360
+    },
+    {
+      "scrollWidth": 345,
+      "title": "Диагностика",
+      "width": 345
+    },
+    {
+      "scrollWidth": 345,
+      "title": "Сервис",
+      "width": 345
+    },
+    {
+      "scrollWidth": 345,
+      "title": "Топливо и подогрев",
+      "width": 345
+    }
+  ],
+  "backCheck": "Обзор котельной",
+  "onCheck": "Режим подогрева\nРазрешён\nНагреватель\nНет данных",
+  "offCheck": "Режим подогрева\nОтключён\nНагреватель\nНет данных",
+  "scenarioChecks": [
+    {
+      "alert": "Мало топлива",
+      "disableDisabled": true,
+      "enableDisabled": true,
+      "reason": "Демо: включение недоступно при низком уровне",
+      "scenario": "low",
+      "temperature": "36,0°C",
+      "title": "Ниже нижнего"
+    },
+    {
+      "alert": "Данные уровня устарели",
+      "disableDisabled": true,
+      "enableDisabled": true,
+      "reason": "Нет актуальной температуры топлива",
+      "scenario": "stale",
+      "temperature": "—°C",
+      "title": "Данные устарели"
+    },
+    {
+      "alert": "Нет подключения",
+      "disableDisabled": true,
+      "enableDisabled": true,
+      "reason": "Управление не подключено",
+      "scenario": "disconnected",
+      "temperature": "—°C",
+      "title": "Нет данных"
+    },
+    {
+      "alert": null,
+      "disableDisabled": true,
+      "enableDisabled": false,
+      "reason": "Изменение режима в демонстрации.",
+      "scenario": "normal",
+      "temperature": "36,0°C",
+      "title": "Рабочий диапазон"
+    }
+  ]
+}
