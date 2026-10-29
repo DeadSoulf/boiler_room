@@ -9,6 +9,7 @@ export const PRIMARY_PAGES = Object.freeze([
 const PARENTS = Object.freeze({
   fuel: 'overview', history: 'overview', journal: 'fuel', diagnostics: 'fuel',
   wifi: 'settings', bluetooth: 'settings', datetime: 'settings', display: 'settings',
+  dhw: 'controls', electric: 'controls', diesel: 'controls', 'equipment-journal': 'controls',
 });
 
 export function parentPage(route, historySensor = '') {

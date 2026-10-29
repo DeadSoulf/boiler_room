@@ -16,6 +16,10 @@ test('fuel, history, journal and diagnostics keep their parent hierarchy', () =>
     assert.equal(parentPage(route), 'settings');
     assert.equal(primaryPage(route), 'settings');
   }
+  for (const route of ['dhw', 'electric', 'diesel', 'equipment-journal']) {
+    assert.equal(parentPage(route), 'controls');
+    assert.equal(primaryPage(route), 'controls');
+  }
 });
 test('primary navigation wraps in both directions', () => {
   assert.equal(adjacentPage('overview', -1), 'service');
@@ -31,7 +35,7 @@ test('only a deliberate horizontal gesture changes a primary page', () => {
   }
 });
 test('detail screens and invalid directions cannot become swipe commands', () => {
-  for (const route of ['fuel', 'history', 'journal', 'diagnostics', 'wifi']) {
+  for (const route of ['fuel', 'history', 'journal', 'diagnostics', 'wifi', 'dhw', 'electric', 'diesel', 'equipment-journal']) {
     assert.equal(swipePage(route, -150, 0, 200), null);
   }
   assert.equal(adjacentPage('overview', 0), null);

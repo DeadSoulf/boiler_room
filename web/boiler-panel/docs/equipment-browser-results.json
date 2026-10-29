@@ -1,0 +1,279 @@
+{
+  "version": "0.3.0",
+  "date": "2026-10-29",
+  "environment": "Chrome local Sites preview; CSS viewports, not physical display",
+  "geometry": [
+    {
+      "frameId": "panel480",
+      "cards": [
+        {
+          "bottom": 475.78125,
+          "height": 224.1875,
+          "text": "Бойлер косвенного нагрева",
+          "width": 208.5
+        },
+        {
+          "bottom": 475.78125,
+          "height": 224.1875,
+          "text": "Электрокотёл",
+          "width": 208.5
+        },
+        {
+          "bottom": 711.96875,
+          "height": 224.1875,
+          "text": "Дизельный отопитель",
+          "width": 208.5
+        },
+        {
+          "bottom": 711.96875,
+          "height": 224.1875,
+          "text": "Подогрев топлива",
+          "width": 208.5
+        }
+      ],
+      "page": "Управление",
+      "scrollWidth": 465,
+      "width": 465
+    },
+    {
+      "frameId": "panel360",
+      "cards": [
+        {
+          "bottom": 543.75,
+          "height": 279.75,
+          "text": "Бойлер косвенного нагрева",
+          "width": 154.5
+        },
+        {
+          "bottom": 543.75,
+          "height": 279.75,
+          "text": "Электрокотёл",
+          "width": 154.5
+        },
+        {
+          "bottom": 813.25,
+          "height": 259.5,
+          "text": "Дизельный отопитель",
+          "width": 154.5
+        },
+        {
+          "bottom": 813.25,
+          "height": 259.5,
+          "text": "Подогрев топлива",
+          "width": 154.5
+        }
+      ],
+      "page": "Управление",
+      "scrollWidth": 345,
+      "width": 345
+    },
+    {
+      "frameId": "panel480",
+      "commands": [
+        {
+          "bottom": 512.28125,
+          "height": 48,
+          "label": "Запросить нагрев: Бойлер косвенного нагрева"
+        },
+        {
+          "bottom": 512.28125,
+          "height": 48,
+          "label": "Отменить запрос: Бойлер косвенного нагрева"
+        }
+      ],
+      "headingOverflow": false,
+      "page": "Бойлер косвенного нагрева",
+      "scrollWidth": 465,
+      "width": 465
+    },
+    {
+      "frameId": "panel360",
+      "commands": [
+        {
+          "bottom": 529.1875,
+          "height": 48,
+          "label": "Запросить нагрев: Бойлер косвенного нагрева"
+        },
+        {
+          "bottom": 529.1875,
+          "height": 48,
+          "label": "Отменить запрос: Бойлер косвенного нагрева"
+        }
+      ],
+      "headingOverflow": false,
+      "page": "Бойлер косвенного нагрева",
+      "scrollWidth": 345,
+      "width": 345
+    },
+    {
+      "frameId": "panel480",
+      "commands": [
+        {
+          "bottom": 386.09375,
+          "height": 48,
+          "label": "Разрешить: Электрокотёл"
+        },
+        {
+          "bottom": 386.09375,
+          "height": 48,
+          "label": "Отключить: Электрокотёл"
+        },
+        {
+          "bottom": 707.1875,
+          "height": 48,
+          "label": "Разрешить: Контур 1"
+        },
+        {
+          "bottom": 707.1875,
+          "height": 48,
+          "label": "Отключить: Контур 1"
+        },
+        {
+          "bottom": 957.78125,
+          "height": 48,
+          "label": "Разрешить: Контур 2"
+        },
+        {
+          "bottom": 957.78125,
+          "height": 48,
+          "label": "Отключить: Контур 2"
+        },
+        {
+          "bottom": 1208.375,
+          "height": 48,
+          "label": "Разрешить: Контур 3"
+        },
+        {
+          "bottom": 1208.375,
+          "height": 48,
+          "label": "Отключить: Контур 3"
+        }
+      ],
+      "headingOverflow": false,
+      "page": "Электрокотёл",
+      "scrollWidth": 465,
+      "width": 465
+    },
+    {
+      "frameId": "panel360",
+      "commands": [
+        {
+          "bottom": 383,
+          "height": 48,
+          "label": "Разрешить: Электрокотёл"
+        },
+        {
+          "bottom": 383,
+          "height": 48,
+          "label": "Отключить: Электрокотёл"
+        },
+        {
+          "bottom": 720.6875,
+          "height": 48,
+          "label": "Разрешить: Контур 1"
+        },
+        {
+          "bottom": 720.6875,
+          "height": 48,
+          "label": "Отключить: Контур 1"
+        },
+        {
+          "bottom": 988.875,
+          "height": 48,
+          "label": "Разрешить: Контур 2"
+        },
+        {
+          "bottom": 988.875,
+          "height": 48,
+          "label": "Отключить: Контур 2"
+        },
+        {
+          "bottom": 1257.0625,
+          "height": 48,
+          "label": "Разрешить: Контур 3"
+        },
+        {
+          "bottom": 1257.0625,
+          "height": 48,
+          "label": "Отключить: Контур 3"
+        }
+      ],
+      "headingOverflow": false,
+      "page": "Электрокотёл",
+      "scrollWidth": 345,
+      "width": 345
+    },
+    {
+      "frameId": "panel480",
+      "commands": [
+        {
+          "bottom": 500.09375,
+          "height": 48,
+          "label": "Запросить запуск: Дизельный отопитель"
+        },
+        {
+          "bottom": 500.09375,
+          "height": 48,
+          "label": "Запросить остановку: Дизельный отопитель"
+        }
+      ],
+      "headingOverflow": false,
+      "page": "Дизельный отопитель",
+      "scrollWidth": 465,
+      "width": 465
+    },
+    {
+      "frameId": "panel360",
+      "commands": [
+        {
+          "bottom": 492.78125,
+          "height": 52.78125,
+          "label": "Запросить запуск: Дизельный отопитель"
+        },
+        {
+          "bottom": 492.78125,
+          "height": 52.78125,
+          "label": "Запросить остановку: Дизельный отопитель"
+        }
+      ],
+      "headingOverflow": false,
+      "page": "Дизельный отопитель",
+      "scrollWidth": 345,
+      "width": 345
+    },
+    {
+      "frameId": "panel480",
+      "commands": [],
+      "headingOverflow": false,
+      "page": "События оборудования",
+      "scrollWidth": 480,
+      "width": 480
+    },
+    {
+      "frameId": "panel360",
+      "commands": [],
+      "headingOverflow": false,
+      "page": "События оборудования",
+      "scrollWidth": 360,
+      "width": 360
+    }
+  ],
+  "observedCommands": {
+    "circuit1OnPending": {
+      "confirmedMode": "off",
+      "actual": "unknown"
+    },
+    "circuit1OnAccepted": {
+      "confirmedMode": "enabled",
+      "otherCircuits": "off",
+      "actual": "unknown"
+    },
+    "circuit1OffRejected": {
+      "confirmedMode": "enabled",
+      "visibleConfirmedMode": true,
+      "actual": "unknown"
+    }
+  },
+  "navigation": "Each new detail screen opened and returned to Controls in both viewport frames",
+  "physicalHardwareTested": false
+}
