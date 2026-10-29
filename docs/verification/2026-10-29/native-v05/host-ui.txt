@@ -1,0 +1,5 @@
+CLICK settled in 110 ms after release
+CLICK settled in 110 ms after release
+EQUIPMENT UI: 4 cards, real pointer commands/outcomes, reset and superseded ON, 3 independent circuits, touch scrolling, journal16, persistent warning, no radio commands
+HOME BEFORE page=2 rendered=2 pending=-1 rebuild=0 overlay=(nil) sleeping=0 consume=0 clicks=47 hit=0x565190352430 header=0x565190350ca0 hit-button=1
+RESULT: pointer swipes, Home, keyboard layouts/held keys/password submit, bounded SSID/raw connection, wake consumption, freshness/history/modal/AP-race/scroll, fuel thresholds/unknown/stale/history, equipment demo pointer scenarios, 240 page rebuilds completed; clipped labels=0

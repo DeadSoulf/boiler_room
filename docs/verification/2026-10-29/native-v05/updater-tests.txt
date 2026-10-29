@@ -1,0 +1,87 @@
+SUCCESS: source update. No device flashed. Backup: /tmp/tmp6q3rmw22/bsp/boiler_backups/update_20261029_172614_432707
+SUCCESS: source update. No device flashed. Backup: /tmp/tmp3s7uhcb_/bsp/boiler_backups/update_20261029_172614_519498
+SUCCESS: source update. No device flashed. Backup: /tmp/tmprkcgwzy8/bsp/boiler_backups/update_20261029_172614_565843
+SUCCESS: source update. No device flashed. Backup: /tmp/tmp6ah3p138/bsp/boiler_backups/update_20261029_172614_591146
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpj36f_ktc/bsp/boiler_backups/update_20261029_172614_619777
+SUCCESS: source update. No device flashed. Backup: /tmp/tmp6zqzyeni/bsp/boiler_backups/update_20261029_172614_708908
+SUCCESS: source restore. No device flashed. Backup: /tmp/tmp6zqzyeni/bsp/boiler_backups/restore_20261029_172614_726462
+ALREADY RESTORED. No changes made.
+ALREADY RESTORED. No changes made.
+SUCCESS: source restore. No device flashed. Backup: /tmp/tmpthbzohlh/bsp/boiler_backups/restore_20261029_172614_867472
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpufybvvto/bsp/boiler_backups/update_20261029_172614_886325
+ALREADY CURRENT: v0.5.0. No changes made.
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpobkh08lc/bsp/boiler_backups/update_20261029_172614_978112
+SUCCESS: source restore. No device flashed. Backup: /tmp/tmp1xhlqubk/bsp/boiler_backups/restore_20261029_172615_048913
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpgyn43cri/bsp/boiler_backups/update_20261029_172615_101836
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpmj6nsx8x/bsp/boiler_backups/update_20261029_172615_128929
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpzw74y7v9/bsp/boiler_backups/update_20261029_172615_155453
+SUCCESS: source update. No device flashed. Backup: /tmp/tmp97h40hw_/bsp/boiler_backups/update_20261029_172615_532250
+ALREADY CURRENT: v0.5.0. No changes made.
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpwiw2bh86/bsp/boiler_backups/update_20261029_172615_566945
+SUCCESS: source restore. No device flashed. Backup: /tmp/tmpwiw2bh86/bsp/boiler_backups/restore_20261029_172615_577809
+SUCCESS: source update. No device flashed. Backup: /tmp/tmp_ua4di30/bsp/boiler_backups/update_20261029_172615_640467
+ALREADY CURRENT: v0.5.0. No changes made.
+SUCCESS: source restore. No device flashed. Backup: /tmp/tmp_ua4di30/bsp/boiler_backups/restore_20261029_172615_673628
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpjikjqxqe/bsp/boiler_backups/update_20261029_172615_741656
+ALREADY CURRENT: v0.5.0. No changes made.
+SUCCESS: source restore. No device flashed. Backup: /tmp/tmpjikjqxqe/bsp/boiler_backups/restore_20261029_172615_773217
+SUCCESS: source update. No device flashed. Backup: /tmp/tmpfbqkqhtw/bsp/boiler_backups/update_20261029_172615_805263
+ALREADY CURRENT: v0.5.0. No changes made.
+SUCCESS: source restore. No device flashed. Backup: /tmp/tmpfbqkqhtw/bsp/boiler_backups/restore_20261029_172615_825322
+
+test_added_header_must_be_present_in_payload_and_manifest (__main__.Tests.test_added_header_must_be_present_in_payload_and_manifest) ... ok
+test_backup_path_injection_rejected (__main__.Tests.test_backup_path_injection_rejected) ... ok
+test_board_mismatch_rejected (__main__.Tests.test_board_mismatch_rejected) ... ok
+test_ci_portrait_exact_transform (__main__.Tests.test_ci_portrait_exact_transform) ... ok
+test_concurrent_change_before_apply_refused (__main__.Tests.test_concurrent_change_before_apply_refused) ... ok
+test_config_duplicate_or_inheritance_rejected (__main__.Tests.test_config_duplicate_or_inheritance_rejected) ... ok
+test_config_mismatch_rejected (__main__.Tests.test_config_mismatch_rejected) ... ok
+test_config_noncritical_customization_preserved (__main__.Tests.test_config_noncritical_customization_preserved) ... ok
+test_critical_target_overrides_rejected_without_writes (__main__.Tests.test_critical_target_overrides_rejected_without_writes) ... ok
+test_crlf_bom_exact_semantics (__main__.Tests.test_crlf_bom_exact_semantics) ... ok
+test_current_missing_added_header_rejected (__main__.Tests.test_current_missing_added_header_rejected) ... ok
+test_current_missing_screen_file_rejected (__main__.Tests.test_current_missing_screen_file_rejected) ... ok
+test_default_cli_read_only (__main__.Tests.test_default_cli_read_only) ... ok
+test_earlier_v04_retires_only_known_idle (__main__.Tests.test_earlier_v04_retires_only_known_idle) ... ok
+test_failed_rollback_status_preserves_prepared_and_original_error (__main__.Tests.test_failed_rollback_status_preserves_prepared_and_original_error) ... ok
+test_final_manifest_failure_rolls_back_with_valid_metadata (__main__.Tests.test_final_manifest_failure_rolls_back_with_valid_metadata) ... ok
+test_fonts_mismatch_rejected (__main__.Tests.test_fonts_mismatch_rejected) ... ok
+test_initial_manifest_failure_changes_no_sources (__main__.Tests.test_initial_manifest_failure_changes_no_sources) ... ok
+test_interrupted_apply_refused_and_explicit_restore (__main__.Tests.test_interrupted_apply_refused_and_explicit_restore) ... ok
+test_matching_target_overrides_and_supported_lvgl_preserved (__main__.Tests.test_matching_target_overrides_and_supported_lvgl_preserved) ... ok
+test_missing_conflicting_and_incompatible_lvgl_rejected (__main__.Tests.test_missing_conflicting_and_incompatible_lvgl_rejected) ... ok
+test_missing_payload_rejected (__main__.Tests.test_missing_payload_rejected) ... ok
+test_mixed_source_set_rejected (__main__.Tests.test_mixed_source_set_rejected) ... ok
+test_modified_each_owned_source_rejected (__main__.Tests.test_modified_each_owned_source_rejected) ... ok
+test_modified_glue_rejected_even_marker_intact (__main__.Tests.test_modified_glue_rejected_even_marker_intact) ... ok
+test_partial_source_set_rejected (__main__.Tests.test_partial_source_set_rejected) ... ok
+test_payload_manifest_corruption_rejected (__main__.Tests.test_payload_manifest_corruption_rejected) ... ok
+test_persistent_write_failure_keeps_manifest_and_later_restore (__main__.Tests.test_persistent_write_failure_keeps_manifest_and_later_restore) ... ok
+test_protected_concurrent_edit_rolls_back_sources_only (__main__.Tests.test_protected_concurrent_edit_rolls_back_sources_only) ... ok
+test_restore_preserves_edited_added_header (__main__.Tests.test_restore_preserves_edited_added_header) ... ok
+test_restore_refuses_corrupted_backup (__main__.Tests.test_restore_refuses_corrupted_backup) ... ok
+test_restore_refuses_post_update_edit (__main__.Tests.test_restore_refuses_post_update_edit) ... ok
+test_rollback_write_failure_all_positions (__main__.Tests.test_rollback_write_failure_all_positions) ... ok
+test_symlink_owned_file_rejected (__main__.Tests.test_symlink_owned_file_rejected) ... ok
+test_symlink_source_directory_rejected (__main__.Tests.test_symlink_source_directory_rejected) ... ok
+test_unknown_retired_file_rejected (__main__.Tests.test_unknown_retired_file_rejected) ... ok
+test_unpatched_v031_glue_rejected (__main__.Tests.test_unpatched_v031_glue_rejected) ... ok
+test_v01_v02_unsupported (__main__.Tests.test_v01_v02_unsupported) ... ok
+test_v031_and_idempotence (__main__.Tests.test_v031_and_idempotence) ... ok
+test_v03_safe_transform_and_backup (__main__.Tests.test_v03_safe_transform_and_backup) ... ok
+test_v04_audited_baseline_hashes (__main__.Tests.test_v04_audited_baseline_hashes) ... ok
+test_v04_audited_mixed_sources_and_preexisting_new_header_rejected (__main__.Tests.test_v04_audited_mixed_sources_and_preexisting_new_header_rejected) ... ok
+test_v04_audited_requires_exact_patched_adapter (__main__.Tests.test_v04_audited_requires_exact_patched_adapter) ... ok
+test_v04_audited_update_noop_and_restore_added_header (__main__.Tests.test_v04_audited_update_noop_and_restore_added_header) ... ok
+test_v04_before_fuel_mixed_new_sources_rejected (__main__.Tests.test_v04_before_fuel_mixed_new_sources_rejected) ... ok
+test_v04_before_fuel_requires_known_patched_glue (__main__.Tests.test_v04_before_fuel_requires_known_patched_glue) ... ok
+test_v04_before_fuel_unknown_source_rejected (__main__.Tests.test_v04_before_fuel_unknown_source_rejected) ... ok
+test_v04_before_fuel_update_noop_and_exact_restore (__main__.Tests.test_v04_before_fuel_update_noop_and_exact_restore) ... ok
+test_v04_fuel_baseline_hashes (__main__.Tests.test_v04_fuel_baseline_hashes) ... ok
+test_v04_fuel_rejects_edited_source_and_unpatched_glue (__main__.Tests.test_v04_fuel_rejects_edited_source_and_unpatched_glue) ... ok
+test_v04_fuel_update_noop_and_exact_restore (__main__.Tests.test_v04_fuel_update_noop_and_exact_restore) ... ok
+
+----------------------------------------------------------------------
+Ran 51 tests in 1.438s
+
+OK

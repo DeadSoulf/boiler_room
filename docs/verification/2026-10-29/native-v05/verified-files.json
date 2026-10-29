@@ -1,0 +1,17 @@
+{
+  "src/boiler_fonts.c": "2bc21156983acec91e8bb89f992302057a25b09b38e600c6da258b3d2c82ea9f",
+  "src/equipment_demo.h": "94dc6db2d3ec43c8d62c33404b94826d93fa092b6c59225b4adcbd561a311adf",
+  "src/main.cpp": "ec7841ef22f4d567bd3261d424d78c794736adf695253c86a9b4682d6304078b",
+  "src/panel_radio.cpp": "b8b23bb99256ada064cce45ea6a696d3504355614171b4f28d9db5ed7f96cfd2",
+  "src/panel_radio.h": "85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7",
+  "src/panel_screen.cpp": "7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767",
+  "src/panel_screen.h": "0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647",
+  "src/panel_types.h": "0d16fd7800967a8640dcf48c0e2f8cb3d72df3e04b7e35d1ca78d40e305f7c53",
+  "src/screen_state.h": "ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba",
+  "tests/host/host.cpp": "daf4ed8e1234c7fe55ec8bc3935934a7316191414f3c33d3e7d6851a7db2eb17",
+  "tests/equipment_demo_tests.cpp": "15d3184bf923e004c1048697e477ef6a90ce4c081a3e28fc36466383916c5a27",
+  "tests/flash_panel_tests.py": "dbbf6293a0fc02d20283842a277a2219e6353029000b3e58086df6e051eab3cc",
+  "scripts/flash_panel.py": "ceb35035323f1101a4dad1a7181024c7701fc799f85fe2844b749b5db5597810",
+  "scripts/flash_COM3.cmd": "8c30198a6699b2b571fcb0dfd32639f49e2920c8733b45f655921b5f8222324b",
+  "apply_update.py": "f87a407d92ce027234f23b6c29aad1d096febd0d977fb600bf052eb8e0ea0a8c"
+}

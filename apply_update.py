@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline BoilerPanel v0.3.0/v0.3.1 -> v0.4.0 source update.
+"""Offline BoilerPanel v0.3.0/v0.3.1/v0.4.0 -> v0.5.0 source update.
 Default read-only. Only exact known complete installations are accepted (UTF-8
 BOM/CRLF tolerated). v0.1/v0.2 and edited/mixed installations are unsupported.
 Caught write failures are rolled back; multi-file updates are NOT power-loss atomic.
@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 FILES = ('main.cpp','panel_types.h','panel_radio.h','panel_radio.cpp',
-         'screen_state.h','panel_screen.h','panel_screen.cpp')
+         'screen_state.h','panel_screen.h','panel_screen.cpp','equipment_demo.h')
 RETIRED = ('display_idle.h',)
 MARKER='/* BOILER_SCREEN_031: deferred touch and wake filter. */'
 
@@ -51,7 +51,15 @@ KNOWN_RELEASES = {'v03': {'main.cpp': 'f3b868683746c7902129618cc374fad61698d22c4
               'panel_radio.cpp': '49a38d2cf26a0d115cf8dd251381457adb65ea89ced513a5e02ad5bb99c883a4',
               'screen_state.h': 'ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba',
               'panel_screen.h': '0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647',
-              'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767'}}
+              'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767'},
+ # Exact e09980a source set (unchanged since audited firmware commit 73639bd).
+ 'v04_audited': {'main.cpp': '85f45c794a1e5a1ffb4a6440dc21e8641e9df9c6f4ffcc2dd7a3c93354138143',
+                 'panel_types.h': 'f176b79c9953e5f0386525ca873f9f00b504ab6ddc651916a6bf818c44ea42f3',
+                 'panel_radio.h': '85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7',
+                 'panel_radio.cpp': 'b8b23bb99256ada064cce45ea6a696d3504355614171b4f28d9db5ed7f96cfd2',
+                 'screen_state.h': 'ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba',
+                 'panel_screen.h': '0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647',
+                 'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767'}}
 GLUE_INPUTS = {'21f57f84236abf46aa7b612ee08a5ab10c1b28cc18d375b14bb4045c35e56f3b': '9f4731067dbc35d9fa4b6de74d74c514d033b10e42a1547d967e8ec3a9c02b42',
  'd24840d05fd756805d70fc8f6980a3d35068706ab275aaaf24ff7e7b5cfae535': '83c1004b49d99913194f144b0eff6006d793aa7770788b757c844768ff83d478'}
 BOARD_HASH = 'b6837425c6562a83b6ed1995a348470ef51e2ee886911663498c2a43a3d50898'
@@ -200,17 +208,17 @@ def preflight(root, package):
     actual = {n:normalized_sha(src/n) for n in (*FILES,*RETIRED) if (src/n).exists()}
     current = {n:normalized_sha(package/'src'/n) for n in FILES}
     version = next((v for v,files in KNOWN_RELEASES.items() if actual==files),None)
-    if actual==current: version='v04_current'
+    if actual==current: version='v05_current'
     if version is None:
         raise ValueError('Unsupported, edited, incomplete or mixed source set. Only complete known '
-                         'v0.3.0/v0.3.1/earlier v0.4.0 accepted. No files changed.')
+                         'v0.3.0/v0.3.1/v0.4.0 and the current v0.5.0 accepted. No files changed.')
     for n,expected in [('boards/jc4880p4.json',BOARD_HASH),('src/board_p4.h',HEADER_HASH),
                        (prefix+'boiler_fonts.c',FONT_HASH)]:
         if normalized_sha(root/n)!=expected: raise ValueError('Unknown or modified BSP/font file: '+n)
     glue=root/prefix/'lvgl_glue.c';ini=root/'examples/LvglUi/platformio.ini'
     glue_s=text(glue); ini_s=text(ini)
     verify_ini(ini_s)
-    if version in ('v031','v04_before_fuel','v04_fuel','v04_current'):
+    if version in ('v031','v04_before_fuel','v04_fuel','v04_audited','v05_current'):
         if digest(glue_s.encode()) not in GLUE_INPUTS.values():
             raise ValueError('Incomplete/mismatched installed screen adapter or CPU/debug configuration.')
     elif digest(glue_s.encode()) not in GLUE_INPUTS:
@@ -249,7 +257,7 @@ def transaction(root,plan,operation='update'):
     for n,b in observed.items():
         if current_bytes(root,n)!=b: raise RuntimeError('Concurrent edit before update: '+n)
     if not edits:
-        print('ALREADY CURRENT: v0.4.0. No changes made.' if operation=='update' else 'ALREADY RESTORED. No changes made.');return None
+        print('ALREADY CURRENT: v0.5.0. No changes made.' if operation=='update' else 'ALREADY RESTORED. No changes made.');return None
     backup_parent=root/'boiler_backups'
     if backup_parent.is_symlink(): raise ValueError('Symlink backup directory refused.')
     backup=backup_parent/(operation+'_'+datetime.now().strftime('%Y%m%d_%H%M%S_%f'))
@@ -258,7 +266,7 @@ def transaction(root,plan,operation='update'):
     for n,b in previous.items():
         if b is not None:
             dest=backup/n;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(b)
-    meta={'root':str(root.resolve()),'version':'v0.4.0','from':plan.get('version'),
+    meta={'root':str(root.resolve()),'version':'v0.5.0','from':plan.get('version'),
           'state':'prepared','power_loss_atomic':False,'files':{
         n:{'old_sha256':None if previous[n] is None else digest(previous[n]),
            'new_sha256':None if b is None else digest(b)} for n,b in edits.items()}}

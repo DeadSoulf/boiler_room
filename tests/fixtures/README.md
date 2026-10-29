@@ -18,6 +18,13 @@
   before the audited UI/radio fixes. Their bytes match the GitHub snapshot.
   This complete baseline is accepted for upgrade and requires an already-patched
   screen adapter. It is never copied into the firmware payload.
+- `v04_audited/`: all seven managed source files from
+  `DeadSoulf/boiler_room` commit `e09980a21f55565d1c0ba5174eeb35be96143997`.
+  This source set is unchanged from the firmware validated at `73639bd` and
+  precedes the native equipment visualization. The v0.5 updater accepts only
+  this complete exact set with its already-patched screen adapter, then adds
+  `equipment_demo.h`. Restore removes that added file and restores the original
+  source bytes. This fixture is not firmware payload.
 - `v01/`: historical negative test, not an accepted direct upgrade source.
 - `bsp/`: upstream ultramcu/guition-jc4880p4-bsp at commit
   `324970bade0d1f4e52880fe8016580368bc1e06e`, retrieved via GitHub connector.

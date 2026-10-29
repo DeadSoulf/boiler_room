@@ -9,10 +9,11 @@ uint32_t fakeMillis=1000;SerialStub Serial;ESPStub ESP;
 namespace panel_radio {
 panel::RadioState fixture;
 panel::Command lastCommand;
+unsigned submittedCommands=0;
 bool begin(){return true;}
 bool cancel(){return true;}
 bool snapshot(panel::RadioState& out){out=fixture;return true;}
-bool submit(const panel::Command& cmd){lastCommand=cmd;return true;}
+bool submit(const panel::Command& cmd){++submittedCommands;lastCommand=cmd;return true;}
 const char* zoneName(uint8_t z){const char* zones[]={"UTC","Москва UTC+3","Берлин CET/CEST"};return zones[z<3?z:0];}
 }
 #include "../../src/main.cpp"
@@ -66,7 +67,169 @@ void clickKey(const char* text,int heldMs=60){
  assert(false && "Keyboard key not found");
 }
 void swipe(bool left){mx=left?400:80;my=650;down=true;step(70);for(int i=0;i<7;i++){mx+=(left?-40:40);step(35);}down=false;step(300);}
+lv_obj_t* findLabel(lv_obj_t* parent,const char* text){
+ if(lv_obj_has_flag(parent,LV_OBJ_FLAG_HIDDEN))return nullptr;
+ if(lv_obj_check_type(parent,&lv_label_class) && !strcmp(lv_label_get_text(parent),text))return parent;
+ for(unsigned i=0;i<lv_obj_get_child_cnt(parent);i++)if(auto* found=findLabel(lv_obj_get_child(parent,i),text))return found;
+ return nullptr;
+}
+void touchObject(lv_obj_t* object){
+ assert(object && !lv_obj_has_state(object,LV_STATE_DISABLED));
+ lv_obj_update_layout(lv_scr_act());lv_area_t area;lv_obj_get_coords(object,&area);
+ assert(area.x1>=0 && area.x2<480 && area.y1>=0 && area.y2<800);
+ lv_point_t point={lv_coord_t((area.x1+area.x2)/2),lv_coord_t((area.y1+area.y2)/2)};
+ auto* hit=lv_indev_search_obj(overlay?lv_layer_top():lv_scr_act(),&point);
+ auto* ancestor=hit;while(ancestor && ancestor!=object)ancestor=lv_obj_get_parent(ancestor);
+ assert(ancestor==object && "Target must be physically exposed to the touch hit test");
+ clickAt(point.x,point.y);
+}
+void touchNamed(const char* caption){
+ auto* text=findLabel(overlay?lv_layer_top():lv_scr_act(),caption);
+ assert(text && "Named control is visible in the current LVGL tree");
+ auto* object=lv_obj_get_parent(text);
+ assert(lv_obj_check_type(object,&lv_btn_class));touchObject(object);
+}
+void touchScrollList(bool forward){
+ assert(resultList);lv_obj_update_layout(resultList);lv_area_t a;lv_obj_get_coords(resultList,&a);
+ mx=(a.x1+a.x2)/2;const int begin=forward?a.y2-30:a.y1+30,end=forward?a.y1+30:a.y2-30;
+ my=begin;down=true;step(60);
+ for(int i=1;i<=10;i++){my=begin+(end-begin)*i/10;step(35);}
+ down=false;step(300);
+}
+void exposeByTouch(lv_obj_t* object){
+ for(unsigned tries=0;tries<8;tries++){
+  lv_obj_update_layout(resultList);lv_area_t a,b;lv_obj_get_coords(object,&a);lv_obj_get_coords(resultList,&b);
+  if(a.y1>=b.y1+2 && a.y2<=b.y2-2)return;
+  touchScrollList(a.y2>b.y2-2);
+ }
+ assert(false && "Physical scrolling must reveal the equipment button");
+}
+void equipmentUiChecks(){
+ // No synthetic measurements or transport command is introduced by startup/render.
+ assert(panel_radio::submittedCommands==0 && panel_radio::lastCommand.job==Job::None);
+ assert(equipmentDemo.eventCount==0);
+ for(const auto& device:equipmentDemo.devices)assert(device.mode==demo::Mode::Off && device.command.status==demo::Status::None);
+ for(const auto& m:measurements)assert(!m.valid);
+ assert(fuelLevel.status(fakeMillis)==FuelLevelStatus::NoData);
+ const auto radioBefore=panel_radio::submittedCommands;
+ swipe(true);assert(page==1 && view==0);save("equipment_control_native");bounds(lv_scr_act());
+ const char* screenshots[]={"equipment_dhw_native","equipment_electric_native","equipment_diesel_native","equipment_fuel_native"};
+ for(int item=0;item<4;item++){
+  clickAt(item%2?356:124,item/2?601:353);step();
+  assert(page==1 && view==item+1 && !overlay);
+  assert(findLabel(body,"ДЕМО: кнопки меняют только макет.\nФизическое оборудование не подключено."));
+  assert(findLabel(body,"Фактическая работа: нет данных"));
+  save(screenshots[item]);bounds(lv_scr_act());
+  // Fixed cards are checked individually even when their ancestor is scrollable.
+  if(item==1)for(unsigned n=0;n<4;n++)bounds(lv_obj_get_child(resultList,n));
+  touchNamed("Назад");step();assert(page==1 && view==0);
+ }
+ assert(equipmentDemo.eventCount==0 && panel_radio::submittedCommands==radioBefore);
+ swipe(true);assert(page==2);swipe(false);assert(page==1 && view==0);
+ assert(equipmentDemo.eventCount==0); // A page swipe must not also press a card.
+
+ clickAt(124,353);step();assert(view==1);
+ touchObject(equipmentOn[unsigned(demo::Id::Dhw)]);
+ assert(equipmentDemo.device(demo::Id::Dhw)->command.status==demo::Status::Pending);
+ assert(!strcmp(lv_label_get_text(equipmentMode[0]),"Отключён"));
+ assert(!strcmp(lv_label_get_text(equipmentCommand[0]),"Ожидание демо-ответа"));
+ save("equipment_dhw_pending_native");step(1100);
+ assert(equipmentDemo.device(demo::Id::Dhw)->mode==demo::Mode::Enabled);
+ assert(!strcmp(lv_label_get_text(equipmentMode[0]),"Разрешён"));
+ assert(lv_obj_has_state(equipmentOn[0],LV_STATE_DISABLED) && !lv_obj_has_state(equipmentOff[0],LV_STATE_DISABLED));
+ touchNamed("Отказать");step();assert(equipmentDemo.nextOutcome==demo::Outcome::Rejected);
+ touchObject(equipmentOff[0]);step(1100);
+ assert(equipmentDemo.device(demo::Id::Dhw)->mode==demo::Mode::Enabled);
+ assert(equipmentDemo.device(demo::Id::Dhw)->command.status==demo::Status::Rejected);
+ assert(!strcmp(lv_label_get_text(equipmentMode[0]),"Разрешён"));
+ assert(!strcmp(lv_label_get_text(equipmentCommand[0]),"Демо: отказ"));
+ assert(!lv_obj_has_flag(equipmentMode[0],LV_OBJ_FLAG_HIDDEN));
+ save("equipment_rejected_off_native");bounds(lv_scr_act());
+ touchNamed("Домой");step();assert(page==0 && view==0);
+ for(int p=0;p<4;p++){
+  assert(page==p && !strcmp(lv_label_get_text(equipmentWarning),"ДЕМО: проверьте ответы команд"));
+  assert(equipmentDemo.device(demo::Id::Dhw)->command.status==demo::Status::Rejected);
+  if(p<3)swipe(true);
+ }
+ swipe(false);swipe(false);assert(page==1);
+ clickAt(124,353);step();touchNamed("Без ответа");step();
+ assert(equipmentDemo.nextOutcome==demo::Outcome::Timeout);
+ touchObject(equipmentOff[0]);step(1100);
+ assert(equipmentDemo.device(demo::Id::Dhw)->mode==demo::Mode::Unknown);
+ assert(!strcmp(lv_label_get_text(equipmentMode[0]),"Неизвестен"));
+ assert(lv_obj_has_state(equipmentOn[0],LV_STATE_DISABLED) && !lv_obj_has_state(equipmentOff[0],LV_STATE_DISABLED));
+ save("equipment_timeout_native");bounds(lv_scr_act());
+ touchNamed("Подтвердить");step();touchObject(equipmentOff[0]);step(1100);
+ assert(equipmentDemo.device(demo::Id::Dhw)->mode==demo::Mode::Off);
+
+ // A pending request is cancelled through the actual journal/reset controls.
+ touchObject(equipmentOn[0]);
+ assert(equipmentDemo.device(demo::Id::Dhw)->command.status==demo::Status::Pending);
+ touchNamed("События оборудования");step(100);assert(page==1 && view==5);
+ save("equipment_journal_native");bounds(lv_scr_act());
+ for(unsigned n=0;n<lv_obj_get_child_cnt(resultList);n++)bounds(lv_obj_get_child(resultList,n));
+ touchNamed("Сбросить демонстрацию");step(1200);
+ assert(equipmentDemo.eventCount==0 && !strstr(lv_label_get_text(equipmentWarning),"проверьте"));
+ assert(findLabel(body,"Команд пока нет.\nЗапросите действие в карточке оборудования."));
+ for(const auto& device:equipmentDemo.devices)assert(device.mode==demo::Mode::Off && device.command.status==demo::Status::None);
+ touchNamed("Назад");step();assert(view==0);
+
+ // Replace ON with OFF by touches; at the old ON deadline only the new request exists.
+ clickAt(124,601);step();assert(view==3);
+ const unsigned diesel=unsigned(demo::Id::Diesel);
+ touchObject(equipmentOn[diesel]);const auto oldCommand=equipmentDemo.devices[diesel].command;
+ step(250);touchObject(equipmentOff[diesel]);
+ const auto replacement=equipmentDemo.devices[diesel].command;
+ assert(replacement.token!=oldCommand.token && !replacement.requested);
+ assert(equipmentDemo.devices[diesel].mode==demo::Mode::Unknown);
+ const int untilOld=int(uint32_t(oldCommand.requestedAt+demo::RESPONSE_MS+100U-fakeMillis));
+ assert(untilOld>0);step(untilOld);
+ assert(equipmentDemo.devices[diesel].command.status==demo::Status::Pending);
+ assert(equipmentDemo.devices[diesel].mode==demo::Mode::Unknown);
+ step(1100);assert(equipmentDemo.devices[diesel].mode==demo::Mode::Off);
+ touchNamed("Назад");step();
+
+ clickAt(356,353);step();assert(view==2);
+ const unsigned electric=unsigned(demo::Id::Electric),first=unsigned(demo::Id::Circuit1);
+ for(unsigned circuit=0;circuit<3;circuit++){
+  const auto eventsBefore=equipmentDemo.eventCount;
+  exposeByTouch(equipmentOn[first+circuit]);
+  assert(equipmentDemo.eventCount==eventsBefore); // Vertical scrolling is not a command.
+  touchObject(equipmentOn[first+circuit]);step(1100);
+  for(unsigned other=0;other<3;other++)assert(equipmentDemo.devices[first+other].mode==(other<=circuit?demo::Mode::Enabled:demo::Mode::Off));
+  assert(equipmentDemo.devices[electric].mode==demo::Mode::Off);
+ }
+ save("equipment_three_circuits_native");bounds(lv_scr_act());
+ exposeByTouch(equipmentOn[electric]);touchObject(equipmentOn[electric]);step(1100);
+ touchObject(equipmentOff[electric]);step(1100);
+ assert(equipmentDemo.devices[electric].mode==demo::Mode::Off);
+ for(unsigned i=0;i<3;i++)assert(equipmentDemo.devices[first+i].mode==demo::Mode::Enabled);
+ touchNamed("Назад");step();
+
+ clickAt(356,601);step();assert(view==4);
+ assert(!strcmp(lv_label_get_text(equipmentFuelTemp),"--.- °C"));
+ assert(!strcmp(lv_label_get_text(equipmentFuelLevel),"Нет данных"));
+ const unsigned fuel=unsigned(demo::Id::FuelHeat);
+ touchObject(equipmentOn[fuel]);step(1100);
+ assert(equipmentDemo.devices[fuel].mode==demo::Mode::Enabled);
+ assert(findLabel(body,"Фактическая работа: нет данных"));
+ touchObject(equipmentOff[fuel]);step(1100);
+ assert(equipmentDemo.devices[fuel].mode==demo::Mode::Off);
+ touchNamed("Уровень и температура топлива");assert(overlay && dialogKind==4);
+ touchNamed("Подогрев топлива до 80 °C");step();assert(!overlay && page==1 && view==4);
+ touchNamed("Назад");step();touchNamed("События оборудования");step();
+ assert(equipmentDemo.eventCount==demo::JOURNAL_SIZE);
+ save("equipment_journal_full_native");bounds(lv_scr_act());
+ for(unsigned n=0;n<lv_obj_get_child_cnt(resultList);n++)bounds(lv_obj_get_child(resultList,n));
+ touchNamed("Сбросить демонстрацию");step();
+ touchNamed("Домой");step();assert(page==0 && view==0 && !overlay);
+ assert(panel_radio::submittedCommands==radioBefore && panel_radio::lastCommand.job==Job::None);
+ for(const auto& m:measurements)assert(!m.valid);
+ assert(fuelLevel.status(fakeMillis)==FuelLevelStatus::NoData);
+ printf("EQUIPMENT UI: 4 cards, real pointer commands/outcomes, reset and superseded ON, 3 independent circuits, touch scrolling, journal16, persistent warning, no radio commands\n");
+}
 int main(){
+ setvbuf(stdout,nullptr,_IONBF,0);
  lv_init();static lv_color_t draw[480*40];static lv_disp_draw_buf_t buf;lv_disp_draw_buf_init(&buf,draw,nullptr,480*40);
  static lv_disp_drv_t dd;lv_disp_drv_init(&dd);dd.hor_res=480;dd.ver_res=800;dd.draw_buf=&buf;dd.flush_cb=flush;lv_disp_drv_register(&dd);
  static lv_indev_drv_t id;lv_indev_drv_init(&id);id.type=LV_INDEV_TYPE_POINTER;id.read_cb=pointer;lv_indev_drv_register(&id);
@@ -150,6 +313,7 @@ int main(){
  // Inspect each compact card state after a normal live update, including long status text.
  for(const auto& sample:fuelCases){fuelLevel.put(sample.lower,sample.upper,fakeMillis);step(1100);bounds(lv_obj_get_parent(fuelCardLabels.summary));}
  fuelLevel.clear();measurements[3]=Measurement{};step(1100);
+ equipmentUiChecks();
  // Exercise real LVGL pointer gestures and Home event callback.
  swipe(true);assert(page==1);swipe(true);assert(page==2);
  save("before_home_click");
@@ -238,6 +402,6 @@ int main(){
  assert(activity && activityDot);save("busy_test_fixture");bounds(lv_scr_act());
  panel_radio::fixture.busy=false;++panel_radio::fixture.revision;step();
  for(int i=0;i<240;i++){page=i%4;view=page==2?(i/4)%4:0;render();step(10);}
- printf("RESULT: pointer swipes, Home, keyboard layouts/held keys/password submit, bounded SSID/raw connection, wake consumption, freshness/history/modal/AP-race/scroll, fuel thresholds/unknown/stale/history, 240 page rebuilds completed; clipped labels=%d\n",clipped);
+ printf("RESULT: pointer swipes, Home, keyboard layouts/held keys/password submit, bounded SSID/raw connection, wake consumption, freshness/history/modal/AP-race/scroll, fuel thresholds/unknown/stale/history, equipment demo pointer scenarios, 240 page rebuilds completed; clipped labels=%d\n",clipped);
  return clipped?1:0;
 }

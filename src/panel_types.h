@@ -8,7 +8,7 @@
 #include <time.h>
 
 namespace panel {
-constexpr const char* VERSION = "v0.4.0";
+constexpr const char* VERSION = "v0.5.0";
 constexpr unsigned CHANNELS = 4;
 constexpr unsigned MAX_AP = 16;
 constexpr unsigned MAX_BLE = 16;
