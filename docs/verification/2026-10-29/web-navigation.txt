@@ -1,0 +1,13 @@
+✔ the display has four agreed primary pages (1.653328ms)
+✔ fuel, history, journal and diagnostics keep their parent hierarchy (0.197669ms)
+✔ primary navigation wraps in both directions (0.140042ms)
+✔ only a deliberate horizontal gesture changes a primary page (1.226744ms)
+✔ detail screens and invalid directions cannot become swipe commands (0.268225ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11.168415

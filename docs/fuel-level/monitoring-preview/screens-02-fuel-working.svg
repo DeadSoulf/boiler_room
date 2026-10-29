@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="800" viewBox="0 0 480 800" role="img" aria-label="Топливо — рабочий диапазон">
+  <title>Топливо — рабочий диапазон</title>
+  <desc>Демонстрационный макет мониторинга. Нижний порог достигнут; верхний не достигнут. Предусмотрен подогрев до 80 °C по сообщению пользователя. Это не назначение аварийного предела или алгоритма управления. Температура и режим неизвестны; управление не подключено; обе кнопки видимы и недоступны.</desc>
+  <rect x="0" y="0" width="480" height="800" rx="0" fill="#09121F" />
+  <text x="18" y="48" fill="#F1F6FC" font-family="DejaVu Sans" font-size="26" font-weight="400" text-anchor="start">Топливо</text>
+  <rect x="352" y="16" width="112" height="48" rx="12" fill="#214258" />
+  <text x="408.0" y="46.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Домой</text>
+  <text x="18" y="94" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Уровень и подогрев топлива</text>
+  <rect x="16" y="111" width="448" height="96" rx="18" fill="#152439" stroke="#66DDB4" stroke-width="1" />
+  <text x="32" y="136" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Уровень топлива</text>
+  <text x="32" y="170" fill="#66DDB4" font-family="DejaVu Sans" font-size="25" font-weight="400" text-anchor="start">Рабочий диапазон</text>
+  <text x="32" y="194" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Нижний достигнут · верхний ещё нет</text>
+  <rect x="16" y="219" width="448" height="64" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <circle cx="38" cy="242" r="5" fill="#96ABC1" />
+  <text x="58" y="248" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Верхний уровень</text>
+  <text x="58" y="271" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Герконовый датчик</text>
+  <text x="446" y="249" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Не достигнут</text>
+  <rect x="16" y="295" width="448" height="64" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <circle cx="38" cy="318" r="5" fill="#66DDB4" />
+  <text x="58" y="324" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Нижний уровень</text>
+  <text x="58" y="347" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Герконовый датчик</text>
+  <text x="446" y="325" fill="#66DDB4" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Достигнут</text>
+  <rect x="16" y="371" width="448" height="280" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <text x="32" y="399" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Подогрев топлива</text>
+  <text x="446" y="399" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">до 80 °C</text>
+  <text x="32" y="433" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Температура</text>
+  <text x="446" y="437" fill="#F1F6FC" font-family="DejaVu Sans" font-size="25" font-weight="400" text-anchor="end">--.- °C</text>
+  <text x="32" y="466" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Режим подогрева</text>
+  <text x="446" y="469" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Нет данных</text>
+  <text x="32" y="497" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Нагреватель</text>
+  <text x="446" y="500" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Нет данных</text>
+  <rect x="32" y="514" width="202" height="48" rx="12" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <text x="133.0" y="544.5" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Включить</text>
+  <rect x="246" y="514" width="202" height="48" rx="12" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <text x="347.0" y="544.5" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Выключить</text>
+  <text x="32" y="586" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Управление не подключено</text>
+  <rect x="32" y="599" width="416" height="44" rx="12" fill="#214258" />
+  <text x="240.0" y="627.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">История температуры</text>
+  <rect x="16" y="663" width="216" height="44" rx="12" fill="#214258" />
+  <text x="124.0" y="691.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Журнал</text>
+  <rect x="248" y="663" width="216" height="44" rx="12" fill="#214258" />
+  <text x="356.0" y="691.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Диагностика</text>
+  <rect x="16" y="719" width="448" height="44" rx="12" fill="#214258" />
+  <text x="240.0" y="747.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Назад</text>
+  <text x="18" y="788" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">МАКЕТ · пример состояний</text>
+</svg>

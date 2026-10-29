@@ -1,5 +1,5 @@
 #pragma once
-// Application-only data. No sensor model or GPIO is assigned by this project.
+// Application-only state. No GPIO or sensor electrical polarity is assigned.
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
@@ -8,7 +8,7 @@
 #include <time.h>
 
 namespace panel {
-constexpr const char* VERSION = "v0.4.0";
+constexpr const char* VERSION = "v0.5.0";
 constexpr unsigned CHANNELS = 4;
 constexpr unsigned MAX_AP = 16;
 constexpr unsigned MAX_BLE = 16;
@@ -35,6 +35,35 @@ struct Measurement {
     if(count<HISTORY_POINTS)++count;
   }
   bool fresh(uint32_t now) const { return valid && uint32_t(now - updated) < STALE_MS; }
+};
+enum class FuelLevelStatus : uint8_t {
+  NoData, Stale, BelowLower, Between, UpperReached, Inconsistent
+};
+// Accept stable, normalized threshold readings only: true means the fuel has
+// reached this sensor's height. A future hardware adapter owns GPIO, NO/NC
+// polarity and debounce; a raw reed-contact state is not this logical value.
+struct ReedLevelReading {
+  bool valid=false, reached=false;
+  uint32_t updated=0;
+  void put(bool levelReached, uint32_t now) {
+    reached=levelReached;updated=now;valid=true;
+  }
+  void clear() { *this=ReedLevelReading{}; }
+  bool fresh(uint32_t now) const { return valid && uint32_t(now-updated)<STALE_MS; }
+};
+struct FuelLevel {
+  ReedLevelReading upper,lower;
+  // Publish both normalized readings from one observation; lower is first.
+  void put(bool lowerReached, bool upperReached, uint32_t now) {
+    lower.put(lowerReached,now);upper.put(upperReached,now);
+  }
+  void clear() { lower.clear();upper.clear(); }
+  FuelLevelStatus status(uint32_t now) const {
+    if(!lower.valid || !upper.valid)return FuelLevelStatus::NoData;
+    if(!lower.fresh(now) || !upper.fresh(now))return FuelLevelStatus::Stale;
+    if(upper.reached)return lower.reached?FuelLevelStatus::UpperReached:FuelLevelStatus::Inconsistent;
+    return lower.reached?FuelLevelStatus::Between:FuelLevelStatus::BelowLower;
+  }
 };
 inline int adjacent(int page, int direction) { return (page + direction + 4) % 4; }
 inline bool passwordValid(const char* password, bool open) {

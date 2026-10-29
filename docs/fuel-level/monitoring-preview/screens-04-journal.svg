@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="800" viewBox="0 0 480 800" role="img" aria-label="Журнал — события текущего запуска">
+  <title>Журнал — события текущего запуска</title>
+  <desc>Пример относительной последовательности событий после запуска. Формат времени — минуты:секунды. Постоянное хранение и восстановление после перезапуска не заявляются.</desc>
+  <rect x="0" y="0" width="480" height="800" rx="0" fill="#09121F" />
+  <text x="18" y="48" fill="#F1F6FC" font-family="DejaVu Sans" font-size="26" font-weight="400" text-anchor="start">Журнал</text>
+  <rect x="352" y="16" width="112" height="48" rx="12" fill="#214258" />
+  <text x="408.0" y="46.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Домой</text>
+  <text x="18" y="104" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">События уровня топлива</text>
+  <text x="18" y="139" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Время от запуска · мин:сек</text>
+  <line x1="18" y1="157" x2="462" y2="157" stroke="#293D54" stroke-width="1" />
+  <text x="18" y="195" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">+00:00</text>
+  <text x="112" y="195" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Запуск панели</text>
+  <text x="112" y="223" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Ожидание двух показаний</text>
+  <line x1="18" y1="249" x2="462" y2="249" stroke="#293D54" stroke-width="1" />
+  <text x="18" y="278" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">+00:01</text>
+  <text x="112" y="278" fill="#66DDB4" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Нижний уровень достигнут</text>
+  <text x="112" y="306" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Уровень между датчиками</text>
+  <line x1="18" y1="332" x2="462" y2="332" stroke="#293D54" stroke-width="1" />
+  <text x="18" y="361" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">+01:12</text>
+  <text x="112" y="361" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Верхний уровень достигнут</text>
+  <text x="112" y="389" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Оба порога подтверждены</text>
+  <line x1="18" y1="415" x2="462" y2="415" stroke="#293D54" stroke-width="1" />
+  <text x="18" y="444" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">+02:04</text>
+  <text x="112" y="444" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Верхний уровень не достигнут</text>
+  <text x="112" y="472" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Уровень между датчиками</text>
+  <line x1="18" y1="498" x2="462" y2="498" stroke="#293D54" stroke-width="1" />
+  <text x="18" y="527" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">+02:18</text>
+  <text x="112" y="527" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Нижний уровень не достигнут</text>
+  <text x="112" y="555" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Предупреждение: мало топлива</text>
+  <line x1="18" y1="581" x2="462" y2="581" stroke="#293D54" stroke-width="1" />
+  <text x="18" y="610" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">+02:50</text>
+  <text x="112" y="610" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Нет актуальных показаний</text>
+  <text x="112" y="638" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Оценка уровня приостановлена</text>
+  <line x1="18" y1="664" x2="462" y2="664" stroke="#293D54" stroke-width="1" />
+  <text x="18" y="695" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">События текущего запуска</text>
+  <rect x="16" y="714" width="448" height="48" rx="12" fill="#214258" />
+  <text x="240.0" y="744.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Назад к топливу</text>
+  <text x="18" y="788" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">МАКЕТ · пример состояний</text>
+</svg>

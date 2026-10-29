@@ -22,9 +22,38 @@ int main(){
  history.put(INFINITY,100000);CHECK(!history.valid && history.count==24);
  history.put(-10,101000);CHECK(history.minimum==-10 && history.maximum==99);
  history.put(20,0xfffffff0U);CHECK(history.freshness(10)==99);CHECK(!history.fresh(40000));
+ // Missing or expired inputs must never be reported as a low fuel level.
+ ReedLevelReading reed;
+ CHECK(!reed.valid && !reed.fresh(0));
+ reed.put(false,0);CHECK(reed.valid && !reed.reached && reed.fresh(0));
+ CHECK(reed.fresh(STALE_MS-1));CHECK(!reed.fresh(STALE_MS));
+ reed.clear();CHECK(!reed.valid && !reed.fresh(0));
+ FuelLevel fuel;
+ CHECK(fuel.status(100)==FuelLevelStatus::NoData);
+ fuel.upper.put(true,100);CHECK(fuel.status(100)==FuelLevelStatus::NoData);
+ fuel.clear();fuel.lower.put(false,100);CHECK(fuel.status(100)==FuelLevelStatus::NoData);
+ fuel.put(false,false,100);CHECK(fuel.status(100)==FuelLevelStatus::BelowLower);
+ fuel.put(true,false,200);CHECK(fuel.status(200)==FuelLevelStatus::Between);
+ fuel.put(true,true,300);CHECK(fuel.status(300)==FuelLevelStatus::UpperReached);
+ fuel.put(false,true,400);CHECK(fuel.status(400)==FuelLevelStatus::Inconsistent);
+ CHECK(fuel.status(400+STALE_MS)==FuelLevelStatus::Stale);
+ // One fresh sensor cannot revive the other sensor's expired reading.
+ fuel.put(true,true,100);fuel.upper.put(false,100+STALE_MS);
+ CHECK(fuel.status(100+STALE_MS)==FuelLevelStatus::Stale);
+ fuel.lower.put(true,100+STALE_MS);CHECK(fuel.status(100+STALE_MS)==FuelLevelStatus::Between);
+ fuel.lower.clear();CHECK(fuel.status(100+STALE_MS)==FuelLevelStatus::NoData);
+ fuel.put(false,false,100+STALE_MS);CHECK(fuel.status(100+STALE_MS)==FuelLevelStatus::BelowLower);
+ fuel.clear();CHECK(!fuel.upper.valid && !fuel.lower.valid);
+ CHECK(fuel.status(100+STALE_MS)==FuelLevelStatus::NoData);
+ // The two-sensor freshness window must survive uint32 millis() wraparound.
+ const uint32_t nearWrap=0xfffffff0U;
+ fuel.put(true,true,nearWrap);CHECK(fuel.status(10)==FuelLevelStatus::UpperReached);
+ CHECK(fuel.status(uint32_t(nearWrap+STALE_MS-1))==FuelLevelStatus::UpperReached);
+ CHECK(fuel.status(uint32_t(nearWrap+STALE_MS))==FuelLevelStatus::Stale);
+ fuel.put(true,false,40000);CHECK(fuel.status(40000)==FuelLevelStatus::Between);
  setenv("TZ","UTC0",1);tzset();time_t t;
  CHECK(parseLocalTime("2026-10-27 18:40",t));CHECK(!parseLocalTime("2026-02-30 10:20",t));CHECK(!parseLocalTime("2026-10-27 24:00",t));
  CHECK(!parseLocalTime("2026-10-27 18:40x",t));CHECK(!parseLocalTime("1970-01-01 00:00",t));CHECK(parseLocalTime("2024-02-29 12:00",t));
  for(int initial=0;initial<4;initial++){int p=initial;for(int n=0;n<10000;n++){p=adjacent(p,n%2?1:-1);CHECK(p>=0 && p<4);}}
- printf("PASS: %u assertions (navigation, validity, stale readings, wraparound, password validation, date parsing)\n",checks);
+ printf("PASS: %u assertions (navigation, validity, stale readings, fuel level thresholds, wraparound, password validation, date parsing)\n",checks);
 }

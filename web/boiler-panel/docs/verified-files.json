@@ -1,0 +1,10 @@
+{
+  "dist/app.js": "11431038f11d9b34f69d7abec32f0c12288df140963906213553e051b475a03a",
+  "dist/favicon.svg": "c57c59e9078c3e6a0548801d3f769bf8ae793c5b4994fa4f0ac8f96ffed188d6",
+  "dist/index.html": "4df8bc774f2d8129d02a7d1f13cb4d3d56fdea9914ff84b1e798e124da07506a",
+  "dist/model.js": "ba6fe06448634366994c8a7819ff1a38617569a92c929fbfdaea6eac7f752c8d",
+  "dist/navigation.js": "48fbaa9ac95d060d43f2b091dc0931318a8be061f455e60e69d88731ce55f3bf",
+  "dist/styles.css": "484702ed356ea210655f0f85e1fb8f8d9331a39342665a775ac14925577f6164",
+  "tests/model.test.mjs": "902d610a511a1caf845a8d1dfcf3bc6ab6f5b8b718f4b593f29617b5714b2725",
+  "tests/navigation.test.mjs": "5c3093d6f2f27c79846fcd09c9c0249b77deaca2a04f2cc0aeaa3961ebb31b1e"
+}

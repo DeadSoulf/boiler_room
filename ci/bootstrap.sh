@@ -16,10 +16,15 @@ host)
  checkout https://github.com/lvgl/lvgl.git 74d0a816a440eea53e030c4f1af842a94f7ce3d3 .build/lvgl
  g++ -std=c++17 -Wall -Wextra -Isrc tests/model_tests.cpp -o .build/model_tests
  .build/model_tests | tee artifacts/model.log
+ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -Isrc tests/equipment_demo_tests.cpp -o .build/equipment_demo_tests
+ .build/equipment_demo_tests | tee artifacts/equipment-demo.log
  bash tests/run_radio_tests.sh | tee artifacts/radio.log
  g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/display_idle_tests.cpp -o .build/display_tests
  .build/display_tests | tee artifacts/display.log
  python3 tests/updater_tests.py 2>&1 | tee artifacts/updater.log
+ python3 tests/artifact_manifest_tests.py 2>&1 | tee artifacts/artifact-manifest-tests.log
+ python3 tests/flash_panel_tests.py 2>&1 | tee artifacts/flash-panel-tests.log
+ python3 tests/flash_launcher_tests.py 2>&1 | tee artifacts/flash-launcher-tests.log
  cmake -S tests/host -B .build/host -DLVGL_DIR="$ROOT/.build/lvgl" -DBOILER_FONTS="$ROOT/src/boiler_fonts.c"
  cmake --build .build/host --parallel 2 2>&1 | tee artifacts/host-build.log
  # Preserve the exact official LVGL inputs for offline reproduction when local network is restricted.
@@ -37,6 +42,7 @@ firmware)
  .build/venv/bin/pio pkg list -d .build/bsp/examples/LvglUi > artifacts/packages.txt
  cp .build/bsp/examples/LvglUi/.pio/build/jc4880p4/{firmware.bin,firmware.elf,bootloader.bin,partitions.bin} artifacts/
  python3 ci/verify_binary.py
+ python3 ci/package_flash.py
  ;;
 *) echo 'Usage: ci/bootstrap.sh host|firmware' >&2; exit 2;;
 esac

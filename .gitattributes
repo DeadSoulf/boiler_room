@@ -1,0 +1,2 @@
+# Preserve the byte-exact CRLF Windows launcher in every checkout.
+/scripts/flash_COM3.cmd -text

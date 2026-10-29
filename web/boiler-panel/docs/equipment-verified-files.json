@@ -1,0 +1,16 @@
+{
+  "version": "0.3.0",
+  "sha256": {
+    "dist/app.js": "26c75b8ea7701956abb52c05d2a6c6af79e347a9849d1c01843dcbf7d45bad99",
+    "dist/equipment.js": "ffee8c760e0dad0ee821fb2da77cda570bdda0adcfda017046adbd2a53e0ae6a",
+    "dist/favicon.svg": "c57c59e9078c3e6a0548801d3f769bf8ae793c5b4994fa4f0ac8f96ffed188d6",
+    "dist/index.html": "1db7e15e6152b8f4188c3dcdb466ebb8fe9306ec8b06a4324497e9801b5bffed",
+    "dist/model.js": "ba6fe06448634366994c8a7819ff1a38617569a92c929fbfdaea6eac7f752c8d",
+    "dist/navigation.js": "7a8e58a1348db34868b5de262a10cbccbe4d07d9791f96c9b884e9107976086a",
+    "dist/styles.css": "7fe295ea26eddc465745c7127542e0739fb563be8afcd4e96bec5bb3414fe892",
+    "tests/app-equipment.test.mjs": "09a53f0ed9fd19aefa984bb672ac8c5c130c6e24e532b89711c024d924e6727b",
+    "tests/equipment.test.mjs": "aaa9bf98983abfb12582fe825f2e4f37f62492134dbc424719b022952daaf9c1",
+    "tests/model.test.mjs": "902d610a511a1caf845a8d1dfcf3bc6ab6f5b8b718f4b593f29617b5714b2725",
+    "tests/navigation.test.mjs": "0dd79f5e37266a4f4ea261d11fa05222d71c477df726f31b0f839f546bc4e867"
+  }
+}

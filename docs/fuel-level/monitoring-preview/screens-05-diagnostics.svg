@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="800" viewBox="0 0 480 800" role="img" aria-label="Диагностика — условный пример контактов">
+  <title>Диагностика — условный пример контактов</title>
+  <desc>Только в этом иллюстративном сценарии замкнутый контакт соответствует достигнутому порогу. Реальная полярность, GPIO и аппаратная интеграция не назначены. Давность показания не является контролем обрыва линии.</desc>
+  <rect x="0" y="0" width="480" height="800" rx="0" fill="#09121F" />
+  <text x="18" y="48" fill="#F1F6FC" font-family="DejaVu Sans" font-size="26" font-weight="400" text-anchor="start">Диагностика</text>
+  <rect x="352" y="16" width="112" height="48" rx="12" fill="#214258" />
+  <text x="408.0" y="46.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Домой</text>
+  <text x="18" y="104" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Входы уровня топлива</text>
+  <rect x="16" y="124" width="448" height="84" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <text x="32" y="152" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Условный пример контактов</text>
+  <text x="32" y="178" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">В этом макете: замкнут = достигнут</text>
+  <text x="32" y="199" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Полярность подключения не задана</text>
+  <rect x="16" y="224" width="448" height="163" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <circle cx="38" cy="248" r="5" fill="#96ABC1" />
+  <text x="58" y="255" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Верхний датчик</text>
+  <text x="32" y="288" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Контакт</text>
+  <text x="446" y="288" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Разомкнут</text>
+  <text x="32" y="323" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Логический порог</text>
+  <text x="446" y="323" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Не достигнут</text>
+  <text x="32" y="358" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Подтверждение</text>
+  <text x="446" y="358" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">1 с назад</text>
+  <rect x="16" y="403" width="448" height="163" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <circle cx="38" cy="427" r="5" fill="#66DDB4" />
+  <text x="58" y="434" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Нижний датчик</text>
+  <text x="32" y="467" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Контакт</text>
+  <text x="446" y="467" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Замкнут</text>
+  <text x="32" y="502" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Логический порог</text>
+  <text x="446" y="502" fill="#66DDB4" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Достигнут</text>
+  <text x="32" y="537" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Подтверждение</text>
+  <text x="446" y="537" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">1 с назад</text>
+  <text x="18" y="602" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Контроль линии: не подключён</text>
+  <text x="18" y="635" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Давность относится к показанию.</text>
+  <text x="18" y="658" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Она не подтверждает целостность линии.</text>
+  <rect x="16" y="714" width="448" height="48" rx="12" fill="#214258" />
+  <text x="240.0" y="744.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Назад к топливу</text>
+  <text x="18" y="788" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">МАКЕТ · пример состояний</text>
+</svg>

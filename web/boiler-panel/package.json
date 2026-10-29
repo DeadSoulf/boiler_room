@@ -1,0 +1,8 @@
+{
+  "name": "boiler-panel-web",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Интерактивная веб-визуализация панели котельной",
+  "scripts": {"test": "node --test tests/*.test.mjs"}
+}

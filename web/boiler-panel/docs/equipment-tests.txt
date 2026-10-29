@@ -1,0 +1,100 @@
+$ node tests/equipment.test.mjs
+✔ equipment contains the requested independent devices and exactly three electric circuits (1.80625ms)
+✔ all seven existing scenarios are accepted without borrowing fuel state for equipment (0.651985ms)
+✔ missing and stale DHW temperatures stay distinguishable and never become zero (0.665035ms)
+✔ ON and OFF change only the selected simulated permission after acknowledgement (1.248697ms)
+✔ concurrent requests and out-of-order replies remain isolated across devices (0.321095ms)
+✔ pending ON can be replaced by OFF without confirming off or accepting the late ON reply (0.303759ms)
+✔ duplicate pending requests do not add commands or journal records (0.153232ms)
+✔ rejected requests preserve confirmed permission and acknowledgement does not clear their warning (1.211722ms)
+✔ timeout never confirms operation or stop; unknown mode still permits an available OFF request (0.355297ms)
+✔ settled, unknown and prior-session replies cannot change state or append events (0.368257ms)
+✔ invalid commands, devices, times, and replies leave state intact (0.262447ms)
+✔ scenario changes preserve the bounded journal with unique IDs, without inventing cross-device rules (0.804066ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19.022105
+
+exit: 0
+
+$ node tests/app-equipment.test.mjs
+✔ all 16 routes render in seven scenarios, preserving four primary pages and fuel features (51.558747ms)
+✔ all existing temperature charts retain their scenario, sensor, and period combinations (44.543942ms)
+✔ equipment pages expose the requested devices, three distinct circuits, and unknown feedback (4.277975ms)
+✔ clicks and reply timers keep pending, accepted, rejected, and timeout separate for every device (43.080526ms)
+✔ six simultaneous equipment commands and fuel command retain independent timers and replies (10.364211ms)
+✔ OFF replacing pending ON ignores old and duplicate callbacks while preserving the new timer (2.528441ms)
+✔ rejected and timed-out OFF never establish a false stopped equipment state (5.05584ms)
+✔ reset and scenario change cancel all timers and ignore replies captured before the change (12.495823ms)
+✔ equipment warning persists across all pages, routes to the right parent, and survives acknowledgement (5.947197ms)
+✔ equipment actions never alter the preserved fuel model or its separate event journal (4.720593ms)
+✔ fuel pending and reply behavior remains correct with the additional equipment state present (9.401537ms)
+✔ primary swipe suppresses its click, while equipment detail swipes cannot navigate or send commands (3.159475ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 207.482855
+
+exit: 0
+
+$ node tests/model.test.mjs
+✔ a request waits for acknowledgement before changing the confirmed heating mode (2.172442ms)
+✔ four normalized combinations describe a range, never a percentage (0.475689ms)
+✔ unknown inputs take precedence over stale or contradictory inputs (0.208245ms)
+✔ freshness boundary is inclusive; future, absent, and nonfinite readings are invalid (0.139741ms)
+✔ all exposed scenarios are coherent and all disconnected readings are unknown (0.499345ms)
+✔ demo enable requires fresh fuel temperature and usable consistent levels (0.322277ms)
+✔ available disable survives invalid levels and temperature, but not a missing command channel (0.2779ms)
+✔ ON and OFF are immutable demo permissions, never heater feedback or auto-regulation (0.346394ms)
+✔ OFF can replace an unconfirmed ON and the superseded reply cannot change the mode (0.280955ms)
+✔ a rejected OFF replacing pending ON cannot restore a falsely confirmed off mode (0.262586ms)
+✔ a rejected ON or OFF preserves the confirmed mode and exposes a command warning (0.424722ms)
+✔ a timeout never confirms ON or OFF; OFF remains available with unknown mode and invalid readings (0.290298ms)
+✔ settled requests ignore duplicate and late replies without adding events (0.124708ms)
+✔ scenario changes and resets invalidate old replies even when timestamps are identical (0.247173ms)
+✔ an unsupported reply cannot settle or confirm a pending request (0.087813ms)
+✔ commands re-evaluate freshness at an explicitly supplied new time (0.111418ms)
+✔ scenario selection preserves the session journal without mutating old states (0.189736ms)
+✔ acknowledgement affects only the selected event and does not clear a live condition (0.194534ms)
+✔ bounded journal uses unique stable IDs after truncation (0.719197ms)
+✔ histories are deterministic finite samples with valid times and exact current endpoint (2.944089ms)
+✔ stale history ends in the past, disconnected and invalid history is empty (0.228475ms)
+✔ alerts retain condition semantics and age labels handle missing inputs (0.431102ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22.471167
+
+exit: 0
+
+$ node tests/navigation.test.mjs
+✔ the display has four agreed primary pages (1.29735ms)
+✔ fuel, history, journal and diagnostics keep their parent hierarchy (0.225521ms)
+✔ primary navigation wraps in both directions (0.162375ms)
+✔ only a deliberate horizontal gesture changes a primary page (0.851987ms)
+✔ detail screens and invalid directions cannot become swipe commands (0.200853ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8.304579
+
+exit: 0
+
+node --check app.js/equipment.js/navigation.js/model.js: passed

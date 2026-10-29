@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="800" viewBox="0 0 480 800" role="img" aria-label="Сервис — нет актуальных показаний уровня">
+  <title>Сервис — нет актуальных показаний уровня</title>
+  <desc>Демонстрация общего предупреждения вне раздела топлива. Оба показания устарели; низкий уровень не выводится. Состояние контактов и фактический запас топлива по устаревшим данным неизвестны.</desc>
+  <rect x="0" y="0" width="480" height="800" rx="0" fill="#09121F" />
+  <text x="18" y="48" fill="#F1F6FC" font-family="DejaVu Sans" font-size="26" font-weight="400" text-anchor="start">Сервис</text>
+  <rect x="352" y="16" width="112" height="48" rx="12" fill="#214258" />
+  <text x="408.0" y="46.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Домой</text>
+  <text x="18" y="104" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Состояние панели</text>
+  <rect x="16" y="124" width="448" height="92" rx="16" fill="#152439" stroke="#F4C083" stroke-width="1" />
+  <circle cx="43" cy="155" r="15" fill="#F4C083" />
+  <text x="43" y="162" fill="#09121F" font-family="DejaVu Sans" font-size="22" font-weight="700" text-anchor="middle">!</text>
+  <text x="70" y="153" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="700" text-anchor="start">Нет актуальных показаний</text>
+  <text x="70" y="177" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="700" text-anchor="start">уровня</text>
+  <text x="70" y="200" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Оценка топлива приостановлена</text>
+  <rect x="16" y="234" width="448" height="192" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <text x="32" y="264" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Датчики топлива</text>
+  <text x="32" y="302" fill="#F4C083" font-family="DejaVu Sans" font-size="25" font-weight="400" text-anchor="start">Данные устарели</text>
+  <text x="32" y="340" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Верхний уровень</text>
+  <text x="446" y="340" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Устарело</text>
+  <text x="32" y="373" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Нижний уровень</text>
+  <text x="446" y="373" fill="#F4C083" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Устарело</text>
+  <text x="32" y="410" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Последнее подтверждение: 35 с назад</text>
+  <rect x="16" y="444" width="448" height="163" rx="18" fill="#152439" stroke="#293D54" stroke-width="1" />
+  <text x="32" y="476" fill="#62CFFF" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Мониторинг</text>
+  <text x="32" y="520" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Температуры</text>
+  <text x="446" y="520" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Нет данных</text>
+  <text x="32" y="563" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="start">Журнал</text>
+  <text x="446" y="563" fill="#96ABC1" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="end">Текущий запуск</text>
+  <rect x="16" y="625" width="448" height="50" rx="12" fill="#214258" />
+  <text x="240.0" y="656.5" fill="#F1F6FC" font-family="DejaVu Sans" font-size="19" font-weight="400" text-anchor="middle">Открыть топливо</text>
+  <text x="18" y="731" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">Свайп влево / вправо — смена страницы</text>
+  <rect x="206" y="749" width="7" height="6" rx="3" fill="#293D54" />
+  <rect x="225" y="749" width="7" height="6" rx="3" fill="#293D54" />
+  <rect x="244" y="749" width="7" height="6" rx="3" fill="#293D54" />
+  <rect x="263" y="749" width="16" height="6" rx="3" fill="#62CFFF" />
+  <text x="18" y="788" fill="#96ABC1" font-family="DejaVu Sans" font-size="14" font-weight="400" text-anchor="start">МАКЕТ · пример состояний</text>
+</svg>

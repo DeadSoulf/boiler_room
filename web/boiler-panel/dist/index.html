@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1420">
+  <meta name="description" content="Панель котельной: бойлер косвенного нагрева, электрокотёл на три контура, дизельный отопитель и топливо. Интерактивный демонстрационный интерфейс.">
+  <title>Панель котельной · Обзор</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg"><link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">Перейти к содержимому</a>
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" aria-label="Главная навигация">
+      <a class="brand" href="#overview" aria-label="Панель котельной — обзор"><span class="brand-symbol" data-icon="boiler"></span><span>КОТЕЛЬНАЯ<small>Панель управления</small></span></a>
+      <div class="sidebar-caption">РАБОЧЕЕ ПРОСТРАНСТВО</div><nav id="desktopNav"></nav>
+      <div class="sidebar-bottom"><div class="hardware-visual" aria-hidden="true"><span></span><i></i><i></i><i></i></div><strong>Дисплей 480 × 800</strong><p>Привычная панель.<br>Теперь в браузере.</p><div class="sidebar-demo"><span class="status-dot"></span> Демо-версия</div></div>
+    </aside>
+    <div class="main-area">
+      <header class="topbar"><div class="page-heading"><p class="eyebrow">ПАНЕЛЬ КОТЕЛЬНОЙ</p><h1 id="pageTitle">Обзор котельной</h1></div><div class="topbar-actions"><div class="clock" id="homeClock"><time id="clockTime"></time><span id="clockDate"></span></div><button class="button secondary home-button" id="homeButton" data-route="overview" hidden><span data-icon="room"></span>Домой</button><button class="icon-button display-toggle" id="displayToggle" aria-label="Включить вид дисплея 480 на 800" aria-pressed="false" title="Вид дисплея 480 × 800" data-icon="display"></button></div></header>
+      <div class="demo-ribbon"><div><span class="demo-tag">ДЕМО</span><span class="demo-copy">Данные примера · оборудование не подключено</span></div><button class="text-button" id="scenarioButton" aria-haspopup="dialog"><span data-icon="sliders"></span><span id="scenarioLabel">Сценарии</span></button></div>
+      <div class="page-navigation" id="pageNavigation" aria-label="Навигация по страницам"></div>
+      <main id="mainContent" tabindex="-1"><p class="loading">Загружаем панель…</p></main>
+      <footer class="app-footer"><span>Панель котельной</span><span>Интерактивный макет · v0.3</span></footer>
+    </div>
+  </div>
+  <dialog id="scenarioDialog" aria-labelledby="scenarioTitle"><form method="dialog"><div class="dialog-heading"><div><p class="eyebrow">ПРОВЕРКА ИНТЕРФЕЙСА</p><h2 id="scenarioTitle">Демонстрационные сценарии</h2></div><button class="icon-button" value="cancel" aria-label="Закрыть сценарии" data-icon="close"></button></div><p class="dialog-copy">Выберите пример, чтобы посмотреть показания, предупреждения и доступность кнопок.</p><div id="scenarioOptions"></div><label class="command-response">Результат следующей команды · демо<select id="commandResponse"><option value="accepted">Подтверждение</option><option value="rejected">Отказ</option><option value="timeout">Нет ответа</option></select></label><p class="dialog-copy">Ожидание и ответ моделируются в браузере. Физическое оборудование не подключено.</p><div class="dialog-footer"><span>Все изменения остаются в браузере.</span><button class="button secondary" value="cancel">Готово</button></div></form></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+  <noscript><div class="noscript">Для интерактивной панели нужно включить JavaScript.</div></noscript>
+</body>
+</html>

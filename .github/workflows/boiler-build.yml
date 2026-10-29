@@ -1,7 +1,7 @@
 name: Boiler panel build and tests
 on:
   push:
-    paths: ['src/**', 'tests/**', 'ci/**', 'apply_update.py', '.github/workflows/boiler-build.yml']
+    paths: ['src/**', 'tests/**', 'ci/**', 'scripts/**', 'apply_update.py', '.github/workflows/boiler-build.yml']
   workflow_dispatch:
 permissions:
   contents: read
