@@ -1,0 +1,35 @@
+name: Windows COM3 launcher
+on:
+  push:
+    paths:
+      - 'scripts/flash_COM3.cmd'
+      - 'ci/package_flash.py'
+      - 'tests/flash_launcher_tests.py'
+      - '.gitattributes'
+      - '.github/workflows/flash-launcher.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: flash-launcher-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows-launcher:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test cmd.exe with a harmless Python recorder
+        shell: pwsh
+        run: |
+          python --version
+          python tests/flash_launcher_tests.py 2>&1 | Tee-Object -FilePath flash-launcher-tests.log
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: windows-launcher-${{ github.sha }}
+          path: flash-launcher-tests.log
+          retention-days: 14
