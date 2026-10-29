@@ -216,24 +216,43 @@ void connectWifi(const Command& cmd, bool save) {
   message("Подключение к Wi-Fi...");
   if(!startWifi()) return;
   WiFi.setAutoReconnect(false);
-  WiFi.disconnect(false,false);
-  lock();state.connected=false;state.rssi=0;state.ssid[0]=0;state.ip[0]=0;unlock();
+  const bool hadConnection=WiFi.status()==WL_CONNECTED;
+  const bool disconnected=WiFi.disconnect(false,false);
+  // An idle STA may reject disconnect because there is no association to end.
+  // An existing association must be gone before a new command can be accepted.
+  if((hadConnection && !disconnected) || WiFi.status()==WL_CONNECTED) {
+    updateConnection();recoveryPending=false;
+    message("Не удалось отключить прежнюю сеть. Настройки не изменены");return;
+  }
+  updateConnection();recoveryPending=false;
   // Open networks require an explicit UI choice; no silent security downgrade.
   WiFi.setMinSecurity(cmd.open?WIFI_AUTH_OPEN:WIFI_AUTH_WPA2_PSK);
   if(stopRequested())return;
   lastDisconnectReason.store(0);
-  WiFi.begin(cmd.ssid,cmd.open?nullptr:cmd.password);
+  if(WiFi.begin(cmd.ssid,cmd.open?nullptr:cmd.password)==WL_CONNECT_FAILED) {
+    updateConnection();recoveryPending=false;
+    message("Не удалось запустить подключение. Настройки не изменены");return;
+  }
+  const auto requestedNetwork=[&cmd]() {
+    return WiFi.status()==WL_CONNECTED && uint32_t(WiFi.localIP())!=0 && !strcmp(WiFi.SSID().c_str(),cmd.ssid);
+  };
   const uint32_t start=millis();
-  while(!stopRequested() && uint32_t(millis()-start)<20000U && !(WiFi.status()==WL_CONNECTED && uint32_t(WiFi.localIP())!=0)) vTaskDelay(pdMS_TO_TICKS(100));
-  if(stopRequested()){WiFi.disconnect(false,false);message("Подключение отменено");return;}
-  if(WiFi.status()!=WL_CONNECTED || uint32_t(WiFi.localIP())==0) {
+  while(!stopRequested() && uint32_t(millis()-start)<20000U && !requestedNetwork()) vTaskDelay(pdMS_TO_TICKS(100));
+  if(stopRequested()){
+    WiFi.disconnect(false,false);updateConnection();recoveryPending=false;
+    message(WiFi.status()==WL_CONNECTED?"Запрос отменён; Wi-Fi остался подключён":"Подключение отменено");return;
+  }
+  if(!requestedNetwork()) {
     const unsigned reason=lastDisconnectReason.load();const bool associated=WiFi.status()==WL_CONNECTED;
-    WiFi.disconnect(false,false);char detail[150];
-    if(reason)snprintf(detail,sizeof(detail),"%s (%u). Нет IP за 20 с; повторите вручную",reasonName(reason),reason);
+    const bool wrongNetwork=associated && strcmp(WiFi.SSID().c_str(),cmd.ssid);
+    WiFi.disconnect(false,false);updateConnection();recoveryPending=false;char detail[150];
+    if(wrongNetwork)snprintf(detail,sizeof(detail),"Подтверждена другая сеть. Настройки не сохранены");
+    else if(reason)snprintf(detail,sizeof(detail),"%s (%u). Нет IP за 20 с; повторите вручную",reasonName(reason),reason);
     else snprintf(detail,sizeof(detail),"%s",associated?"Таймаут DHCP: нет IP за 20 с":"Таймаут Wi-Fi: нет IP за 20 с. Проверьте журнал C6");
     message(detail);
     return;
   }
+  updateConnection();recoveryPending=false;
   bool stored=true;
   lock();bool automatic=state.autoConnect;xSemaphoreGive(stateMutex);
   if(save) {
@@ -252,17 +271,50 @@ void connectWifi(const Command& cmd, bool save) {
   unlock();versions();
 }
 #endif
+#if PANEL_BLE
+std::atomic<bool> bleScanComplete{false};
+bool bleScanPending=false; // Worker-owned; a missing callback must not overlap a new scan.
+void bleScanFinished(BLEScanResults) {
+  // NimBLE event task: no UI, NVS or application mutex; publish completion only.
+  bleScanComplete.store(true);
+}
+#endif
 void scanBle() {
 #if PANEL_BLE
+  lock();state.bleCount=0;unlock();
   message("Поиск BLE-устройств: 5 секунд...",true);
   if(!configurePins()) {message("Ошибка связи с C6",true);return;}
   if(!BLEDevice::init("BoilerPanel")) {message("BLE не запущен. Проверьте C6",true);return;}
   BLEScan* scanner=BLEDevice::getScan();
   if(!scanner) {message("BLE: сканер недоступен",true);return;}
+  if(scanner->isScanning()) {message("Поиск BLE уже выполняется",true);return;}
+  if(bleScanPending && !bleScanComplete.load()) {
+    message("Нет подтверждения предыдущего поиска BLE",true);return;
+  }
   scanner->setActiveScan(true);scanner->setInterval(160);scanner->setWindow(80);
-  BLEScanResults* found=scanner->start(5,false);
+  bleScanComplete.store(false);
+  bleScanPending=true;
+  // The blocking 3.3.6 wrapper returns a results pointer even on launch failure.
+  if(!scanner->start(5,bleScanFinished,false)) {bleScanPending=false;message("Не удалось запустить поиск BLE",true);return;}
+  const uint32_t started=millis();
+  // The extra 2 s is a worker watchdog for the 5 s SDK scan, not a hardware setting.
+  while(!stopRequested() && uint32_t(millis()-started)<7000U && (scanner->isScanning() || !bleScanComplete.load()))
+    vTaskDelay(pdMS_TO_TICKS(50));
+  const bool cancelled=stopRequested();
+  if(cancelled || scanner->isScanning() || !bleScanComplete.load()) {
+    const bool stopped=!scanner->isScanning() || scanner->stop();
+    const bool inactive=stopped && !scanner->isScanning();
+    // Never free the SDK result vector while its event task can still write to it.
+    const bool confirmed=inactive && bleScanComplete.load();
+    if(confirmed){bleScanPending=false;scanner->clearResults();}
+    message(!inactive?"Поиск BLE не удалось остановить":cancelled?(confirmed?"Поиск BLE отменён":"Отмена BLE: нет подтверждения завершения"):"Таймаут BLE: нет подтверждения завершения",true);
+    return;
+  }
+  bleScanPending=false;
+  BLEScanResults* found=scanner->getResults();
+  if(!found){message("BLE: результат недоступен",true);return;}
   BleDevice results[MAX_BLE];uint8_t count=0;
-  if(found) for(int i=0;i<found->getCount();i++) {
+  for(int i=0;i<found->getCount();i++) {
     BLEAdvertisedDevice d=found->getDevice(i);BleDevice item;
     snprintf(item.name,sizeof(item.name),"%s",d.haveName()?d.getName().c_str():"Без имени");
     snprintf(item.address,sizeof(item.address),"%s",d.getAddress().toString().c_str());item.rssi=d.getRSSI();
@@ -272,14 +324,21 @@ void scanBle() {
   }
   scanner->clearResults();
   lock();state.bleCount=count;for(int i=0;i<count;i++)state.ble[i]=results[i];
-  snprintf(state.bleMessage,sizeof(state.bleMessage),"%s",found?"Поиск завершён. Только BLE, без подключения":"Ошибка BLE-сканирования");unlock();versions();
+  snprintf(state.bleMessage,sizeof(state.bleMessage),"Поиск завершён. Найдено: %u. Только BLE",unsigned(count));unlock();versions();
 #else
   message("BLE не включён в установленной сборке Arduino",true);
 #endif
 }
 void disconnectWifi(bool forget) {
+  bool disconnected=true;
 #if PANEL_WIFI
-  if(wifiStarted){recoveryPending=false;WiFi.setAutoReconnect(false);WiFi.disconnect(false,false);}
+  if(wifiStarted){
+    recoveryPending=false;WiFi.setAutoReconnect(false);
+    const bool hadConnection=WiFi.status()==WL_CONNECTED;
+    const bool accepted=WiFi.disconnect(false,false);
+    disconnected=(!hadConnection || accepted) && WiFi.status()!=WL_CONNECTED;
+    updateConnection();recoveryPending=false;
+  }
 #endif
   const bool autoStored=nvsOK && prefs.putBool("autoconnect",false)==1;
   bool forgotten=true;
@@ -287,10 +346,10 @@ void disconnectWifi(bool forget) {
     forgotten=nvsOK && (!prefs.isKey("credentials") || prefs.remove("credentials"));
     wipe(&saved,sizeof(saved));if(forgotten)haveCredentials=false;
   }
-  lock();state.connected=false;state.autoConnect=haveCredentials && !autoStored && state.autoConnect;state.hasSaved=haveCredentials;
-  state.ssid[0]=0;state.ip[0]=0;state.rssi=0;
-  const char* result=!forgotten?"Отключено. Не удалось удалить сеть из NVS":!autoStored?"Отключено. NVS: автозапуск не сохранён":forget?"Сохранённая сеть удалена":"Wi-Fi отключён. Автоподключение выключено";
-  snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s",result);unlock();
+  lock();state.autoConnect=haveCredentials && !autoStored && state.autoConnect;state.hasSaved=haveCredentials;
+  if(disconnected){state.connected=false;state.ssid[0]=0;state.ip[0]=0;state.rssi=0;}
+  const char* result=!forgotten?"Не удалось удалить сеть из NVS":!autoStored?"NVS: автозапуск не сохранён":forget?"Сохранённая сеть удалена":"Автоподключение выключено";
+  snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s. %s",disconnected?"Wi-Fi отключён":"Не удалось отключить Wi-Fi",result);unlock();
 }
 void worker(void*) {
   nvsOK=prefs.begin("boiler03",false);

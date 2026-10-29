@@ -2,7 +2,8 @@
  * Browser-local demonstration model. No device transport or hardware control.
  * The ON prerequisites below are provisional UI demo rules, not an equipment
  * protection system. «До 80 °C» is descriptive: no regulator, trip limit or
- * hysteresis is inferred from it. Permission and actual heater state differ.
+ * hysteresis is inferred from it. Requests await an explicit simulated reply;
+ * this model assigns no transport timeout. Permission and heater state differ.
  */
 export const FRESHNESS_MS = 30_000;
 export const MAX_EVENTS = 100;
@@ -26,6 +27,8 @@ export const SCENARIOS = Object.freeze([
 
 const KNOWN_SCENARIOS = new Set(SCENARIOS.map(({ id }) => id));
 const KNOWN_SENSORS = new Set(SENSOR_DEFS.map(({ id }) => id));
+// A reset in the same tab must not reuse an ID still held by a demo reply timer.
+let nextDemoSessionId = 1;
 const finiteTime = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const clock = (value) => {
   if (!finiteTime(value)) throw new TypeError('Time must be a finite non-negative timestamp.');
@@ -65,7 +68,7 @@ function scenarioSnapshot(scenario, now) {
     lower: { reached: disconnected ? null : !['low', 'inconsistent'].includes(scenario), valid: !disconnected, updatedAt },
     upper: { reached: disconnected ? null : ['upper', 'inconsistent'].includes(scenario), valid: !disconnected, updatedAt },
     connection: { connected: !disconnected, commandAvailable: !disconnected },
-    heating: { mode: disconnected ? 'unknown' : scenario === 'heating' ? 'enabled' : 'off', actual: 'unknown' },
+    heating: { mode: disconnected ? 'unknown' : scenario === 'heating' ? 'enabled' : 'off', actual: 'unknown', command: null },
     now,
   };
 }
@@ -76,6 +79,8 @@ export function createState(scenario = 'normal', now = Date.now()) {
   let state = {
     ...scenarioSnapshot(chosen, now),
     startedAt: Math.max(0, now - 5 * 60_000),
+    sessionId: `demo-${nextDemoSessionId++}`,
+    nextCommandId: 1,
     events: [],
     nextEventId: 1,
   };
@@ -129,7 +134,17 @@ export function getHeatingAvailability(state) {
   if (state?.connection?.connected !== true || state?.connection?.commandAvailable !== true) {
     return unavailable('Управление не подключено');
   }
-  if (!['off', 'enabled'].includes(state?.heating?.mode)) return unavailable('Режим подогрева неизвестен');
+  const command = state?.heating?.command;
+  if (command?.status === 'pending') {
+    // OFF can supersede an unconfirmed ON; a late reply to ON is then ignored.
+    if (command.requested === 'enabled') return {
+      canEnable: false, canDisable: true, reason: 'Ожидается подтверждение включения',
+    };
+    return unavailable('Ожидается подтверждение выключения');
+  }
+  if (!['off', 'enabled'].includes(state?.heating?.mode)) return {
+    canEnable: false, canDisable: true, reason: 'Режим подогрева неизвестен — можно запросить выключение',
+  };
   // Loss of level or temperature validity must never hide an available OFF action.
   if (state.heating.mode === 'enabled') return { canEnable: false, canDisable: true, reason: '' };
   if (getReadingStatus(state?.telemetry?.fuel, state?.now) !== 'fresh') {
@@ -153,15 +168,73 @@ export function setHeating(state, enabled, now) {
     state: next, ok: false,
     message: availability.reason || (enabled ? 'Подогрев уже разрешён' : 'Подогрев уже отключён'),
   };
-  const message = enabled ? 'Режим подогрева разрешён' : 'Режим подогрева отключён';
+  const requestId = `${state.sessionId}:heating:${state.nextCommandId}`;
+  const message = enabled ? 'Ожидается подтверждение включения' : 'Ожидается подтверждение выключения';
+  // An unconfirmed ON may already have executed; replacing it cannot prove OFF.
+  const supersedesOn = !enabled && state.heating.command?.status === 'pending'
+    && state.heating.command.requested === 'enabled';
+  const command = {
+    id: requestId,
+    requested: enabled ? 'enabled' : 'off',
+    status: 'pending',
+    requestedAt: timestamp,
+    resolvedAt: null,
+    message,
+  };
   return {
-    state: event({ ...next, heating: { mode: enabled ? 'enabled' : 'off', actual: 'unknown' } }, {
-      kind: enabled ? 'success' : 'info',
-      title: message,
-      detail: 'Демонстрационная команда. Состояние физического нагревателя неизвестно.',
+    state: event({
+      ...next,
+      nextCommandId: state.nextCommandId + 1,
+      heating: { ...state.heating, mode: supersedesOn ? 'unknown' : state.heating.mode, actual: 'unknown', command },
+    }, {
+      kind: 'info',
+      title: enabled ? 'Запрошено включение подогрева' : 'Запрошено выключение подогрева',
+      detail: `Демонстрационная команда. ${message}. Состояние физического нагревателя неизвестно.`,
     }),
     ok: true,
+    requestId,
     message: `${message} · демо`,
+  };
+}
+
+export function resolveHeating(state, requestId, outcome, now) {
+  const command = state?.heating?.command;
+  if (!command || command.id !== requestId || command.status !== 'pending') return {
+    state, ok: false, ignored: true, message: 'Ответ не относится к ожидающей команде',
+  };
+  if (!['accepted', 'rejected', 'timeout'].includes(outcome)) return {
+    state, ok: false, ignored: false, message: 'Неизвестный результат команды',
+  };
+  const timestamp = snapshotNow(state, now);
+  const enabling = command.requested === 'enabled';
+  const accepted = outcome === 'accepted';
+  const title = accepted
+    ? enabling ? 'Режим подогрева разрешён' : 'Режим подогрева отключён'
+    : outcome === 'rejected' ? 'Команда подогрева отклонена' : 'Нет подтверждения команды';
+  const message = accepted
+    ? `${title} · подтверждение в демо`
+    : outcome === 'rejected'
+      ? `Запрос ${enabling ? 'включения' : 'выключения'} отклонён · демо`
+      : `${enabling ? 'Включение' : 'Выключение'} не подтверждено. Результат команды неизвестен · демо`;
+  // A timeout says nothing about execution: an OFF timeout must not claim OFF.
+  const mode = accepted ? command.requested : outcome === 'timeout' ? 'unknown' : state.heating.mode;
+  return {
+    state: event({
+      ...state,
+      now: timestamp,
+      heating: {
+        mode,
+        actual: 'unknown',
+        command: { ...command, status: outcome, resolvedAt: timestamp, message },
+      },
+    }, {
+      kind: accepted ? enabling ? 'success' : 'info' : 'warning',
+      title,
+      detail: `Демонстрационная команда. ${message}. Состояние физического нагревателя неизвестно.`,
+    }),
+    ok: accepted,
+    ignored: false,
+    message,
   };
 }
 
@@ -195,6 +268,12 @@ export function getAlerts(state) {
   if (state?.connection?.commandAvailable !== true) alerts.push({
     id: 'command', kind: 'warning', title: 'Управление недоступно',
     detail: 'Канал команд отключён в выбранном сценарии.',
+  });
+  const command = state?.heating?.command;
+  if (['rejected', 'timeout'].includes(command?.status)) alerts.push({
+    id: `heating-${command.status}`, kind: 'warning',
+    title: command.status === 'rejected' ? 'Команда подогрева отклонена' : 'Нет подтверждения команды',
+    detail: command.message,
   });
   return alerts;
 }

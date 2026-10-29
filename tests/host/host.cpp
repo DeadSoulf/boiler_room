@@ -39,8 +39,8 @@ void bounds(lv_obj_t* obj,bool scroll=false){
  }
  for(unsigned i=0;i<lv_obj_get_child_cnt(obj);i++)bounds(lv_obj_get_child(obj,i),inScroll);
 }
-void clickAt(int x,int y){
- mx=x;my=y;down=true;step(60);down=false;
+void clickAt(int x,int y,int heldMs=60){
+ mx=x;my=y;down=true;step(heldMs);down=false;
  // Physical release is sampled by the indev timer BEFORE the app's 100 ms
  // refresh consumes deferred navigation/dialog actions. A fixed 100 ms wait
  // races those independent timers; bound and assert completion instead.
@@ -53,6 +53,17 @@ void clickAt(int x,int y){
  }
  fprintf(stderr,"CLICK timeout: pending=%d close=%d rebuild=%d\n",pendingPage,int(closeDialog),int(rebuild));
  assert(false && "UI did not settle within 250 ms after physical release");
+}
+void clickKey(const char* text,int heldMs=60){
+ // Find the visible key, then exercise the real LVGL pointer path.
+ lv_obj_update_layout(keyboard);lv_area_t origin;lv_obj_get_coords(keyboard,&origin);
+ const auto* matrix=reinterpret_cast<const lv_btnmatrix_t*>(keyboard);
+ for(uint16_t i=0;const char* key=lv_btnmatrix_get_btn_text(keyboard,i);++i){
+  if(strcmp(key,text))continue;
+  const auto& area=matrix->button_areas[i];
+  clickAt(origin.x1+(area.x1+area.x2)/2,origin.y1+(area.y1+area.y2)/2,heldMs);return;
+ }
+ assert(false && "Keyboard key not found");
 }
 void swipe(bool left){mx=left?400:80;my=650;down=true;step(70);for(int i=0;i<7;i++){mx+=(left?-40:40);step(35);}down=false;step(300);}
 int main(){
@@ -82,7 +93,15 @@ int main(){
  assert(strstr(lv_label_get_text(detailText),"свежие"));dismiss();
  auto* unchangedBody=body;step(31000);assert(body==unchangedBody);
  assert(!strcmp(lv_label_get_text(tempValue[0]),"--.-"));
+ // Stale measurements still have history; the summary must not claim none ever arrived.
+ assert(measurements[0].count==3);
+ assert(!strcmp(lv_label_get_text(tempState[0]),"Нет свежих данных"));
+ assert(!strcmp(lv_label_get_text(tempTrend[0]),"История: нажмите"));
+ assert(!strcmp(lv_label_get_text(sensorSummary),"Свежие температуры: 0 / 4"));
+ assert(!strcmp(lv_label_get_text(sensorHint),"Свежих температурных данных пока нет"));
  sensorDetails(0);step();save("history_test_fixture");bounds(lv_layer_top());dismiss();measurements[0]=Measurement{};step(1100);
+ assert(!strcmp(lv_label_get_text(tempState[0]),"Нет данных"));
+ assert(!strcmp(lv_label_get_text(tempTrend[0]),"Истории пока нет"));
  // Fuel level uses independent normalized reed thresholds; no hardware data is invented.
  assert(fuelLevel.status(fakeMillis)==FuelLevelStatus::NoData);
  assert(!strcmp(lv_label_get_text(fuelCardLabels.summary),"Нет данных"));
@@ -163,8 +182,41 @@ int main(){
  clickAt(100,310);assert(panel_radio::lastCommand.job==Job::SetDisplayTimeout);
  assert(panel_radio::lastCommand.displayTimeoutSec==30);
  credentials(nullptr);step();save("wifi_keyboard");bounds(lv_layer_top());
+ clickKey("q");clickKey("ABC");clickKey("Q");clickKey("123");
+ assert(!strcmp(lv_textarea_get_text(ssidField),"qQ"));
+ clickKey("1");assert(!strcmp(lv_textarea_get_text(ssidField),"qQ1"));
+ clickKey("abc");assert(!upper && !symbols);
+ assert(!strcmp(lv_textarea_get_text(ssidField),"qQ1"));
+ clickKey("q");assert(!strcmp(lv_textarea_get_text(ssidField),"qQ1q"));
+ // A held layout key must neither repeat a layout switch nor type from its new map.
+ clickKey("123",900);assert(symbols && !strcmp(lv_textarea_get_text(ssidField),"qQ1q"));
+ clickKey("abc",900);assert(!upper && !symbols && !strcmp(lv_textarea_get_text(ssidField),"qQ1q"));
+ clickKey("ABC",900);assert(upper && !symbols && !strcmp(lv_textarea_get_text(ssidField),"qQ1q"));
+ clickKey("abc");
+ lv_textarea_set_text(ssidField,"");clickKey("123");assert(!lv_textarea_get_text(ssidField)[0]);
+ clickKey("abc");assert(!upper && !symbols && !lv_textarea_get_text(ssidField)[0]);
+ clickAt(80,232);assert(activeField==passwordField && lv_textarea_get_password_mode(passwordField));
+ clickKey("a");clickKey("ABC");clickKey("A");clickKey("123");clickKey("1");clickKey("abc");clickKey("b");
+ assert(!strcmp(lv_textarea_get_text(passwordField),"aA1b"));
+ assert(!upper && !symbols && !lv_textarea_get_text(ssidField)[0]);
+ save("keyboard_layout_regression");
  lv_textarea_set_text(ssidField,"TestNetwork");lv_textarea_set_text(passwordField,"Password123");
  clickAt(300,410);assert(panel_radio::lastCommand.job==panel::Job::Connect);assert(!strcmp(panel_radio::lastCommand.ssid,"TestNetwork"));assert(!overlay);
+ const char* selectedNames[]={"Line1\nLine2\nLine3\nLine4\nLine5","Room\r\n\tBoiler","WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW"};
+ for(const char* name:selectedNames){
+  AccessPoint ap;snprintf(ap.ssid,sizeof(ap.ssid),"%s",name);ap.auth=3;ap.supported=true;
+  credentials(&ap);step();
+  auto* shownName=lv_obj_get_child(overlay,3);auto* passwordLabel=lv_obj_get_child(overlay,4);
+  assert(lv_obj_check_type(shownName,&lv_label_class) && lv_obj_check_type(passwordLabel,&lv_label_class));
+  assert(!strcmp(lv_label_get_text(passwordLabel),"Пароль"));
+  lv_area_t nameBox,passwordBox;lv_obj_get_coords(shownName,&nameBox);lv_obj_get_coords(passwordLabel,&passwordBox);
+  assert(nameBox.y2<passwordBox.y1);
+  assert(!strchr(lv_label_get_text(shownName),'\n') && !strchr(lv_label_get_text(shownName),'\r') && !strchr(lv_label_get_text(shownName),'\t'));
+  assert(!strcmp(selectedSsid,name));bounds(lv_layer_top());
+  if(strchr(name,'\n'))save("selected_multiline_ssid_regression");
+  lv_textarea_set_text(passwordField,"Password123");clickAt(300,410);
+  assert(!overlay && panel_radio::lastCommand.job==Job::Connect && !strcmp(panel_radio::lastCommand.ssid,name));
+ }
  manualClock();step();save("clock_keyboard");bounds(lv_layer_top());dismiss();
  info("В котельной","Датчик не назначен.\n\nРеальных измерений и истории пока нет. Тип датчика и подключение зададим отдельно для этой котельной.");step();save("sensor_detail");bounds(lv_layer_top());dismiss();
  panel_radio::fixture.apCount=16;panel_radio::fixture.bleCount=16;
@@ -186,6 +238,6 @@ int main(){
  assert(activity && activityDot);save("busy_test_fixture");bounds(lv_scr_act());
  panel_radio::fixture.busy=false;++panel_radio::fixture.revision;step();
  for(int i=0;i<240;i++){page=i%4;view=page==2?(i/4)%4:0;render();step(10);}
- printf("RESULT: pointer swipes, Home, keyboard submit, wake consumption, freshness/history/modal/AP-race/scroll, fuel thresholds/unknown/stale/history, 240 page rebuilds completed; clipped labels=%d\n",clipped);
+ printf("RESULT: pointer swipes, Home, keyboard layouts/held keys/password submit, bounded SSID/raw connection, wake consumption, freshness/history/modal/AP-race/scroll, fuel thresholds/unknown/stale/history, 240 page rebuilds completed; clipped labels=%d\n",clipped);
  return clipped?1:0;
 }

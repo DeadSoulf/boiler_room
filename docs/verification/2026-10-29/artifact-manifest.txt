@@ -1,0 +1,8 @@
+
+test_existing_notices_are_packaged_and_hashed (__main__.ArtifactManifestTests.test_existing_notices_are_packaged_and_hashed) ... ok
+test_nested_same_names_and_updated_files_have_distinct_hashes (__main__.ArtifactManifestTests.test_nested_same_names_and_updated_files_have_distinct_hashes) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.139s
+
+OK

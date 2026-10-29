@@ -43,7 +43,15 @@ KNOWN_RELEASES = {'v03': {'main.cpp': 'f3b868683746c7902129618cc374fad61698d22c4
                      'panel_radio.cpp': '49a38d2cf26a0d115cf8dd251381457adb65ea89ced513a5e02ad5bb99c883a4',
                      'screen_state.h': 'ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba',
                      'panel_screen.h': '0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647',
-                     'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767'}}
+                     'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767'},
+ # Exact 339073c source set before the audited UI/radio fixes.
+ 'v04_fuel': {'main.cpp': '1aea53152fb700406168643aa2f3bb13b6febd4bd5e355ad75572bc5579fb6af',
+              'panel_types.h': 'f176b79c9953e5f0386525ca873f9f00b504ab6ddc651916a6bf818c44ea42f3',
+              'panel_radio.h': '85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7',
+              'panel_radio.cpp': '49a38d2cf26a0d115cf8dd251381457adb65ea89ced513a5e02ad5bb99c883a4',
+              'screen_state.h': 'ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba',
+              'panel_screen.h': '0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647',
+              'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767'}}
 GLUE_INPUTS = {'21f57f84236abf46aa7b612ee08a5ab10c1b28cc18d375b14bb4045c35e56f3b': '9f4731067dbc35d9fa4b6de74d74c514d033b10e42a1547d967e8ec3a9c02b42',
  'd24840d05fd756805d70fc8f6980a3d35068706ab275aaaf24ff7e7b5cfae535': '83c1004b49d99913194f144b0eff6006d793aa7770788b757c844768ff83d478'}
 BOARD_HASH = 'b6837425c6562a83b6ed1995a348470ef51e2ee886911663498c2a43a3d50898'
@@ -135,6 +143,19 @@ def verify_ini(s):
     for key,value in required.items():
         if env.get(key,'').strip()!=value:
             raise ValueError('platformio.ini requires '+key+' = '+value+'; preserved unchanged. Configure and retry.')
+    # The board JSON is hash-checked, so these are the effective defaults.
+    # An explicit board_build override must preserve the same target.
+    target={'board_build.mcu':'esp32p4','board_build.chip_variant':'esp32p4_es',
+            'board_build.variant':'esp32p4'}
+    for key,value in target.items():
+        if env.get(key,value).strip()!=value:
+            raise ValueError('Incompatible target override: '+key+'; expected '+value+'. platformio.ini preserved.')
+    # Preserve both the recovered v0.3.1 range and the exact CI pin. Do not
+    # silently permit a missing, duplicate, unpinned or incompatible LVGL.
+    dependencies=[re.sub(r'\s+','',line) for line in env.get('lib_deps','').splitlines() if line.strip()]
+    lvgl={'lvgl@~8.3.0','lvgl@8.3.11','lvgl/lvgl@~8.3.0','lvgl/lvgl@8.3.11'}
+    if len(dependencies)!=2 or dependencies.count('symlink://../../')!=1 or sum(item in lvgl for item in dependencies)!=1:
+        raise ValueError('Require the local BSP and LVGL ~8.3.0 or 8.3.11 in lib_deps; platformio.ini preserved.')
     for key in ('extends','extra_configs','extra_scripts','build_unflags'):
         if any(cfg.has_option(section,key) for section in cfg.sections()):
             raise ValueError('Unsupported configuration override: '+key)
@@ -189,7 +210,7 @@ def preflight(root, package):
     glue=root/prefix/'lvgl_glue.c';ini=root/'examples/LvglUi/platformio.ini'
     glue_s=text(glue); ini_s=text(ini)
     verify_ini(ini_s)
-    if version in ('v031','v04_before_fuel','v04_current'):
+    if version in ('v031','v04_before_fuel','v04_fuel','v04_current'):
         if digest(glue_s.encode()) not in GLUE_INPUTS.values():
             raise ValueError('Incomplete/mismatched installed screen adapter or CPU/debug configuration.')
     elif digest(glue_s.encode()) not in GLUE_INPUTS:
@@ -241,7 +262,9 @@ def transaction(root,plan,operation='update'):
           'state':'prepared','power_loss_atomic':False,'files':{
         n:{'old_sha256':None if previous[n] is None else digest(previous[n]),
            'new_sha256':None if b is None else digest(b)} for n,b in edits.items()}}
-    def save(): (backup/'manifest.json').write_text(json.dumps(meta,indent=2)+'\n')
+    def save(): atomic_write(backup/'manifest.json',(json.dumps(meta,indent=2)+'\n').encode())
+    # A complete prepared manifest must exist before any source change.
+    # Later status-write failures preserve that last valid manifest for restore.
     save();written=[]
     try:
         for n,b in edits.items():
@@ -262,8 +285,16 @@ def transaction(root,plan,operation='update'):
                 else: atomic_write(root/n,previous[n])
             except Exception as e: errors.append(str(e))
         meta['state']='rollback_failed' if errors else 'rolled_back'
-        meta['errors']=errors;save()
-        if errors: raise RuntimeError('Rollback incomplete; preserve backup '+str(backup)+': '+ '; '.join(errors)) from failure
+        meta['errors']=errors
+        status_failure=None
+        try: save()
+        except Exception as e: status_failure=e
+        if errors or status_failure is not None:
+            outcome='Rollback incomplete' if errors else 'Rollback completed; status could not be saved'
+            details='; '.join(errors)
+            if status_failure is not None: details+='; manifest status error: '+str(status_failure)
+            raise RuntimeError(outcome+'; preserve backup '+str(backup)+
+                               '. Original error: '+str(failure)+'. '+details) from failure
         raise
     print('SUCCESS: source '+operation+'. No device flashed. Backup: '+str(backup))
     return backup

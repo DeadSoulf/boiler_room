@@ -1,0 +1,30 @@
+✔ a request waits for acknowledgement before changing the confirmed heating mode (2.49478ms)
+✔ four normalized combinations describe a range, never a percentage (0.546336ms)
+✔ unknown inputs take precedence over stale or contradictory inputs (0.222016ms)
+✔ freshness boundary is inclusive; future, absent, and nonfinite readings are invalid (0.135975ms)
+✔ all exposed scenarios are coherent and all disconnected readings are unknown (0.526075ms)
+✔ demo enable requires fresh fuel temperature and usable consistent levels (0.473355ms)
+✔ available disable survives invalid levels and temperature, but not a missing command channel (0.286293ms)
+✔ ON and OFF are immutable demo permissions, never heater feedback or auto-regulation (1.195076ms)
+✔ OFF can replace an unconfirmed ON and the superseded reply cannot change the mode (0.277169ms)
+✔ a rejected OFF replacing pending ON cannot restore a falsely confirmed off mode (0.517521ms)
+✔ a rejected ON or OFF preserves the confirmed mode and exposes a command warning (1.099216ms)
+✔ a timeout never confirms ON or OFF; OFF remains available with unknown mode and invalid readings (0.31817ms)
+✔ settled requests ignore duplicate and late replies without adding events (0.14601ms)
+✔ scenario changes and resets invalidate old replies even when timestamps are identical (0.288987ms)
+✔ an unsupported reply cannot settle or confirm a pending request (0.108093ms)
+✔ commands re-evaluate freshness at an explicitly supplied new time (0.117217ms)
+✔ scenario selection preserves the session journal without mutating old states (0.192691ms)
+✔ acknowledgement affects only the selected event and does not clear a live condition (0.13219ms)
+✔ bounded journal uses unique stable IDs after truncation (1.081244ms)
+✔ histories are deterministic finite samples with valid times and exact current endpoint (6.695186ms)
+✔ stale history ends in the past, disconnected and invalid history is empty (0.258791ms)
+✔ alerts retain condition semantics and age labels handle missing inputs (0.453495ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27.204194

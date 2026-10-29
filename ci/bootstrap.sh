@@ -20,6 +20,7 @@ host)
  g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/display_idle_tests.cpp -o .build/display_tests
  .build/display_tests | tee artifacts/display.log
  python3 tests/updater_tests.py 2>&1 | tee artifacts/updater.log
+ python3 tests/artifact_manifest_tests.py 2>&1 | tee artifacts/artifact-manifest-tests.log
  cmake -S tests/host -B .build/host -DLVGL_DIR="$ROOT/.build/lvgl" -DBOILER_FONTS="$ROOT/src/boiler_fonts.c"
  cmake --build .build/host --parallel 2 2>&1 | tee artifacts/host-build.log
  # Preserve the exact official LVGL inputs for offline reproduction when local network is restricted.

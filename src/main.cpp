@@ -128,14 +128,23 @@ void fieldFocus(lv_event_t* e){activeField=lv_event_get_target(e);}
 const char* LOWER[]={"q","w","e","r","t","y","u","i","o","p","\n","a","s","d","f","g","h","j","k","l","\n","z","x","c","v","b","n","m","-","_","\n","ABC","123","Пробел","<-",""};
 const char* UPPER[]={"Q","W","E","R","T","Y","U","I","O","P","\n","A","S","D","F","G","H","J","K","L","\n","Z","X","C","V","B","N","M","-","_","\n","abc","123","Пробел","<-",""};
 const char* SYMBOLS[]={"1","2","3","4","5","6","7","8","9","0","\n","!","@","#","$","%","^","&","*","(",")","\n","-","_","+","=","[","]","{","}","\\","|","\n",".",",",":",";","/","?","'","\"","<",">","\n","abc","~","`","Пробел","<-",""};
+void setKeyboardMap(const char* map[]){
+  lv_btnmatrix_set_map(keyboard,map);
+  // Change layouts only after release. A held finger must not hit the new map.
+  // Reapply controls because maps with a different key count allocate new bits.
+  for(uint16_t id=0;const char* text=lv_btnmatrix_get_btn_text(keyboard,id);++id){
+    if(!strcmp(text,"ABC") || !strcmp(text,"abc") || !strcmp(text,"123"))
+      lv_btnmatrix_set_btn_ctrl(keyboard,id,lv_btnmatrix_ctrl_t(LV_BTNMATRIX_CTRL_CLICK_TRIG|LV_BTNMATRIX_CTRL_NO_REPEAT));
+  }
+}
 void keyboardEvent(lv_event_t* e){
   if(!activeField || lv_obj_has_state(activeField,LV_STATE_DISABLED))return;
   const uint16_t id=lv_btnmatrix_get_selected_btn(lv_event_get_target(e));
   if(id==LV_BTNMATRIX_BTN_NONE)return;
   const char* t=lv_btnmatrix_get_btn_text(lv_event_get_target(e),id);if(!t)return;
-  if(!strcmp(t,"ABC")){upper=true;symbols=false;lv_btnmatrix_set_map(keyboard,UPPER);}
-  else if(!strcmp(t,"abc")){upper=false;symbols=false;lv_btnmatrix_set_map(keyboard,LOWER);}
-  else if(!strcmp(t,"123")){symbols=true;lv_btnmatrix_set_map(keyboard,SYMBOLS);}
+  if(!strcmp(t,"ABC")){upper=true;symbols=false;setKeyboardMap(UPPER);}
+  else if(!strcmp(t,"abc")){upper=false;symbols=false;setKeyboardMap(LOWER);}
+  else if(!strcmp(t,"123")){symbols=true;setKeyboardMap(SYMBOLS);}
   else if(!strcmp(t,"<-"))lv_textarea_del_char(activeField);
   else if(!strcmp(t,"Пробел"))lv_textarea_add_text(activeField," ");
   else lv_textarea_add_text(activeField,t);
@@ -156,7 +165,7 @@ void makeKeyboard(int y){
   lv_obj_set_style_text_color(keyboard,c(TXT),LV_PART_ITEMS);lv_obj_set_style_bg_color(keyboard,c(0x20384E),LV_PART_ITEMS);
   lv_obj_set_style_bg_color(keyboard,c(0x3B647E),LV_PART_ITEMS|LV_STATE_PRESSED);
   lv_obj_set_style_border_width(keyboard,0,LV_PART_ITEMS);lv_obj_set_style_radius(keyboard,6,LV_PART_ITEMS);
-  lv_btnmatrix_set_map(keyboard,LOWER);upper=false;symbols=false;
+  setKeyboardMap(LOWER);upper=false;symbols=false;
   lv_obj_clear_flag(keyboard,LV_OBJ_FLAG_GESTURE_BUBBLE);lv_obj_add_event_cb(keyboard,keyboardEvent,LV_EVENT_VALUE_CHANGED,nullptr);
 }
 void credentials(const AccessPoint* ap){
@@ -165,7 +174,12 @@ void credentials(const AccessPoint* ap){
   label(overlay,"Подключение Wi-Fi",18,23,300,&boiler_font_25);button(overlay,"Домой",350,14,112,50,Home);
   if(ap){
     snprintf(selectedSsid,sizeof(selectedSsid),"%s",ap->ssid);
-    label(overlay,"Выбранная сеть",18,88,442,&boiler_font_14,MUTED);label(overlay,ap->ssid,18,116,442,&boiler_font_19);
+    // Sanitize only the caption; selectedSsid retains the bytes used to connect.
+    char caption[sizeof(selectedSsid)];snprintf(caption,sizeof(caption),"%s",selectedSsid);
+    for(char* p=caption;*p;++p)if(static_cast<unsigned char>(*p)<0x20 || *p==0x7F)*p=' ';
+    label(overlay,"Выбранная сеть",18,88,442,&boiler_font_14,MUTED);
+    auto* name=label(overlay,caption,18,116,442,&boiler_font_19);
+    lv_label_set_long_mode(name,LV_LABEL_LONG_DOT);lv_obj_set_height(name,52);
   }else{
     label(overlay,"Имя сети (SSID)",18,84,442,&boiler_font_14,MUTED);ssidField=field(overlay,"Введите SSID",18,108,444,32);
   }

@@ -2,12 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   FRESHNESS_MS, MAX_EVENTS, SENSOR_DEFS, SCENARIOS, createState, selectScenario,
-  getLevel, getReadingStatus, getHeatingAvailability, setHeating, ackEvent,
+  getLevel, getReadingStatus, getHeatingAvailability, setHeating, resolveHeating, ackEvent,
   getAlerts, getTemperatureHistory, formatAge,
 } from '../dist/model.js';
 
 const NOW = Date.UTC(2026, 9, 29, 9, 0, 0);
 const copy = (value) => structuredClone(value);
+
+test('a request waits for acknowledgement before changing the confirmed heating mode', () => {
+  const state = createState('normal', NOW);
+  const saved = copy(state);
+  const requested = setHeating(state, true, NOW);
+  assert.equal(requested.ok, true);
+  assert.equal(requested.state.heating.mode, 'off');
+  assert.equal(requested.state.heating.command.status, 'pending');
+  assert.equal(requested.state.heating.command.id, requested.requestId);
+  assert.equal(requested.state.heating.command.requested, 'enabled');
+  assert.equal(requested.state.heating.command.requestedAt, NOW);
+  assert.equal(requested.state.heating.command.resolvedAt, null);
+  assert.equal(requested.state.heating.actual, 'unknown');
+  assert.deepEqual(state, saved);
+});
 
 test('four normalized combinations describe a range, never a percentage', () => {
   const cases = [
@@ -88,7 +103,10 @@ test('available disable survives invalid levels and temperature, but not a missi
     state.heating.mode = 'enabled';
     state.telemetry.fuel.valid = false;
     assert.equal(getHeatingAvailability(state).canDisable, true);
-    assert.equal(setHeating(state, false, NOW).state.heating.mode, 'off');
+    const requested = setHeating(state, false, NOW);
+    assert.equal(requested.ok, true);
+    assert.equal(requested.state.heating.mode, 'enabled');
+    assert.equal(resolveHeating(requested.state, requested.requestId, 'accepted', NOW).state.heating.mode, 'off');
   }
   const state = createState('heating', NOW);
   state.connection.commandAvailable = false;
@@ -99,16 +117,25 @@ test('available disable survives invalid levels and temperature, but not a missi
 test('ON and OFF are immutable demo permissions, never heater feedback or auto-regulation', () => {
   const original = createState('normal', NOW);
   const saved = copy(original);
-  const on = setHeating(original, true, NOW);
+  const requestedOn = setHeating(original, true, NOW);
+  assert.equal(requestedOn.ok, true);
+  assert.equal(requestedOn.state.heating.mode, 'off');
+  assert.equal(setHeating(requestedOn.state, true, NOW).ok, false);
+  const pendingOn = copy(requestedOn.state);
+  const on = resolveHeating(requestedOn.state, requestedOn.requestId, 'accepted', NOW);
   assert.equal(on.ok, true);
   assert.equal(on.state.heating.mode, 'enabled');
+  assert.equal(on.state.heating.command.status, 'accepted');
   assert.equal(on.state.heating.actual, 'unknown');
   assert.deepEqual(original, saved);
+  assert.deepEqual(requestedOn.state, pendingOn);
   assert.deepEqual(on.state.telemetry, saved.telemetry);
-  assert.equal(on.state.events.length, original.events.length + 1);
+  assert.equal(on.state.events.length, original.events.length + 2);
   assert.match(on.state.events[0].detail, /Демонстрационная/);
   assert.equal(setHeating(on.state, true, NOW).ok, false);
-  const off = setHeating(on.state, false, NOW);
+  const requestedOff = setHeating(on.state, false, NOW);
+  assert.equal(requestedOff.state.heating.mode, 'enabled');
+  const off = resolveHeating(requestedOff.state, requestedOff.requestId, 'accepted', NOW);
   assert.equal(off.ok, true);
   assert.equal(off.state.heating.mode, 'off');
   assert.equal(off.state.heating.actual, 'unknown');
@@ -116,6 +143,114 @@ test('ON and OFF are immutable demo permissions, never heater feedback or auto-r
   above80.telemetry.fuel.value = 81;
   assert.equal(getHeatingAvailability(above80).canEnable, true, '80 is descriptive, no hardware control threshold is invented');
   assert.equal(setHeating(original, 'true', NOW).ok, false);
+});
+
+test('OFF can replace an unconfirmed ON and the superseded reply cannot change the mode', () => {
+  const on = setHeating(createState('normal', NOW), true, NOW);
+  assert.equal(getHeatingAvailability(on.state).canEnable, false);
+  assert.equal(getHeatingAvailability(on.state).canDisable, true);
+  const off = setHeating(on.state, false, NOW);
+  assert.equal(off.ok, true);
+  assert.notEqual(off.requestId, on.requestId);
+  assert.equal(off.state.heating.command.requested, 'off');
+  assert.equal(off.state.heating.mode, 'unknown');
+  assert.equal(getHeatingAvailability(off.state).canEnable, false);
+  assert.equal(getHeatingAvailability(off.state).canDisable, false);
+  const lateOn = resolveHeating(off.state, on.requestId, 'accepted', NOW);
+  assert.equal(lateOn.ignored, true);
+  assert.equal(lateOn.state, off.state);
+  const confirmedOff = resolveHeating(off.state, off.requestId, 'accepted', NOW);
+  assert.equal(confirmedOff.state.heating.mode, 'off');
+  assert.equal(confirmedOff.state.heating.actual, 'unknown');
+});
+
+test('a rejected OFF replacing pending ON cannot restore a falsely confirmed off mode', () => {
+  const on = setHeating(createState('normal', NOW), true, NOW);
+  const off = setHeating(on.state, false, NOW);
+  const rejectedOff = resolveHeating(off.state, off.requestId, 'rejected', NOW);
+  assert.equal(rejectedOff.state.heating.mode, 'unknown');
+  assert.equal(rejectedOff.state.heating.actual, 'unknown');
+  assert.equal(getHeatingAvailability(rejectedOff.state).canDisable, true);
+  const oldOn = resolveHeating(rejectedOff.state, on.requestId, 'accepted', NOW);
+  assert.equal(oldOn.ignored, true);
+  assert.equal(oldOn.state, rejectedOff.state);
+});
+
+test('a rejected ON or OFF preserves the confirmed mode and exposes a command warning', () => {
+  for (const [scenario, enabled, expectedMode] of [['normal', true, 'off'], ['heating', false, 'enabled']]) {
+    const state = createState(scenario, NOW);
+    const requested = setHeating(state, enabled, NOW);
+    const rejected = resolveHeating(requested.state, requested.requestId, 'rejected', NOW);
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.ignored, false);
+    assert.equal(rejected.state.heating.mode, expectedMode);
+    assert.equal(rejected.state.heating.command.status, 'rejected');
+    assert.equal(rejected.state.heating.actual, 'unknown');
+    assert.match(rejected.state.heating.command.message, /отклонён/);
+    assert.ok(getAlerts(rejected.state).some(({ id }) => id === 'heating-rejected'));
+    const acknowledged = ackEvent(rejected.state, rejected.state.events[0].id);
+    assert.ok(getAlerts(acknowledged).some(({ id }) => id === 'heating-rejected'));
+    assert.equal(setHeating(rejected.state, enabled, NOW).ok, true);
+  }
+});
+
+test('a timeout never confirms ON or OFF; OFF remains available with unknown mode and invalid readings', () => {
+  for (const [scenario, enabled] of [['normal', true], ['heating', false]]) {
+    const requested = setHeating(createState(scenario, NOW), enabled, NOW);
+    const timedOut = resolveHeating(requested.state, requested.requestId, 'timeout', NOW);
+    assert.equal(timedOut.ok, false);
+    assert.equal(timedOut.state.heating.mode, 'unknown');
+    assert.equal(timedOut.state.heating.actual, 'unknown');
+    assert.equal(timedOut.state.heating.command.status, 'timeout');
+    assert.match(timedOut.message, /не подтверждено/);
+    assert.ok(getAlerts(timedOut.state).some(({ id }) => id === 'heating-timeout'));
+    timedOut.state.telemetry.fuel.valid = false;
+    timedOut.state.lower.valid = false;
+    timedOut.state.upper.valid = false;
+    assert.equal(getHeatingAvailability(timedOut.state).canEnable, false);
+    assert.equal(getHeatingAvailability(timedOut.state).canDisable, true);
+    const off = setHeating(timedOut.state, false, NOW);
+    assert.equal(off.ok, true);
+    assert.equal(off.state.heating.mode, 'unknown');
+    const confirmed = resolveHeating(off.state, off.requestId, 'accepted', NOW);
+    assert.equal(confirmed.state.heating.mode, 'off');
+    assert.equal(confirmed.state.heating.actual, 'unknown');
+  }
+});
+
+test('settled requests ignore duplicate and late replies without adding events', () => {
+  for (const outcome of ['accepted', 'rejected', 'timeout']) {
+    const requested = setHeating(createState('normal', NOW), true, NOW);
+    const settled = resolveHeating(requested.state, requested.requestId, outcome, NOW);
+    const late = resolveHeating(settled.state, requested.requestId, 'accepted', NOW + 1);
+    assert.equal(late.ignored, true);
+    assert.equal(late.state, settled.state);
+  }
+});
+
+test('scenario changes and resets invalidate old replies even when timestamps are identical', () => {
+  const oldRequest = setHeating(createState('normal', NOW), true, NOW);
+  const switched = selectScenario(oldRequest.state, 'normal', NOW);
+  assert.equal(switched.heating.command, null);
+  const afterSwitch = setHeating(switched, true, NOW);
+  assert.notEqual(afterSwitch.requestId, oldRequest.requestId);
+  const oldAfterSwitch = resolveHeating(afterSwitch.state, oldRequest.requestId, 'accepted', NOW);
+  assert.equal(oldAfterSwitch.ignored, true);
+  assert.equal(oldAfterSwitch.state, afterSwitch.state);
+  const afterReset = setHeating(createState('normal', NOW), true, NOW);
+  assert.notEqual(afterReset.requestId, oldRequest.requestId);
+  const oldAfterReset = resolveHeating(afterReset.state, oldRequest.requestId, 'accepted', NOW);
+  assert.equal(oldAfterReset.ignored, true);
+  assert.equal(oldAfterReset.state, afterReset.state);
+});
+
+test('an unsupported reply cannot settle or confirm a pending request', () => {
+  const requested = setHeating(createState('normal', NOW), true, NOW);
+  const invalid = resolveHeating(requested.state, requested.requestId, 'success', NOW);
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.ignored, false);
+  assert.equal(invalid.state, requested.state);
+  assert.equal(invalid.state.heating.command.status, 'pending');
 });
 
 test('commands re-evaluate freshness at an explicitly supplied new time', () => {

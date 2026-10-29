@@ -1,7 +1,7 @@
 """Isolated exact recovered releases + pinned real BSP, never a user project."""
 import importlib.util
 from pathlib import Path
-import tempfile, unittest, shutil, subprocess, sys, json
+import tempfile, unittest, shutil, subprocess, sys, json, errno, signal
 from unittest.mock import patch
 PACKAGE=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('updater',PACKAGE/'apply_update.py')
@@ -20,7 +20,7 @@ class Tests(unittest.TestCase):
  def install(self,version):
   for n in (*u.FILES,*u.RETIRED):(self.src/n).unlink(missing_ok=True)
   if version=='v04_before_fuel':
-   # Only the two changed files need historical copies. Verify the complete
+   # Changed main/types/radio files have historical copies. Verify the complete
    # reconstructed baseline so future edits cannot silently change this fixture.
    for n in u.FILES:
     source=F/version/n
@@ -29,7 +29,7 @@ class Tests(unittest.TestCase):
     shutil.copy2(source,self.src/n)
   else:
    for p in (F/version).iterdir():shutil.copy2(p,self.src/p.name)
-  patched=version in ('v031','v04_before_fuel')
+  patched=version in ('v031','v04_before_fuel','v04_fuel')
   shutil.copy2(F/'bsp'/('screen031.c' if patched else 'portrait.c'),self.src/'lvgl_glue.c')
  def snapshot(self):return {str(p.relative_to(self.root)):p.read_bytes() for p in self.root.rglob('*') if p.is_file() and 'boiler_backups' not in p.parts}
  def apply(self):
@@ -58,7 +58,8 @@ class Tests(unittest.TestCase):
   self.install('v04_before_fuel');before=self.snapshot()
   src,plan=u.preflight(self.root,PACKAGE)
   self.assertEqual(plan['version'],'v04_before_fuel')
-  self.assertEqual(set(plan['edits']),{'examples/LvglUi/src/main.cpp','examples/LvglUi/src/panel_types.h'})
+  self.assertTrue({'examples/LvglUi/src/main.cpp','examples/LvglUi/src/panel_types.h'} <= set(plan['edits']))
+  self.assertTrue(set(plan['edits']) <= {'examples/LvglUi/src/'+n for n in ('main.cpp','panel_types.h','panel_radio.cpp')})
   backup=u.apply(src,self.root,PACKAGE,plan)
   for n in u.FILES:self.assertEqual((self.src/n).read_bytes(),(PACKAGE/'src'/n).read_bytes())
   for n in ('examples/LvglUi/platformio.ini','examples/LvglUi/src/lvgl_glue.c'):
@@ -83,6 +84,26 @@ class Tests(unittest.TestCase):
   _,plan=u.preflight(self.root,PACKAGE)
   self.assertEqual(plan['version'],'v04_before_fuel')
   self.assertNotIn('examples/LvglUi/src/lvgl_glue.c',plan['edits'])
+ def test_v04_fuel_baseline_hashes(self):
+  for n in u.FILES:
+   self.assertEqual(u.normalized_sha(F/'v04_fuel'/n),u.KNOWN_RELEASES['v04_fuel'][n])
+ def test_v04_fuel_update_noop_and_exact_restore(self):
+  self.install('v04_fuel');before=self.snapshot()
+  src,plan=u.preflight(self.root,PACKAGE)
+  self.assertEqual(plan['version'],'v04_fuel')
+  self.assertTrue(plan['edits'])
+  self.assertTrue(set(plan['edits']) <= {'examples/LvglUi/src/'+n for n in ('main.cpp','panel_radio.cpp')})
+  backup=u.apply(src,self.root,PACKAGE,plan)
+  for n in u.FILES:self.assertEqual((self.src/n).read_bytes(),(PACKAGE/'src'/n).read_bytes())
+  for n in ('examples/LvglUi/platformio.ini','examples/LvglUi/src/lvgl_glue.c'):
+   self.assertEqual((self.root/n).read_bytes(),before[n])
+  self.assertIsNone(self.apply())
+  u.restore(self.root,backup);self.assertEqual(before,self.snapshot())
+ def test_v04_fuel_rejects_edited_source_and_unpatched_glue(self):
+  self.install('v04_fuel');p=self.src/'main.cpp';p.write_bytes(p.read_bytes()+b'\n// user change\n')
+  with self.assertRaises(ValueError):u.preflight(self.root,PACKAGE)
+  self.install('v04_fuel');shutil.copy2(F/'bsp/portrait.c',self.src/'lvgl_glue.c')
+  with self.assertRaises(ValueError):u.preflight(self.root,PACKAGE)
  def test_default_cli_read_only(self):
   before=self.snapshot();result=subprocess.run([sys.executable,str(PACKAGE/'apply_update.py'),str(self.root)],capture_output=True,text=True)
   self.assertEqual(result.returncode,0,result.stderr);self.assertIn('READ-ONLY',result.stdout)
@@ -121,6 +142,29 @@ class Tests(unittest.TestCase):
  def test_config_noncritical_customization_preserved(self):
   p=self.src.parent/'platformio.ini';s=p.read_text().replace('monitor_speed = 115200','monitor_speed = 9600');p.write_text(s)
   self.apply();self.assertEqual(p.read_text(),s)
+ def test_critical_target_overrides_rejected_without_writes(self):
+  p=self.src.parent/'platformio.ini';original=p.read_text()
+  for key,value in [('board_build.mcu','esp32s3'),('board_build.chip_variant','esp32p4'),('board_build.variant','esp32s3')]:
+   with self.subTest(key=key):
+    p.write_text(original+'\n'+key+' = '+value+'\n');before=self.snapshot()
+    with self.assertRaisesRegex(ValueError,'target override'):u.preflight(self.root,PACKAGE)
+    self.assertEqual(before,self.snapshot())
+  p.write_text(original)
+ def test_matching_target_overrides_and_supported_lvgl_preserved(self):
+  p=self.src.parent/'platformio.ini';original=p.read_text()
+  for version in ('~8.3.0','8.3.11'):
+   with self.subTest(version=version):
+    s=original.replace('lvgl@~8.3.0','lvgl@'+version).replace('monitor_speed = 115200','monitor_speed = 9600')
+    s+='\nboard_build.mcu = esp32p4\nboard_build.chip_variant = esp32p4_es\nboard_build.variant = esp32p4\n'
+    p.write_text(s);self.apply();self.assertEqual(p.read_text(),s)
+ def test_missing_conflicting_and_incompatible_lvgl_rejected(self):
+  p=self.src.parent/'platformio.ini';original=p.read_text()
+  for entry in ('lvgl@9.0.0','lvgl@^8.3.0','lvgl','', 'lvgl@8.3.11\n    lvgl@9.0.0'):
+   with self.subTest(entry=entry):
+    p.write_text(original.replace('lvgl@~8.3.0',entry));before=self.snapshot()
+    with self.assertRaisesRegex(ValueError,'LVGL'):u.preflight(self.root,PACKAGE)
+    self.assertEqual(before,self.snapshot())
+  p.write_text(original)
  def test_board_mismatch_rejected(self):
   p=self.root/'boards/jc4880p4.json';p.write_text(p.read_text().replace('esp32p4_es','esp32p4'))
   with self.assertRaises(ValueError):u.preflight(self.root,PACKAGE)
@@ -143,6 +187,69 @@ class Tests(unittest.TestCase):
     with patch.object(u,'atomic_write',side_effect=fail_once):
      with self.assertRaises(OSError):u.apply(src,self.root,PACKAGE,plan)
     self.assertEqual(self.snapshot(),before)
+ def test_initial_manifest_failure_changes_no_sources(self):
+  before=self.snapshot();src,plan=u.preflight(self.root,PACKAGE);original=u.atomic_write
+  def fail_manifest(p,b):
+   if p.name=='manifest.json':raise OSError('prepared manifest blocked')
+   original(p,b)
+  with patch.object(u,'atomic_write',side_effect=fail_manifest):
+   with self.assertRaisesRegex(OSError,'prepared manifest blocked'):u.apply(src,self.root,PACKAGE,plan)
+  self.assertEqual(before,self.snapshot())
+  backup=next((self.root/'boiler_backups').iterdir())
+  self.assertFalse((backup/'manifest.json').exists())
+ def test_final_manifest_failure_rolls_back_with_valid_metadata(self):
+  before=self.snapshot();src,plan=u.preflight(self.root,PACKAGE);original=u.atomic_write
+  def fail_final_status(p,b):
+   if p.name=='manifest.json' and json.loads(b)['state']=='applied':raise OSError('applied status blocked')
+   original(p,b)
+  with patch.object(u,'atomic_write',side_effect=fail_final_status):
+   with self.assertRaisesRegex(OSError,'applied status blocked'):u.apply(src,self.root,PACKAGE,plan)
+  self.assertEqual(before,self.snapshot())
+  backup=next((self.root/'boiler_backups').iterdir())
+  self.assertEqual(json.loads((backup/'manifest.json').read_text())['state'],'rolled_back')
+  self.assertIsNone(u.restore(self.root,backup))
+ def test_failed_rollback_status_preserves_prepared_and_original_error(self):
+  before=self.snapshot();src,plan=u.preflight(self.root,PACKAGE);original=u.atomic_write
+  def fail_status(p,b):
+   if p.name=='manifest.json' and json.loads(b)['state']!='prepared':raise OSError('status blocked')
+   original(p,b)
+  with patch.object(u,'atomic_write',side_effect=fail_status):
+   with self.assertRaisesRegex(RuntimeError,'Rollback completed; status could not be saved') as caught:
+    u.apply(src,self.root,PACKAGE,plan)
+  backup=next((self.root/'boiler_backups').iterdir())
+  self.assertEqual(before,self.snapshot())
+  self.assertIn(str(backup),str(caught.exception))
+  self.assertIsInstance(caught.exception.__cause__,OSError)
+  self.assertEqual(json.loads((backup/'manifest.json').read_text())['state'],'prepared')
+  self.assertIsNone(u.restore(self.root,backup))
+ @unittest.skipUnless(sys.platform.startswith('linux'),'requires process-local RLIMIT_FSIZE')
+ def test_persistent_write_failure_keeps_manifest_and_later_restore(self):
+  import resource
+  old_limit=resource.getrlimit(resource.RLIMIT_FSIZE)
+  if old_limit[0]!=resource.RLIM_INFINITY and old_limit[0]<=512:self.skipTest('file limit already too small')
+  before=self.snapshot();src,plan=u.preflight(self.root,PACKAGE);original=u.atomic_write;source_writes=0;activated=False
+  def fail_after_two_sources(p,b):
+   nonlocal source_writes,activated
+   original(p,b)
+   if p.parent==self.src:
+    source_writes+=1
+    if source_writes==2:
+     resource.setrlimit(resource.RLIMIT_FSIZE,(512,old_limit[1]));activated=True
+  old_signal=signal.signal(signal.SIGXFSZ,signal.SIG_IGN)
+  try:
+   with patch.object(u,'atomic_write',side_effect=fail_after_two_sources):
+    with self.assertRaisesRegex(RuntimeError,'Rollback incomplete') as caught:u.apply(src,self.root,PACKAGE,plan)
+  finally:
+   resource.setrlimit(resource.RLIMIT_FSIZE,old_limit)
+   signal.signal(signal.SIGXFSZ,old_signal)
+  self.assertTrue(activated)
+  self.assertIsInstance(caught.exception.__cause__,OSError)
+  self.assertEqual(caught.exception.__cause__.errno,errno.EFBIG)
+  backup=next((self.root/'boiler_backups').iterdir());manifest=backup/'manifest.json'
+  self.assertIn(str(backup),str(caught.exception))
+  self.assertEqual(json.loads(manifest.read_text())['state'],'prepared')
+  self.assertGreater(manifest.stat().st_size,512)
+  u.restore(self.root,backup);self.assertEqual(before,self.snapshot())
  def test_concurrent_change_before_apply_refused(self):
   src,plan=u.preflight(self.root,PACKAGE);(self.src/'main.cpp').write_text('// concurrent edit')
   with self.assertRaises(RuntimeError):u.apply(src,self.root,PACKAGE,plan)

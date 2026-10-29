@@ -1,29 +1,106 @@
-# Build only — no flashing
+# Сборка и проверки без прошивки устройства
 
-Merge these files into repository root alongside current src/, tests/ and
-apply_update.py. tests/update_fixture/main.cpp is the recovered historical updater
-test fixture only: it is NEVER copied into firmware. Font fixture is copied from
-current src/boiler_fonts.c during host testing.
+Workflow `Boiler panel build and tests` выполняет native-проверки, затем сборку
+ESP32-P4. Он не посылает команды прошивки, не стирает Flash/NVS и не обновляет C6.
+Успешное завершение нужно проверять для точного коммита; наличие этого workflow
+не является результатом сборки.
 
-GitHub-hosted Ubuntu runs native tests, then firmware compilation. Permissions
-contents:read; no secrets, self-hosted runners, upload/flash commands or C6 changes.
-Artifacts inherit repository visibility (PUBLIC for a public repository), expire
-in 14 days, and contain test images, logs, hashes and firmware. No credentials
-should be placed in sources or test fixtures.
+## Состав
 
-Pinned inputs verified through GitHub connector earlier in this task:
-- ultramcu/guition-jc4880p4-bsp 324970bade0d1f4e52880fe8016580368bc1e06e
-- LVGL8.3.11 native commit 74d0a816a440eea53e030c4f1af842a94f7ce3d3;
-  firmware exact registry version lvgl@8.3.11
-- pioarduino55.03.36-1 release archive SHA256
-  837ff736b9a088186ecb99a96b830a1eaccc7f16bb0ee6c73c4e76c2ef3d936e
-- official checkout/upload-artifact v4 immutable action commits in workflow
-- PlatformIO core6.1.18; transitive Python dependencies resolved during install.
-This is not a fully hermetic or bit-for-bit reproducibility claim.
+- `src/` — текущие исходники приложения.
+- `tests/fixtures/` — исторические известные наборы и тестовые BSP-файлы.
+  Они нужны для проверки миграции и не копируются в собираемую прошивку.
+- `tests/host/` — настоящий LVGL с заменами платы, касаний и радио.
+- `ci/prepare.py` — подготовка закреплённого BSP для чистой target-сборки.
+- `ci/verify_binary.py` — структурная проверка полученных образов.
+- `ci/manifest.py` — сведения о коммите, входных файлах и артефактах, копирование
+  имеющихся текстов лицензий и рекурсивные контрольные суммы.
 
-Guarded portrait transform only; never runs the historical app installer. Board
-jc4880p4 / esp32p4_es, portrait480x800. User-requested overrides CPU360MHz and
-CORE_DEBUG_LEVEL0 are explicit. All other original BSP settings preserved except
-LVGL exact pin and hash-checked local platform archive URI. Firmware artifacts
-include ELF/BIN, bootloader and partitions; offline checks report minimum image
-revision but do not establish actual board compatibility or hardware behavior.
+GitHub-hosted Ubuntu запускается с `contents: read`. Текущий workflow не использует
+секреты, self-hosted runners или доступ к устройству. Артефакты наследуют видимость
+репозитория и хранятся 14 дней. Пользовательские пароли, конфигурации и дампы Flash
+в исходники, fixtures и артефакты не включаются.
+
+## Закреплённые входы
+
+- BSP `ultramcu/guition-jc4880p4-bsp`:
+  `324970bade0d1f4e52880fe8016580368bc1e06e`.
+- Native LVGL 8.3.11:
+  `74d0a816a440eea53e030c4f1af842a94f7ce3d3`;
+  firmware использует точную registry-версию `lvgl@8.3.11`.
+- pioarduino `55.03.36-1`, SHA-256 архива платформы:
+  `837ff736b9a088186ecb99a96b830a1eaccc7f16bb0ee6c73c4e76c2ef3d936e`.
+- PlatformIO Core `6.1.18`; транзитивные Python-зависимости разрешаются при установке.
+- Официальные checkout/upload-artifact v4 закреплены полными commit SHA в workflow.
+
+Это не утверждение о полностью герметичной или побайтово воспроизводимой сборке.
+
+## Полные команды из корня checkout
+
+```sh
+bash ci/bootstrap.sh host
+bash ci/bootstrap.sh firmware
+```
+
+Первая команда запускает модель данных, радиологику и её регрессии, модель экрана,
+установщик, проверки упаковки лицензий и host-интерфейс с настоящим LVGL.
+Вторая получает BSP и архив платформы, подготавливает приложение, компилирует
+ESP32-P4 и проверяет образы. Обе команды могут получать закреплённые зависимости
+из сети; `ci/manifest.py` ожидает настоящий Git checkout для определения коммита.
+
+## Локальные проверки без получения зависимостей
+
+Для моделей, установщика и radio-mocks достаточно уже установленных GCC и Python:
+
+```sh
+BOILER_CHECK_DIR="$(mktemp -d /tmp/boiler-check.XXXXXX)"
+g++ -std=c++17 -Wall -Wextra -Isrc tests/model_tests.cpp -o "$BOILER_CHECK_DIR/model_tests"
+"$BOILER_CHECK_DIR/model_tests"
+g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/display_idle_tests.cpp -o "$BOILER_CHECK_DIR/display_tests"
+"$BOILER_CHECK_DIR/display_tests"
+bash tests/run_radio_tests.sh
+python3 tests/updater_tests.py
+python3 tests/artifact_manifest_tests.py
+```
+
+Для host-интерфейса задайте `BOILER_LVGL_DIR` — абсолютный путь к уже полученным
+исходникам LVGL 8.3.11, содержащим `lvgl.h` и `src/`:
+
+```sh
+: "${BOILER_LVGL_DIR:?Укажите путь к исходникам LVGL 8.3.11}"
+BOILER_UI_CHECK_DIR="$(mktemp -d /tmp/boiler-ui-check.XXXXXX)"
+cmake -S tests/host -B "$BOILER_UI_CHECK_DIR/host" -DLVGL_DIR="$BOILER_LVGL_DIR" -DBOILER_FONTS="$PWD/src/boiler_fonts.c"
+cmake --build "$BOILER_UI_CHECK_DIR/host" --parallel 2
+(cd "$BOILER_UI_CHECK_DIR" && ./host/panel_test)
+```
+
+PPM-снимки сохраняются в выбранном временном каталоге. По умолчанию эта CMake-команда
+не включает санитайзеры; результат её выполнения не следует описывать как ASan/UBSan-проверку.
+
+Проверки веб-модели выполняются отдельно:
+
+```sh
+node --test web/boiler-panel/tests/*.test.mjs
+```
+
+Они не заменяют браузерную проверку навигации и размещения элементов.
+
+## Подготовка прошивки и артефакты
+
+Чистая target-сборка применяет проверяемую портретную адаптацию. Исторический
+установщик приложения при этом не запускается. Выбраны `jc4880p4 / esp32p4_es`,
+480×800, CPU 360 МГц и `CORE_DEBUG_LEVEL=0`. Другие исходные настройки BSP
+сохраняются, кроме точного pin LVGL и локального URI архива платформы с проверенным хешем.
+
+Подготовка артефактов копирует репозиторный `licenses/` в `artifacts/licenses/`.
+Входной манифест включает исходные уведомления, а выходной — относительные пути
+и SHA-256 вложенных файлов. Это проверяется `tests/artifact_manifest_tests.py`.
+Не заявляется полный аудит лицензий всех транзитивных зависимостей.
+
+Firmware-комплект успешной сборки содержит ELF/BIN, загрузчик и таблицу разделов.
+Структурная проверка сообщает характеристики образов, но не устанавливает
+совместимость конкретной физической платы или исправность оборудования.
+
+Шаг загрузки артефактов выполняется и после отказа предыдущих шагов. Поэтому
+наличие ZIP само по себе не доказывает успешную сборку: проверьте статус задания,
+нужный коммит, журналы, состав и контрольные суммы.

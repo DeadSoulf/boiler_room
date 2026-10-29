@@ -1,0 +1,23 @@
+{
+  "review": "Independent app.js execution with an inert DOM",
+  "at": "2026-10-28T23:02:16.089Z",
+  "node": "v24.22.1",
+  "project": "/workspace/scratch/029f983d1800/boiler_room_fuel/web/boiler-panel/",
+  "sha256": {
+    "app.js": "11431038f11d9b34f69d7abec32f0c12288df140963906213553e051b475a03a",
+    "model.js": "ba6fe06448634366994c8a7819ff1a38617569a92c929fbfdaea6eac7f752c8d",
+    "navigation.js": "48fbaa9ac95d060d43f2b091dc0931318a8be061f455e60e69d88731ce55f3bf",
+    "index.html": "4df8bc774f2d8129d02a7d1f13cb4d3d56fdea9914ff84b1e798e124da07506a",
+    "styles.css": "484702ed356ea210655f0f85e1fb8f8d9331a39342665a775ac14925577f6164"
+  }
+}
+{
+  "renderCases": 84,
+  "chartCases": 84,
+  "commandOutcomes": 3,
+  "pendingOnReplacedByOff": "pass",
+  "lateResponseAfterReset": "pass",
+  "ackPreservesAlert": "pass",
+  "swipeNavigationAndClickSuppression": "pass",
+  "geometry": "not tested"
+}

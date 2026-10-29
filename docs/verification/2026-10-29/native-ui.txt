@@ -1,0 +1,2 @@
+HOME BEFORE page=2 rendered=2 pending=-1 rebuild=0 overlay=(nil) sleeping=0 consume=0 clicks=5 hit=0x506000015560 header=0x506000015260 hit-button=1
+RESULT: pointer swipes, Home, keyboard layouts/held keys/password submit, bounded SSID/raw connection, wake consumption, freshness/history/modal/AP-race/scroll, fuel thresholds/unknown/stale/history, 240 page rebuilds completed; clipped labels=0

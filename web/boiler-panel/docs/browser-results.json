@@ -1,89 +1,126 @@
 {
-  "responsiveResults": [
+  "scope": "Local managed Chromium preview; not physical panel",
+  "date": "2026-10-29 Europe/Moscow",
+  "actions": [
     {
-      "buttonBottom": 665.484375,
-      "navTop": 736,
+      "check": "ON confirmed after waiting",
+      "state": "Подтверждённый режим · демо\nРазрешён\nНагреватель\nНет данных",
+      "result": "Ответ получен · демо\nРежим подогрева разрешён · подтверждение в демо"
+    },
+    {
+      "check": "OFF pending",
+      "result": "Ожидается подтверждение\nОжидается подтверждение выключения"
+    },
+    {
+      "check": "rejected OFF preserves mode",
+      "state": "Подтверждённый режим · демо\nРазрешён\nНагреватель\nНет данных",
+      "result": "Команда отклонена\nЗапрос выключения отклонён · демо"
+    },
+    {
+      "check": "OFF timeout leaves unknown with retry",
+      "state": "Подтверждённый режим · демо\nНет данных\nНагреватель\nНет данных",
+      "result": "Ответ не получен\nВыключение не подтверждено. Результат команды неизвестен · демо",
+      "offEnabled": true
+    },
+    {
+      "check": "horizontal drag on temperature card",
+      "title": "Главная"
+    },
+    {
+      "check": "keyboard next page",
+      "title": "Управление"
+    },
+    {
+      "check": "Home and visible clock at 360",
+      "title": "Главная",
+      "clockVisible": true
+    }
+  ],
+  "viewports": [
+    {
+      "bottomNav": 0,
+      "buttons": [
+        {
+          "bottom": 684.6875,
+          "height": 48,
+          "text": "Включить"
+        },
+        {
+          "bottom": 684.6875,
+          "height": 48,
+          "text": "Выключить"
+        }
+      ],
+      "clientWidth": 465,
       "scrollWidth": 465,
-      "width": 465
+      "viewport": {
+        "width": 480,
+        "height": 800
+      }
     },
     {
-      "buttonBottom": 690.890625,
-      "navTop": 736,
+      "bottomNav": 0,
+      "buttons": [
+        {
+          "bottom": 713.09375,
+          "height": 48,
+          "text": "Включить"
+        },
+        {
+          "bottom": 713.09375,
+          "height": 48,
+          "text": "Выключить"
+        }
+      ],
+      "clientWidth": 345,
       "scrollWidth": 345,
-      "width": 345
+      "viewport": {
+        "width": 360,
+        "height": 800
+      }
     }
   ],
-  "routeChecks": [
+  "routes360": [
     {
+      "clientWidth": 345,
       "scrollWidth": 345,
-      "title": "Обзор котельной",
-      "width": 345
+      "title": "Управление"
     },
     {
-      "scrollWidth": 345,
-      "title": "История температуры",
-      "width": 345
-    },
-    {
+      "clientWidth": 360,
       "scrollWidth": 360,
-      "title": "Журнал событий",
-      "width": 360
+      "title": "Настройки"
     },
     {
+      "clientWidth": 345,
       "scrollWidth": 345,
-      "title": "Диагностика",
-      "width": 345
+      "title": "Настройки Wi-Fi"
     },
     {
-      "scrollWidth": 345,
-      "title": "Сервис",
-      "width": 345
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "title": "Bluetooth рядом"
     },
     {
+      "clientWidth": 345,
       "scrollWidth": 345,
-      "title": "Топливо и подогрев",
-      "width": 345
+      "title": "Дата и время"
+    },
+    {
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "title": "Экран"
+    },
+    {
+      "clientWidth": 345,
+      "scrollWidth": 345,
+      "title": "Сервис"
     }
   ],
-  "backCheck": "Обзор котельной",
-  "onCheck": "Режим подогрева\nРазрешён\nНагреватель\nНет данных",
-  "offCheck": "Режим подогрева\nОтключён\nНагреватель\nНет данных",
-  "scenarioChecks": [
-    {
-      "alert": "Мало топлива",
-      "disableDisabled": true,
-      "enableDisabled": true,
-      "reason": "Демо: включение недоступно при низком уровне",
-      "scenario": "low",
-      "temperature": "36,0°C",
-      "title": "Ниже нижнего"
-    },
-    {
-      "alert": "Данные уровня устарели",
-      "disableDisabled": true,
-      "enableDisabled": true,
-      "reason": "Нет актуальной температуры топлива",
-      "scenario": "stale",
-      "temperature": "—°C",
-      "title": "Данные устарели"
-    },
-    {
-      "alert": "Нет подключения",
-      "disableDisabled": true,
-      "enableDisabled": true,
-      "reason": "Управление не подключено",
-      "scenario": "disconnected",
-      "temperature": "—°C",
-      "title": "Нет данных"
-    },
-    {
-      "alert": null,
-      "disableDisabled": true,
-      "enableDisabled": false,
-      "reason": "Изменение режима в демонстрации.",
-      "scenario": "normal",
-      "temperature": "36,0°C",
-      "title": "Рабочий диапазон"
-    }
-  ]
+  "gesture": {
+    "trace": "{\"frame\":\"panel480\",\"from\":{\"x\":200,\"y\":256,\"t\":26437,\"target\":\"DIV\"},\"to\":{\"x\":40,\"y\":256,\"t\":32569.30000000447},\"duration\":6132.30000000447,\"hash\":\"#overview\"}",
+    "title": "Главная"
+  },
+  "gestureLimit": "Native drag took 6132.3 ms and was correctly rejected above 1000 ms; fast gesture covered by unit and VM tests",
+  "productionBrowser": "Environment denied URL; not browser-verified"
 }
