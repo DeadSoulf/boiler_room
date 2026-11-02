@@ -11,7 +11,9 @@
 #include <string.h>
 #include "panel_web.h"
 #include "panel_radio.h"
+#include "panel_equipment.h"
 #include "panel_screen.h"
+#include "panel_storage.h"
 #if defined(CONFIG_ESP_WIFI_REMOTE_ENABLED) && CONFIG_ESP_WIFI_REMOTE_ENABLED
 #define BP_WEB_ENABLED 1
 #include <WebServer.h>
@@ -24,7 +26,6 @@
 namespace panel_web {
 namespace {
 using namespace panel;
-namespace demo=panel::equipment_demo;
 struct TempSnap {
   bool valid=false, ever=false;
   float value=0,minimum=0,maximum=0,trend=0;
@@ -32,32 +33,17 @@ struct TempSnap {
   float history[HISTORY_POINTS]={};
   uint32_t historyAge[HISTORY_POINTS]={};
 };
-struct EquipSnap {
-  uint8_t mode=0,status=0;
-  bool requested=false,canOn=false,canOff=false;
-};
-struct EventSnap {
-  uint8_t id=0,status=0,mode=0;
-  bool requested=false;
-  uint32_t atSeconds=0;
-};
 struct Shared {
   TempSnap temp[CHANNELS];
   uint8_t fuelStatus=0;
   bool lowerValid=false,lowerReached=false,upperValid=false,upperReached=false;
   uint32_t lowerAge=0,upperAge=0;
-  EquipSnap equipment[demo::COUNT];
-  EventSnap journal[demo::JOURNAL_SIZE];
-  uint8_t eventCount=0,nextOutcome=0;
   uint32_t uptime=0,freeHeap=0,displayMs=0,lvglMs=0,firstFrameMs=0,touchMs=0;
   bool touchReady=false,published=false;
 };
 Shared latest;
 SemaphoreHandle_t guard=nullptr;
 TaskHandle_t httpTask=nullptr;
-DemoAction mailbox;
-bool mailboxBusy=false;
-char lastDemoResult[72]="";
 char physicalPin[7]="";
 uint32_t pinExpires=0;
 uint8_t failedCodes=0;
@@ -82,29 +68,6 @@ void jsonQuote(String& j,const char* s) {
     else j+=char(*p);
   }
   j+='"';
-}
-const char* modeName(uint8_t value) {
-  switch(static_cast<demo::Mode>(value)){
-    case demo::Mode::Enabled:return "enabled";
-    case demo::Mode::Off:return "off";
-    default:return "unknown";
-  }
-}
-const char* commandName(uint8_t value) {
-  switch(static_cast<demo::Status>(value)){
-    case demo::Status::Pending:return "pending";
-    case demo::Status::Accepted:return "accepted";
-    case demo::Status::Rejected:return "rejected";
-    case demo::Status::Timeout:return "timeout";
-    default:return "none";
-  }
-}
-const char* outcomeName(uint8_t value) {
-  switch(static_cast<demo::Outcome>(value)){
-    case demo::Outcome::Accepted:return "accepted";
-    case demo::Outcome::Rejected:return "rejected";
-    default:return "timeout";
-  }
 }
 const char* fuelName(uint8_t value) {
   switch(static_cast<FuelLevelStatus>(value)){
@@ -191,8 +154,6 @@ void statusRequest() {
   if(!guard || xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE){errorResponse(503,"busy");return;}
   snap=latest;
   const bool pairingActive=physicalPin[0]&&future(pinExpires);
-  char lastResult[sizeof(lastDemoResult)];
-  snprintf(lastResult,sizeof(lastResult),"%s",lastDemoResult);
   xSemaphoreGive(guard);
   if(!snap.published){errorResponse(503,"starting");return;}
   const bool admin=authorized();
@@ -280,30 +241,26 @@ void statusRequest() {
   j+="},\"upper\":{\"valid\":";j+=snap.upperValid?"true":"false";
   j+=",\"reached\":";j+=snap.upperReached?"true":"false";
   j+=",\"age_s\":";j+=String(snap.upperAge);j+="}}";
-  j+=",\"demo_outcome\":";jsonQuote(j,outcomeName(snap.nextOutcome));
-  j+=",\"demo_last_result\":";jsonQuote(j,lastResult);
   j+=",\"equipment\":[";
-  for(unsigned i=0;i<demo::COUNT;i++){
+  for(unsigned i=0;i<panel_equipment::COUNT;i++){
     if(i)j+=',';
-    const EquipSnap& e=snap.equipment[i];
-    j+="{\"mode\":";jsonQuote(j,modeName(e.mode));
-    j+=",\"request\":";jsonQuote(j,commandName(e.status));
-    j+=",\"requested\":";j+=e.requested?"true":"false";
-    j+=",\"can_on\":";j+=e.canOn?"true":"false";
-    j+=",\"can_off\":";j+=e.canOff?"true":"false";
-    j+='}';
-  }
-  j+="],\"journal\":[";
-  for(unsigned i=0;i<snap.eventCount;i++){
-    if(i)j+=',';
-    const EventSnap& e=snap.journal[i];
-    j+="{\"id\":";j+=String(e.id);
-    j+=",\"mode\":";jsonQuote(j,modeName(e.mode));
-    j+=",\"status\":";jsonQuote(j,commandName(e.status));
-    j+=",\"requested\":";j+=e.requested?"true":"false";
-    j+=",\"at_s\":";j+=String(e.atSeconds);j+='}';
+    j+="{\"name\":";jsonQuote(j,panel_equipment::name(i));
+    j+=",\"connected\":false,\"state\":\"not_connected\"}";
   }
   j+="]";
+  panel_storage::Snapshot storage;
+  const bool storageOK=panel_storage::snapshot(storage);
+  j+=",\"storage\":{\"started\":";j+=(storageOK&&storage.started)?"true":"false";
+  j+=",\"mounted\":";j+=storage.mounted?"true":"false";
+  j+=",\"logging\":";j+=storage.logging?"true":"false";
+  j+=",\"card_bytes\":";j+=String((unsigned long long)storage.cardBytes);
+  j+=",\"total_bytes\":";j+=String((unsigned long long)storage.totalBytes);
+  j+=",\"used_bytes\":";j+=String((unsigned long long)storage.usedBytes);
+  j+=",\"free_bytes\":";j+=String((unsigned long long)storage.freeBytes);
+  j+=",\"written_events\":";j+=String(storage.writtenEvents);
+  j+=",\"written_samples\":";j+=String(storage.writtenSamples);
+  j+=",\"dropped\":";j+=String(storage.dropped);
+  j+=",\"message\":";jsonQuote(j,storage.message);j+='}';
   j+=",\"service\":{\"free_heap\":";j+=String(snap.freeHeap);
   j+=",\"display_ms\":";j+=String(snap.displayMs);
   j+=",\"lvgl_ms\":";j+=String(snap.lvglMs);
@@ -313,17 +270,10 @@ void statusRequest() {
   jsonResponse(200,j);
 }
 
-bool enqueueDemo(DemoAction cmd) {
-  if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(25))!=pdTRUE)return false;
-  if(mailboxBusy){xSemaphoreGive(guard);return false;}
-  mailbox=cmd;mailboxBusy=true;
-  xSemaphoreGive(guard);return true;
-}
 void commandRequest() {
   if(!authorized()){errorResponse(401,"pair_required");return;}
   const String kind=server.arg("action");
   panel::Command cmd;
-  bool radioCommand=true;
   if(kind=="wifi_scan")cmd.job=Job::WifiScan;
   else if(kind=="wifi_disconnect")cmd.job=Job::Disconnect;
   else if(kind=="wifi_forget")cmd.job=Job::Forget;
@@ -367,42 +317,16 @@ void commandRequest() {
     if(seconds>0 && !snap.touchReady){errorResponse(409,"touch_unavailable");return;}
     cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=uint16_t(seconds);
   }
-  else if(kind=="demo_on"||kind=="demo_off"){
-    radioCommand=false;
-    const String val=server.arg("id");
-    if(!allDigits(val,1,1)||asUint(val)>=demo::COUNT){errorResponse(400,"invalid_device");return;}
-    DemoAction act;
-    act.type=kind=="demo_on"?DemoActionType::Enable:DemoActionType::Disable;
-    act.id=uint8_t(asUint(val));
-    if(!enqueueDemo(act)){errorResponse(409,"demo_queue_busy");return;}
-  }
-  else if(kind=="demo_outcome"){
-    radioCommand=false;
-    const String val=server.arg("value");
-    if(val!="accepted"&&val!="rejected"&&val!="timeout"){
-      errorResponse(400,"invalid_outcome");return;
-    }
-    DemoAction act;act.type=DemoActionType::Outcome;
-    act.outcome=val=="accepted"?0:val=="rejected"?1:2;
-    if(!enqueueDemo(act)){errorResponse(409,"demo_queue_busy");return;}
-  }
-  else if(kind=="demo_reset"){
-    radioCommand=false;
-    DemoAction act;act.type=DemoActionType::Reset;
-    if(!enqueueDemo(act)){errorResponse(409,"demo_queue_busy");return;}
-  }
   else {errorResponse(404,"unknown_action");return;}
-  if(radioCommand) {
-    RadioState radio;
-    if(!panel_radio::snapshot(radio)||!radio.ready){
-      memset(cmd.password,0,sizeof(cmd.password));
-      errorResponse(503,"radio_unavailable");return;
-    }
-    const bool accepted=panel_radio::submit(cmd);
-    volatile char* secret=cmd.password;
-    for(unsigned i=0;i<sizeof(cmd.password);i++)secret[i]=0;
-    if(!accepted){errorResponse(409,"radio_busy");return;}
+  RadioState radio;
+  if(!panel_radio::snapshot(radio)||!radio.ready){
+    memset(cmd.password,0,sizeof(cmd.password));
+    errorResponse(503,"radio_unavailable");return;
   }
+  const bool accepted=panel_radio::submit(cmd);
+  volatile char* secret=cmd.password;
+  for(unsigned i=0;i<sizeof(cmd.password);i++)secret[i]=0;
+  if(!accepted){errorResponse(409,"radio_busy");return;}
   jsonResponse(202,"{\"ok\":true,\"queued\":true}");
 }
 void logoutRequest() {
@@ -488,22 +412,7 @@ void revokePairing() {
   clearSessionLocked();
   xSemaphoreGive(guard);
 }
-bool takeDemoAction(DemoAction& out) {
-  if(!guard||xSemaphoreTake(guard,0)!=pdTRUE)return false;
-  if(!mailboxBusy){xSemaphoreGive(guard);return false;}
-  out=mailbox;
-  mailboxBusy=false;
-  xSemaphoreGive(guard);
-  return true;
-}
-void recordDemoResult(bool accepted) {
-  if(!guard||xSemaphoreTake(guard,0)!=pdTRUE)return;
-  snprintf(lastDemoResult,sizeof(lastDemoResult),"%s",
-           accepted?"Команда ДЕМО принята":"Действие ДЕМО отклонено текущим состоянием");
-  xSemaphoreGive(guard);
-}
-void publish(const Measurement (&temps)[CHANNELS],const FuelLevel& fuel,
-             const demo::State& equipment,uint32_t now) {
+void publish(const Measurement (&temps)[CHANNELS],const FuelLevel& fuel,uint32_t now) {
   if(!guard)return;
   Shared next;
   next.uptime=now/1000U;
@@ -536,24 +445,6 @@ void publish(const Measurement (&temps)[CHANNELS],const FuelLevel& fuel,
       t.historyAge[k]=uint32_t(now-m.timeAt(k))/1000U;
     }
   }
-  for(unsigned i=0;i<demo::COUNT;i++){
-    const demo::Node* n=equipment.device(static_cast<demo::Id>(i));
-    if(!n)continue;
-    EquipSnap& e=next.equipment[i];
-    e.mode=uint8_t(n->mode);
-    e.status=uint8_t(n->command.status);
-    e.requested=n->command.requested;
-    e.canOn=equipment.canRequest(static_cast<demo::Id>(i),true);
-    e.canOff=equipment.canRequest(static_cast<demo::Id>(i),false);
-  }
-  next.eventCount=uint8_t(equipment.eventCount);
-  for(unsigned i=0;i<equipment.eventCount && i<demo::JOURNAL_SIZE;i++){
-    const demo::Event* e=equipment.event(i);
-    if(!e)continue;
-    next.journal[i]={uint8_t(e->device),uint8_t(e->status),
-                     uint8_t(e->mode),e->requested,e->at/1000U};
-  }
-  next.nextOutcome=uint8_t(equipment.nextOutcome);
   next.published=true;
   if(xSemaphoreTake(guard,0)==pdTRUE){latest=next;xSemaphoreGive(guard);}
 }
