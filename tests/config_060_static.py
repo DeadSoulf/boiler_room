@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile,subprocess,re
-root=Path(r"C:\Users\TexNik\BoilerPanel\boiler_room_v0_5_0")
+root=Path(__file__).resolve().parents[1]
 main=(root/"src/main.cpp").read_text(encoding="utf-8")
 cfg=(root/"src/panel_config.cpp").read_text(encoding="utf-8")
 web=(root/"src/panel_web.cpp").read_text(encoding="utf-8")
