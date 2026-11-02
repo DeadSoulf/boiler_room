@@ -1,6 +1,6 @@
 # Boiler Panel — GUITION JC4880P443 (ESP32-P4 + ESP32-C6)
 
-**Current firmware: v0.5.6.** This repository is an independent boiler-room touch-panel project. It is not the heater-control firmware or a relay controller.
+**Current firmware: v0.5.8.** This repository is an independent boiler-room touch-panel project. It is not the heater-control firmware or a relay controller.
 
 [Инструкция на русском](README_RU.md) · [microSD](docs/microsd-storage.md) · [Web interface](docs/web-on-panel.md) · [Safe flashing](docs/flash-panel.md)
 
@@ -26,3 +26,7 @@ The card is connected to P4 SDMMC **Slot 0** (CLK43/CMD44/D0–D3 GPIO39–42), 
 **Never assign GPIOs reserved for the display, GT911 touch, SDMMC, audio, or ESP-Hosted SDIO. Never enable live boiler/heater outputs without verified wiring, an actual control module and independent safety limits.**
 
 Build environment: PIOArduino 55.03.36-1 / Arduino-ESP32 3.3.6 / LVGL 8.3.11 / ESP32-P4 ES rev1.3 at 360 MHz. The safe flasher only writes the P4 app partition after chip, layout and backup checks; it never overwrites the C6 firmware or NVS.
+
+## Manual microSD formatting
+
+Web Service can request one-time FAT preparation. It permanently destroys existing card data and requires an authenticated paired browser, exact confirmation phrase, and a separate physical confirmation button within 90 seconds. No automatic formatting occurs at boot. [Instructions](docs/microSD-format-web.md).
