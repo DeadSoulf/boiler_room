@@ -260,6 +260,10 @@ void statusRequest() {
   j+=",\"written_events\":";j+=String(storage.writtenEvents);
   j+=",\"written_samples\":";j+=String(storage.writtenSamples);
   j+=",\"dropped\":";j+=String(storage.dropped);
+  j+=",\"format_state\":";j+=String(unsigned(storage.formatPhase));
+  j+=",\"format_attempted\":";j+=storage.formatAttempted?"true":"false";
+  j+=",\"format_remaining_s\":";j+=String(storage.formatRemainingSeconds);
+  j+=",\"format_message\":";jsonQuote(j,storage.formatMessage);
   j+=",\"message\":";jsonQuote(j,storage.message);j+='}';
   j+=",\"service\":{\"free_heap\":";j+=String(snap.freeHeap);
   j+=",\"display_ms\":";j+=String(snap.displayMs);
@@ -273,6 +277,18 @@ void statusRequest() {
 void commandRequest() {
   if(!authorized()){errorResponse(401,"pair_required");return;}
   const String kind=server.arg("action");
+  if(kind=="sd_format_prepare"){
+    // Strict exact phrase from browser + existing physical pairing.
+    // This ONLY arms a temporary request; no SD API may be called here.
+    if(server.arg("confirm")!="СТЕРЕТЬ MICROSD"){
+      errorResponse(400,"type_ERASE_MICROSD");return;
+    }
+    if(!panel_storage::prepareFormat()){
+      errorResponse(409,"sd_format_busy_or_already_attempted");return;
+    }
+    jsonResponse(202,"{\"ok\":true,\"status\":\"awaiting_physical_confirmation\",\"expires_in_s\":90}");
+    return;
+  }
   panel::Command cmd;
   if(kind=="wifi_scan")cmd.job=Job::WifiScan;
   else if(kind=="wifi_disconnect")cmd.job=Job::Disconnect;
