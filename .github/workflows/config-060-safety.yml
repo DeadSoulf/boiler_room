@@ -1,0 +1,24 @@
+name: v0.6.0 connection config safety
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'tests/config_060_static.py'
+      - '.github/workflows/config-060-safety.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/config_060_static.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: GPIO profile and web UI safety
+        run: python3 tests/config_060_static.py
