@@ -1,18 +1,32 @@
-# Панель котельной · Boiler Panel v0.4.0
+# Boiler Panel — GUITION JC4880P443 (ESP32-P4 + ESP32-C6)
 
-Самостоятельный интерфейс GUITION JC4880P443, ESP32-P4 ES v1.3 и ESP32-C6.
-Объединяет установленную v0.3.1 с новым динамическим интерфейсом.
-Русское меню, четыре температуры, свайпы, часы, Wi-Fi/BLE и сон подсветки с
-пробуждением первым касанием без случайной команды.
+**Current firmware: v0.5.8.** This repository is an independent boiler-room touch-panel project. It is not the heater-control firmware or a relay controller.
 
-- **[Полная инструкция на русском](README_RU.md)**: установка, обновление, диагностика, откат.
-- [Аудит и ограничения проверки](AUDIT_RU.md).
-- [Сборки и результаты GitHub Actions](https://github.com/DeadSoulf/boiler_room/actions).
-- [Как устроена сборка](ci/README.md).
+[Инструкция на русском](README_RU.md) · [microSD](docs/microsd-storage.md) · [Web interface](docs/web-on-panel.md) · [Safe flashing](docs/flash-panel.md)
 
-Используйте только артефакты успешного запуска для нужного коммита.
-Компиляция не заменяет проверку на устройстве. Реальные датчики и выходы ещё
-не назначены; отсутствующие показания не имитируются.
+## What works
 
-GitHub Actions не прошивает панель. C6 автоматически не обновляется.
-Не записывайте образ C6 в основной P4 и не стирайте память панели.
+- 480×800 LVGL portrait display, horizontal swipe navigation, first-frame startup, touch wake, configurable backlight timeout.
+- Four temperature channels and two fuel-level reed switch channels, without invented data. Actual electrical sensors are not yet connected.
+- Wi-Fi through the ESP32-C6 ESP-Hosted co-processor (host/C6 firmware 2.9.6), Wi-Fi scan/connect, BLE discovery, time and timezone.
+- Embedded Russian HTTP browser interface with live status, physically initiated pairing for configuration changes. Use **trusted local LAN only**, never expose HTTP port 80 to the internet.
+- Equipment inventory: indirect water heater, electric boiler and three circuits, diesel heater, fuel heater. None is connected to a confirmed actuator controller, so **no physical commands and no simulations** are provided.
+- microSD monitor and bounded logging under `/boiler-panel/logs/` only when mounting a supported filesystem succeeds. No automatic formatting; storage access runs outside the LVGL and networking tasks.
+
+## microSD status
+
+The card is connected to P4 SDMMC **Slot 0** (CLK43/CMD44/D0–D3 GPIO39–42), powered by on-chip LDO4. The ESP32-C6 SDIO link uses Slot 1. The BSP already owns LDO4, so the Arduino SD_MMC wrapper must use `setPowerChannel(-1)`.
+
+**On-device test (Nov 2, 2026):** v0.5.6 boots and Wi-Fi/Web still work, but the inserted card returns `vfs_fat_sdmmc: mount_to_vfs failed (0xffffffff)`. It may use an unsupported filesystem such as exFAT, or there may be a filesystem/read error; capacity and free space are not yet verified, and no log files were written. No card format or erase was attempted. Follow [issue #5](https://github.com/DeadSoulf/boiler_room/issues/5) for nondestructive diagnosis.
+
+## Next milestone
+
+[Issue #4](https://github.com/DeadSoulf/boiler_room/issues/4): Tasmota-like hardware configuration page, exposing only verified, physically available GPIOs, supported sensor types, bus assignments, driver-specific settings, conflict validation, NVS-backed active configuration with rollback, and optional SD backup once the card mounts reliably.
+
+**Never assign GPIOs reserved for the display, GT911 touch, SDMMC, audio, or ESP-Hosted SDIO. Never enable live boiler/heater outputs without verified wiring, an actual control module and independent safety limits.**
+
+Build environment: PIOArduino 55.03.36-1 / Arduino-ESP32 3.3.6 / LVGL 8.3.11 / ESP32-P4 ES rev1.3 at 360 MHz. The safe flasher only writes the P4 app partition after chip, layout and backup checks; it never overwrites the C6 firmware or NVS.
+
+## Manual microSD formatting
+
+Web Service can request one-time FAT preparation. It permanently destroys existing card data and requires an authenticated paired browser, exact confirmation phrase, and a separate physical confirmation button within 90 seconds. No automatic formatting occurs at boot. [Instructions](docs/microSD-format-web.md).
