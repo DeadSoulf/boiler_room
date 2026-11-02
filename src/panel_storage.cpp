@@ -1,10 +1,14 @@
 // microSD for GUITION JC4880P443 / ESP32-P4.
 // Display BSP already powers the TF slot from LDO channel 4 (3.3V).
 // Card uses SDMMC SLOT 0 (GPIO43/44/39/40/41/42). C6 uses SLOT 1.
-// Default format_if_mount_failed=false; one-shot service requires
-// BOILER_SD_FORMAT_MAINTENANCE and explicit USB command.
+// No automatic formatting at boot. Web requests must be physically approved.
+// Dedicated SD worker owns mounting, formatting and logging.
 #include <Arduino.h>
 #include <SD_MMC.h>
+#include "esp_vfs_fat.h"
+#include "driver/sdmmc_host.h"
+#include "sdmmc_cmd.h"
+#include "esp_err.h"
 #include <time.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -41,7 +45,19 @@ bool mounted=false;
 bool writable=false;
 uint32_t lastStats=0;
 uint32_t lastAttempt=0;
+uint32_t formatDeadline=0;
+bool formatRunning=false;
+constexpr uint32_t kFormatWindowMs=90000;
+constexpr char kMountPath[]="/sdcard";
 
+void safeText(char* target,size_t cap,const char* source);
+void setFormatPhase(FormatPhase phase,const char* message){
+  if(!stateLock||xSemaphoreTake(stateLock,pdMS_TO_TICKS(40))!=pdTRUE)return;
+  published.formatPhase=phase;
+  if(message)safeText(published.formatMessage,sizeof(published.formatMessage),message);
+  published.formatRemainingSeconds=0;
+  xSemaphoreGive(stateLock);
+}
 void safeText(char* target,size_t cap,const char* source) {
   if(!target||!cap)return;
   size_t n=0;
@@ -104,7 +120,7 @@ bool makeDirectories() {
   if(!SD_MMC.exists(kLogs) && !SD_MMC.mkdir(kLogs))return false;
   return true;
 }
-bool mountCard(bool allowFormat=false) {
+bool mountCard() {
 #ifdef SOC_SDMMC_IO_POWER_EXTERNAL
   // Arduino's P4 variant defaults to BOARD_SDMMC_POWER_CHANNEL=4, but
   // board_p4_display_init() has ALREADY acquired LDO4 for TF_VCC.
@@ -117,17 +133,10 @@ bool mountCard(bool allowFormat=false) {
                      BOARD_P4_SD_D1,BOARD_P4_SD_D2,BOARD_P4_SD_D3)){
     mounted=false;failure("Ошибка настройки SDMMC GPIO");return false;
   }
-  // Ordinary boots use allowFormat=false.
-#ifndef BOILER_SD_FORMAT_MAINTENANCE
-  if(allowFormat){
-    mounted=false;failure("Форматирование отключено в основной сборке");return false;
-  }
-#endif
-  if(!SD_MMC.begin("/sdcard",false,allowFormat,SDMMC_FREQ_DEFAULT,3)){
-    mounted=false;
-    failure(allowFormat ? "Не удалось создать FAT: ошибка карты/чтения"
-                        : "Нет карты или неподдерживаемая файловая система");
-    Serial.printf("[BP-SD] mount failed; allowFormat=%u\n", unsigned(allowFormat));
+  // All normal mounts are non-destructive; native formatting is separate.
+  if(!SD_MMC.begin(kMountPath,false,false,SDMMC_FREQ_DEFAULT,3)){
+    mounted=false;failure("Нет карты или неподдерживаемая файловая система");
+    Serial.println("[BP-SD] regular mount failed; NO automatic format");
     return false;
   }
   mounted=true;
@@ -206,82 +215,105 @@ bool writeMeasurements(const Item& entry) {
   return appendLine(kSamples,line,size_t(n),kSampleLimit);
 }
 
-#ifdef BOILER_SD_FORMAT_MAINTENANCE
-// A physically connected COM3 console can authorize ONE attempt per boot.
-// This function runs inside the SD card worker, not LVGL or the Wi-Fi worker.
-void maintenanceConsole(){
-  static char line[28]={};
-  static uint8_t pos=0;
-  static bool overflow=false;
-  static bool tried=false;
-  for(unsigned n=0;n<56 && Serial.available()>0;n++){
-    const int c=Serial.read();
-    if(c=='\n'||c=='\r'){
-      if(!overflow && pos>0){
-        line[pos]=0;
-        if(strcmp(line,"SD INFO")==0){
-          Snapshot status{};
-          if(stateLock && xSemaphoreTake(stateLock,pdMS_TO_TICKS(30))==pdTRUE){
-            status=published;
-            xSemaphoreGive(stateLock);
-          }
-          Serial.printf("[BP-SD-MAINT] INFO mounted=%u logging=%u card=%llu total=%llu free=%llu status=%s\n",
-            unsigned(status.mounted),unsigned(status.logging),
-            (unsigned long long)status.cardBytes,
-            (unsigned long long)status.totalBytes,
-            (unsigned long long)status.freeBytes,status.message);
-        }else if(strcmp(line,"SD FORMAT FAT32")==0){
-          if(tried){
-            Serial.println("[BP-SD-MAINT] REFUSED already attempted formatting this boot");
-          }else if(mounted){
-            Serial.println("[BP-SD-MAINT] ALREADY MOUNTED; no formatting needed");
-          }else{
-            tried=true;
-            Serial.println("[BP-SD-MAINT] EXPLICIT ONE-SHOT FORMAT REQUEST ACCEPTED, SLOT 0 ONLY");
-            Serial.println("[BP-SD-MAINT] All existing microSD partitions and files may be erased");
-            SD_MMC.end();
-            lastAttempt=millis();
-            if(mountCard(true)){
-              Snapshot st{};
-              if(stateLock && xSemaphoreTake(stateLock,pdMS_TO_TICKS(30))==pdTRUE){
-                st=published;xSemaphoreGive(stateLock);
-              }
-              Serial.printf("[BP-SD-MAINT] FORMAT_MOUNT_OK card=%llu total=%llu free=%llu\n",
-                (unsigned long long)st.cardBytes,
-                (unsigned long long)st.totalBytes,
-                (unsigned long long)st.freeBytes);
-              Item verify{};
-              verify.type=ItemKind::Event;
-              verify.at=millis();
-              verify.wall=time(nullptr);
-              safeText(verify.code,sizeof(verify.code),"storage");
-              safeText(verify.detail,sizeof(verify.detail),"Storage provisioned on panel");
-              const bool wrote=writable && writeEvent(verify);
-              if(wrote)countWritten(false);
-              File check=SD_MMC.open(kEvents,FILE_READ);
-              const bool verified=wrote && check && check.size()>0;
-              if(check)check.close();
-              Serial.printf("[BP-SD-MAINT] WRITE_READ_VERIFY=%s\n",verified?"PASS":"FAIL");
-              if(!verified)failure("Проверка записи/чтения журнала не прошла");
-            }else{
-              Serial.println("[BP-SD-MAINT] FORMAT_FAILED (no automatic retry)");
-            }
-          }
-        }else{
-          Serial.println("[BP-SD-MAINT] UNKNOWN COMMAND. Use SD INFO or SD FORMAT FAT32");
-        }
-      }
-      pos=0;
-      line[0]=0;
-      overflow=false;
-    }else if(c>=32 && c<=126){
-      if(pos<sizeof(line)-1 && !overflow)line[pos++]=char(c);
-      else overflow=true;
-    }
-  }
-}
-#endif
 
+// Destructive FAT preparation, called ONLY on the SD worker, after both
+// authenticated browser request AND a physical touchscreen confirmation.
+// For this board the BSP owns LDO4. The SD controller uses SDMMC SLOT 0.
+bool formatPhysicalCard(){
+  // Stop all prior SD_MMC users; only this worker accesses the filesystem.
+  writable=false;
+  SD_MMC.end();
+  mounted=false;
+  publishState("Подготовка microSD к форматированию");
+  sdmmc_host_t host=SDMMC_HOST_DEFAULT();
+  host.slot=SDMMC_HOST_SLOT_0;
+  host.flags=SDMMC_HOST_FLAG_4BIT;
+  host.max_freq_khz=SDMMC_FREQ_DEFAULT;
+  sdmmc_slot_config_t slot=SDMMC_SLOT_CONFIG_DEFAULT();
+  // ESP32-P4 slot 0 is hardware IO_MUX, not a GPIO matrix bus.
+  // Use zeroed pin fields exactly as the Arduino SD_MMC Slot 0 wrapper does.
+  slot.clk=GPIO_NUM_0;
+  slot.cmd=GPIO_NUM_0;
+  slot.d0=GPIO_NUM_0;
+  slot.d1=GPIO_NUM_0;
+  slot.d2=GPIO_NUM_0;
+  slot.d3=GPIO_NUM_0;
+  slot.d4=GPIO_NUM_0;
+  slot.d5=GPIO_NUM_0;
+  slot.d6=GPIO_NUM_0;
+  slot.d7=GPIO_NUM_0;
+  slot.cd=SDMMC_SLOT_NO_CD;
+  slot.wp=SDMMC_SLOT_NO_WP;
+  slot.width=4;
+  slot.flags=0;
+  esp_vfs_fat_mount_config_t cfg={};
+  // This is intentionally true ONLY within explicit physical confirmation.
+  // On exFAT/no-FAT this partitions+creates FAT, on existing FAT it mounts.
+  cfg.format_if_mount_failed=true;
+  cfg.max_files=3;
+  cfg.allocation_unit_size=0;
+  cfg.use_one_fat=false;
+  sdmmc_card_t* card=nullptr;
+  Serial.println("[BP-SD] WEB+PHYSICAL CONFIRMED: mount SDMMC0 for FAT formatting");
+  esp_err_t err=esp_vfs_fat_sdmmc_mount(kMountPath,&host,&slot,&cfg,&card);
+  if(err!=ESP_OK||!card){
+    Serial.printf("[BP-SD] FAT prepare mount failed: %s (0x%x)\n",esp_err_to_name(err),unsigned(err));
+    failure("Ошибка инициализации носителя для форматирования");
+    return false;
+  }
+  // Always format on explicit command, including a previously valid FAT card.
+  // This API only targets the SD card handle returned for SDMMC0 above.
+  err=esp_vfs_fat_sdcard_format(kMountPath,card);
+  if(err!=ESP_OK){
+    Serial.printf("[BP-SD] FAT format failed: %s (0x%x)\n",esp_err_to_name(err),unsigned(err));
+    failure("Ошибка форматирования FAT; перезапустите панель");
+    // IDF might have recycled card resources after a failed remount.
+    // Do not reuse or double-free the card; do not retry automatically.
+    return false;
+  }
+  err=esp_vfs_fat_sdcard_unmount(kMountPath,card);
+  if(err!=ESP_OK){
+    Serial.printf("[BP-SD] FAT unmount failed: 0x%x\n",unsigned(err));
+    failure("Ошибка размонтирования после форматирования");
+    return false;
+  }
+  return true;
+}
+void runPhysicalFormat(){
+  // xQueueReset discards pending old log events before the card is replaced.
+  if(pending)xQueueReset(pending);
+  setFormatPhase(FormatPhase::Running,"Разметка и создание FAT; не отключайте питание");
+  const bool formatted=formatPhysicalCard();
+  if(!formatted){
+    setFormatPhase(FormatPhase::Failed,"Не удалось отформатировать microSD. Данные могут быть удалены.");
+    return;
+  }
+  setFormatPhase(FormatPhase::Verifying,"Проверка FAT и пробная запись журнала");
+  const bool mountedOK=mountCard();
+  if(!mountedOK||!mounted||!writable){
+    setFormatPhase(FormatPhase::Failed,"FAT создана, но повторное подключение или проверка места не прошла");
+    return;
+  }
+  Item sample{};
+  sample.type=ItemKind::Event;
+  sample.at=millis();
+  sample.wall=time(nullptr);
+  safeText(sample.code,sizeof(sample.code),"storage");
+  safeText(sample.detail,sizeof(sample.detail),"FAT prepared after physical confirmation");
+  const bool written=writeEvent(sample);
+  if(written)countWritten(false);
+  File check=SD_MMC.open(kEvents,FILE_READ);
+  const bool verified=written && check && check.size()>0;
+  if(check)check.close();
+  cardStats();
+  if(!verified || !writable){
+    failure("Пробная запись/чтение microSD не прошла");
+    setFormatPhase(FormatPhase::Failed,"FAT создана, но проверка журнала не прошла");
+    return;
+  }
+  setFormatPhase(FormatPhase::Complete,"FAT готова. Запись и чтение журнала проверены.");
+  Serial.println("[BP-SD] FAT format + read/write verification SUCCESS");
+}
 void worker(void*) {
   // The UI first frame and Wi-Fi initialization must not wait for SD card I/O.
   vTaskDelay(pdMS_TO_TICKS(3500));
@@ -296,9 +328,25 @@ void worker(void*) {
     else{failure("Ошибка записи первого события");countDropped();}
   }
   for(;;) {
-#ifdef BOILER_SD_FORMAT_MAINTENANCE
-    maintenanceConsole();
-#endif
+    bool startFormat=false;
+    if(stateLock && xSemaphoreTake(stateLock,0)==pdTRUE){
+      if(published.formatPhase==FormatPhase::AwaitingPhysical && 
+         int32_t(millis()-formatDeadline)>=0){
+        published.formatPhase=FormatPhase::Expired;
+        published.formatRemainingSeconds=0;
+        safeText(published.formatMessage,sizeof(published.formatMessage),
+                 "Время физического подтверждения истекло");
+      }
+      if(published.formatPhase==FormatPhase::Queued && !published.formatAttempted){
+        published.formatPhase=FormatPhase::Running;
+        published.formatAttempted=true;
+        safeText(published.formatMessage,sizeof(published.formatMessage),
+                 "Начато форматирование microSD");
+        startFormat=true;
+      }
+      xSemaphoreGive(stateLock);
+    }
+    if(startFormat){runPhysicalFormat();continue;}
     const uint32_t now=millis();
     if(!mounted && uint32_t(now-lastAttempt)>=kRetryMs){
       lastAttempt=now;
@@ -329,15 +377,16 @@ bool begin(){
     workerTask=nullptr;return false;
   }
   publishState("Проверка microSD...");
-  Serial.println("[BP-SD] initializing asynchronously; autoformat disabled");
-#ifdef BOILER_SD_FORMAT_MAINTENANCE
-  Serial.println("[BP-SD-MAINT] READY: SD INFO or SD FORMAT FAT32 via USB COM3");
-#endif
+  Serial.println("[BP-SD] microSD init; automatic formatting DISABLED");
   return true;
 }
 bool snapshot(Snapshot& out){
   if(!stateLock || xSemaphoreTake(stateLock,0)!=pdTRUE)return false;
-  out=published;xSemaphoreGive(stateLock);return true;
+  out=published;
+  if(out.formatPhase==FormatPhase::AwaitingPhysical && int32_t(formatDeadline-millis())>0)
+    out.formatRemainingSeconds=(uint32_t(formatDeadline-millis())+999U)/1000U;
+  else out.formatRemainingSeconds=0;
+  xSemaphoreGive(stateLock);return true;
 }
 bool event(const char* category,const char* description){
   if(!pending)return false;
@@ -365,5 +414,49 @@ bool measurements(const panel::Measurement (&temps)[panel::CHANNELS],uint32_t at
   lastSampleAt=atMs;
   if(xQueueSend(pending,&e,0)==pdTRUE)return true;
   countDropped();return false;
+}
+
+
+bool prepareFormat(){
+  if(!stateLock||!workerTask)return false;
+  if(xSemaphoreTake(stateLock,pdMS_TO_TICKS(30))!=pdTRUE)return false;
+  const FormatPhase phase=published.formatPhase;
+  const bool available=!published.formatAttempted &&
+    phase!=FormatPhase::AwaitingPhysical && phase!=FormatPhase::Queued &&
+    phase!=FormatPhase::Running && phase!=FormatPhase::Verifying;
+  if(available){
+    formatDeadline=millis()+kFormatWindowMs;
+    published.formatPhase=FormatPhase::AwaitingPhysical;
+    published.formatRemainingSeconds=kFormatWindowMs/1000U;
+    safeText(published.formatMessage,sizeof(published.formatMessage),
+      "ПОДТВЕРДИТЕ стирание ВСЕХ данных microSD на физическом дисплее");
+  }
+  xSemaphoreGive(stateLock);
+  return available;
+}
+bool confirmFormatPhysically(){
+  if(!stateLock||xSemaphoreTake(stateLock,pdMS_TO_TICKS(30))!=pdTRUE)return false;
+  const bool valid=published.formatPhase==FormatPhase::AwaitingPhysical &&
+    !published.formatAttempted && int32_t(formatDeadline-millis())>0;
+  if(valid){
+    published.formatPhase=FormatPhase::Queued;
+    published.formatRemainingSeconds=0;
+    safeText(published.formatMessage,sizeof(published.formatMessage),
+      "Подтверждено на дисплее; операция в очереди");
+  }
+  xSemaphoreGive(stateLock);
+  return valid;
+}
+bool cancelFormatPhysically(){
+  if(!stateLock||xSemaphoreTake(stateLock,pdMS_TO_TICKS(30))!=pdTRUE)return false;
+  const bool valid=published.formatPhase==FormatPhase::AwaitingPhysical;
+  if(valid){
+    published.formatPhase=FormatPhase::Cancelled;
+    published.formatRemainingSeconds=0;
+    safeText(published.formatMessage,sizeof(published.formatMessage),
+      "Запрос отменён на дисплее. Карта не изменялась");
+  }
+  xSemaphoreGive(stateLock);
+  return valid;
 }
 } // namespace panel_storage
