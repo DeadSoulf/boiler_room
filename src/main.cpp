@@ -51,6 +51,7 @@ bool rebuild=false, closeDialog=false;
 lv_obj_t *tempValue[CHANNELS]={},*tempState[CHANNELS]={},*tempTrend[CHANNELS]={},*freshBar[CHANNELS]={};
 lv_obj_t *sensorSummary=nullptr,*sensorHint=nullptr,*liveTime=nullptr,*activity=nullptr,*activityDot=nullptr;
 lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText=nullptr,*detailGraph=nullptr;
+lv_obj_t *webPairLabel=nullptr;
 int renderedPage=-1,renderedView=-1,detailChannel=-1;
 uint32_t activityStart=0,detailRevision=0;
 AccessPoint displayedAps[MAX_AP];uint8_t displayedApCount=0;
@@ -97,7 +98,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,EquipmentJournal,DemoAccepted=80,DemoRejected,DemoTimeout,DemoReset,Ap0=100,EquipmentOn0=200,EquipmentOff0=220};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,EquipmentJournal,DemoAccepted=80,DemoRejected,DemoTimeout,DemoReset,WebAccess,WebNewCode,WebRevoke,Ap0=100,EquipmentOn0=200,EquipmentOff0=220};
 void action(lv_event_t* e);
 void updateEquipmentLive();
 void subsection(const char* title);
@@ -342,6 +343,9 @@ void action(lv_event_t* e){
     case Home:closeDialog=true;pendingPage=0;slideDirection=-1;view=0;break;
     case Back:view=0;rebuild=true;break;
     case Display:view=4;rebuild=true;break;
+    case WebAccess:view=5;rebuild=true;break;
+    case WebNewCode:panel_web::armPairing();rebuild=true;break;
+    case WebRevoke:panel_web::revokePairing();rebuild=true;break;
     case Wifi:view=1;rebuild=true;break;
     case Ble:view=2;rebuild=true;break;
     case Time:view=3;rebuild=true;break;
@@ -582,16 +586,18 @@ void equipmentJournalPage(){
   label(body,"Сброс меняет только макет и его журнал.",18,649,442,&boiler_font_14,MUTED);
 }
 void settings(){
-  const char* titles[]={"Wi-Fi","Bluetooth рядом","Дата и время","Экран"};
-  const char* hints[]={radio.connected?"Подключено к сети":"Поиск и подключение","Реальный поиск BLE, без сопряжения","NTP, часовой пояс, ручная установка","Таймаут подсветки и пробуждение касанием"};
-  const uintptr_t actions[]={Wifi,Ble,Time,Display};
-  for(unsigned i=0;i<4;i++){
-    auto* card=box(body,16,14+int(i)*148,448,135);
-    label(card,titles[i],18,12,410,&boiler_font_25,ACCENT[i]);
-    label(card,hints[i],18,49,410,&boiler_font_14,MUTED);
-    button(card,"Открыть",18,82,410,42,actions[i]);
+  const char* titles[]={"Wi-Fi","Bluetooth устройства","Дата и время","Экран","Веб-доступ"};
+  const char* hints[]={radio.connected?"Подключено к сети":"Поиск и подключение",
+    "Реальный поиск BLE, без сопряжения","NTP, часовой пояс, ручная установка",
+    "Таймер подсветки и пробуждение касанием","Управление через браузер с кодом на панели"};
+  const uintptr_t actions[]={Wifi,Ble,Time,Display,WebAccess};
+  const uint32_t inks[]={ACCENT[0],ACCENT[1],ACCENT[2],ACCENT[3],SKY};
+  for(unsigned i=0;i<5;i++){
+    auto* card=box(body,16,12+int(i)*125,448,115);
+    label(card,titles[i],18,7,410,&boiler_font_19,inks[i]);
+    label(card,hints[i],18,39,410,&boiler_font_14,MUTED);
+    button(card,"Открыть",18,69,410,37,actions[i]);
   }
-  label(body,"Свайп влево / вправо - смена страницы",18,640,442,&boiler_font_14,MUTED);
 }
 void subsection(const char* title){button(body,"Назад",16,10,105,44,Back);label(body,title,139,16,323,&boiler_font_25);}
 lv_obj_t* scrollList(int y,int height){
@@ -656,6 +662,19 @@ void displayPage(){
   label(body,panel_screen::touchReady()?"После старта сначала коснитесь экрана.\nПервое касание после выключения будит.\nУберите палец, затем нажимайте кнопки.":"Пробуждение касанием недоступно.\nАвтовыключение отключено для безопасности.",18,475,442,&boiler_font_19,MUTED);
   label(body,"Wi-Fi и Bluetooth продолжают работать.\nПосле включения питания экран включён.",18,588,442,&boiler_font_14,MUTED);
 }
+void webAccessPage(){
+  subsection("Веб-доступ");
+  auto* p=box(body,16,72,448,220);
+  label(p,"Управление через браузер",15,17,412,&boiler_font_19,SKY);
+  label(p,"Адрес в локальной сети:",15,58,412,&boiler_font_14,MUTED);
+  char url[64];snprintf(url,sizeof(url),"http://%s/",radio.ip[0]?radio.ip:"нет IP");
+  label(p,url,15,84,412,&boiler_font_19);
+  label(p,"Для команд нужен одноразовый код.\nКод виден только на этом экране.",15,134,412,&boiler_font_14,MUTED);
+  webPairLabel=label(body,"Код не создан",22,322,430,&boiler_font_25,SKY);
+  button(body,"Создать новый код (2 минуты)",16,408,448,57,WebNewCode,0x147C90);
+  button(body,"Отозвать доступ и код",16,482,448,57,WebRevoke,0x643B48);
+  label(body,"Откройте адрес на компьютере в той же сети.\nНажмите «Сопряжение» и введите код с дисплея.\nСессия действует 1 час; новый код отзывает старую.\nБез кода в браузере доступен только просмотр.\nНе открывайте порт 80 в интернет.",18,563,438,&boiler_font_14,MUTED);
+}
 void service(){
   auto* list=scrollList(10,650);
   // Five uint32 values plus Russian UTF-8 text need more than 160 bytes.
@@ -712,6 +731,7 @@ uint32_t signature(){
 void render(){
   const lv_coord_t scrollY=resultList && renderedPage==page && renderedView==view?lv_obj_get_scroll_y(resultList):0;
   if(body)lv_obj_del(body);
+  webPairLabel=nullptr;
   for(unsigned i=0;i<demo::COUNT;i++)equipmentMode[i]=equipmentCommand[i]=equipmentOn[i]=equipmentOff[i]=nullptr;
   equipmentFuelTemp=equipmentFuelLevel=nullptr;
   fuelCardLabels={};
@@ -719,7 +739,7 @@ void render(){
   sensorSummary=sensorHint=liveTime=activity=activityDot=resultList=heapLabel=uptimeLabel=nullptr;
   body=box(lv_scr_act(),0,100,480,673,BG,0);lv_obj_set_style_border_width(body,0,0);
   makeHeader();makeFooter();
-  switch(page){case 0:home();break;case 1:if(view>=1 && view<=4)equipmentPage();else if(view==5)equipmentJournalPage();else control();break;case 2:if(view==1)wifiPage();else if(view==2)blePage();else if(view==3)timePage();else if(view==4)displayPage();else settings();break;default:service();break;}
+  switch(page){case 0:home();break;case 1:if(view>=1 && view<=4)equipmentPage();else if(view==5)equipmentJournalPage();else control();break;case 2:if(view==1)wifiPage();else if(view==2)blePage();else if(view==3)timePage();else if(view==4)displayPage();else if(view==5)webAccessPage();else settings();break;default:service();break;}
   if(page==2 && (view==1 || view==2) && radio.busy){
     activity=label(body,"Операция выполняется",18,635,440,&boiler_font_14,AMBER);
     auto* track=box(body,18,665,444,4,LINE,2);lv_obj_set_style_border_width(track,0,0);
@@ -740,6 +760,28 @@ void gesture(lv_event_t*){
 }
 void refresh(lv_timer_t*){
   if(closeDialog)dismiss();
+  panel_web::DemoAction webCmd;
+  if(panel_web::takeDemoAction(webCmd)){
+    bool accepted=false;
+    switch(webCmd.type){
+      case panel_web::DemoActionType::Enable:
+      case panel_web::DemoActionType::Disable:
+        if(webCmd.id<demo::COUNT)
+          accepted=equipmentDemo.request(static_cast<demo::Id>(webCmd.id),
+            webCmd.type==panel_web::DemoActionType::Enable,millis());
+        break;
+      case panel_web::DemoActionType::Outcome:
+        if(webCmd.outcome<=2){
+          equipmentDemo.nextOutcome=static_cast<demo::Outcome>(webCmd.outcome);
+          accepted=true;
+        }
+        break;
+      case panel_web::DemoActionType::Reset:
+        equipmentDemo.reset();accepted=true;break;
+    }
+    panel_web::recordDemoResult(accepted);
+    updateEquipmentLive();rebuild=true;
+  }
   if(equipmentDemo.tick(millis()))updateEquipmentLive();
   if(page==1 && view==5 && renderedDemoRevision!=equipmentDemo.revision)rebuild=true;
   const bool wasBusy=radio.busy;panel_radio::snapshot(radio);
@@ -756,7 +798,18 @@ void refresh(lv_timer_t*){
     if(lv_indev_get_type(input)==LV_INDEV_TYPE_POINTER && input->proc.state==LV_INDEV_STATE_PRESSED)touching=true;
   if(rebuild && !overlay && !touching){rebuild=false;render();}
   if(activityDot)lv_obj_set_x(activityDot,6+int((millis()/20U)%400U));
-  if(uint32_t(millis()-lastTick)>=1000U){lastTick=millis();updateClock();updateLive();panel_web::publish(measurements,fuelLevel,equipmentDemo,millis());}
+  if(uint32_t(millis()-lastTick)>=1000U){
+    lastTick=millis();updateClock();updateLive();
+    panel_web::publish(measurements,fuelLevel,equipmentDemo,millis());
+    if(webPairLabel){
+      char code[7];uint32_t remaining=0;
+      char line[100];
+      if(panel_web::pairingCode(code,remaining))
+        snprintf(line,sizeof(line),"Код: %s  /  %lu c",code,(unsigned long)remaining);
+      else snprintf(line,sizeof(line),"Нет активного кода");
+      lv_label_set_text(webPairLabel,line);
+    }
+  }
 }
 } // namespace
 void setup(){
