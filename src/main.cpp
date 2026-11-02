@@ -11,6 +11,7 @@
 #include "board_p4.h"
 #include "lvgl_glue.h"
 #include "panel_radio.h"
+#include "panel_web.h"
 #include "panel_screen.h"
 #include "equipment_demo.h"
 #if !LV_USE_BTNMATRIX || !LV_USE_TEXTAREA
@@ -755,7 +756,7 @@ void refresh(lv_timer_t*){
     if(lv_indev_get_type(input)==LV_INDEV_TYPE_POINTER && input->proc.state==LV_INDEV_STATE_PRESSED)touching=true;
   if(rebuild && !overlay && !touching){rebuild=false;render();}
   if(activityDot)lv_obj_set_x(activityDot,6+int((millis()/20U)%400U));
-  if(uint32_t(millis()-lastTick)>=1000U){lastTick=millis();updateClock();updateLive();}
+  if(uint32_t(millis()-lastTick)>=1000U){lastTick=millis();updateClock();updateLive();panel_web::publish(measurements,fuelLevel,equipmentDemo,millis());}
 }
 } // namespace
 void setup(){
@@ -774,7 +775,7 @@ void setup(){
   start=millis();const bool touchOK=board_p4_touch_init()==ESP_OK && board_p4_get_touch_handle()!=nullptr;
   const uint32_t touchMs=millis()-start;
   if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
-  panel_radio::begin();Serial.begin(115200);
+  Serial.begin(115200);panel_radio::begin();panel_web::begin();
   char timing[180];snprintf(timing,sizeof(timing),"[BoilerPanel] %s equipment=LOCAL_DEMO outputs=NONE display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",VERSION,(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
 }
 void loop(){delay(20);}
