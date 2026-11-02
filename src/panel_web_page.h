@@ -49,7 +49,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 </style></head>
 <body><div class="container">
 <header>
- <div class="brand"><div class="mark">°</div><div><h1>КОТЕЛЬНАЯ</h1><p>Boiler Panel <span id="version">v0.5.3</span> · ESP32-P4</p></div></div>
+ <div class="brand"><div class="mark">°</div><div><h1>КОТЕЛЬНАЯ</h1><p>Boiler Panel <span id="version">v0.5.4</span> · ESP32-P4</p></div></div>
  <div class="toolbar"><span id="net" class="status">Подключение…</span><span id="authstate" class="tag">Только просмотр</span><button id="pairbutton" data-action="show-pair">Сопряжение</button><button id="logout" data-action="logout" class="ghost hidden">Выход</button></div>
 </header>
 <nav>
@@ -78,10 +78,8 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
  <div class="card section"><h3>Общая информация</h3><div class="row"><span>Уровень топлива</span><b id="home-fuel">Нет данных</b></div><div class="row"><span>Wi-Fi</span><span id="home-wifi">Неизвестно</span></div><div class="row"><span>Источники измерений</span><span>Не назначены (показываются только реальные данные)</span></div></div>
 </section>
 <section id="equipment" class="page hidden">
- <h2>Управление оборудованием</h2><div class="notice warn">Управление здесь — только локальная ДЕМО-модель панели. Реальные котлы, реле и насосы этой прошивкой не включаются.</div>
- <div class="card"><div class="stack"><strong>Ответ на следующую ДЕМО-команду:</strong><select id="demo-outcome" style="max-width:220px"><option value="accepted">Подтвердить</option><option value="rejected">Отказать</option><option value="timeout">Без ответа</option></select><button data-action="demo-outcome" data-write="1">Установить</button></div><small>Выбор действует также на физическом дисплее.</small></div>
+ <h2>Оборудование котельной</h2><div class="notice warn">Контроллеры оборудования ещё не подключены. Доступно отображение состава и статуса подключения. Команды включения и выключения отсутствуют.</div>
  <div class="equip-list section" id="equipment-list"></div>
- <div class="card section"><div class="stack" style="justify-content:space-between"><h3>Журнал команд (последние 16)</h3><button class="danger" data-action="demo-reset" data-write="1">Сбросить ДЕМО</button></div><div id="journal" class="feed muted">Журнал пуст</div></div>
 </section>
 <section id="fuel" class="page hidden">
  <h2>Топливо</h2>
@@ -90,9 +88,8 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
  <div class="row"><span>Нижний датчик</span><span id="lower-status">Нет данных</span></div>
  <div class="row"><span>Верхний датчик</span><span id="upper-status">Нет данных</span></div>
  <p class="tiny">Проценты и литры не рассчитываются: герконы дают только два порога.</p></div>
- <div class="card"><h3>Подогрев топлива — до 80 °C</h3><div class="row"><span>Температура</span><b id="fuel-temp">--.- °C</b></div><div class="row"><span>Режим (ДЕМО)</span><strong id="fuel-mode">Выключено</strong></div>
+ <div class="card"><h3>Подогрев топлива — до 80 °C</h3><div class="row"><span>Температура</span><b id="fuel-temp">--.- °C</b></div><div class="row"><span>Контроллер подогрева</span><strong id="fuel-controller">Не подключён</strong></div>
  <p class="tiny">80 °C — проектное требование, не подтверждённая уставка исполнительного регулятора.</p>
- <div class="actions"><button data-action="demo_on" data-id="6" data-write="1">Включить (ДЕМО)</button><button data-action="demo_off" data-id="6" data-write="1">Выключить (ДЕМО)</button></div>
  <button class="ghost" data-temp="3">История температуры</button></div></div>
 </section>
 <section id="settings" class="page hidden">
@@ -140,11 +137,23 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 <div class="row"><span>IP панели</span><span id="service-ip">—</span></div>
 <div class="row"><span>Действие веб-сервера</span><span>Наблюдение + сопряжение</span></div>
 </div></div>
+<div class="card section">
+ <h3>Накопитель microSD</h3>
+ <div class="row"><span>Состояние</span><b id="sd-state">Проверка…</b></div>
+ <div class="row"><span>Ёмкость карты</span><b id="sd-card">—</b></div>
+ <div class="row"><span>Размер файловой системы</span><b id="sd-total">—</b></div>
+ <div class="row"><span>Использовано</span><b id="sd-used">—</b></div>
+ <div class="row"><span>Свободно</span><b id="sd-free">—</b></div>
+ <div class="row"><span>Журналы</span><b id="sd-logging">—</b></div>
+ <div class="row"><span>Записано событий / измерений</span><b id="sd-events">—</b></div>
+ <p id="sd-message" class="hint"></p>
+ <p class="tiny muted">Каталог: <code>/boiler-panel/logs/</code>. Только данные этой панели. Автоматическое форматирование, просмотр личных файлов карты и сетевой доступ к ним отсутствуют.</p>
+</div>
 <div class="actions"><button data-action="refresh" class="primary">Обновить сведения</button></div>
 <div class="notice">Эта страница не записывает новую прошивку. OTA, управление реальными выходами и аппаратные датчики пока не реализованы.</div>
 </section>
 <div id="toast" class="hidden" role="status"></div>
-<footer><span>Локальная веб-панель · безопасное ДЕМО</span><span id="last-update">Ожидание ответа</span><span>Автообновление каждые 3 секунды</span></footer>
+<footer><span>Локальная панель мониторинга · без подключённых контроллеров</span><span id="last-update">Ожидание ответа</span><span>Автообновление каждые 3 секунды</span></footer>
 </div>
 <script>
 (()=>{
@@ -154,9 +163,11 @@ const names=["Бойлер косвенного нагрева","Электро�
 const tnames=["В котельной","На улице","Теплоноситель","Топливо"];
 let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="home",tab="wifi",detail=-1;
 let lastServerError="",lastToast=null,refreshInFlight=false;
-const mode=v=>v==="enabled"?"Разрешён (ДЕМО)":v==="off"?"Отключён (ДЕМО)":"Неизвестен";
-const outcome=v=>v==="accepted"?"Подтверждено":v==="rejected"?"Отказано":v==="timeout"?"Без ответа":v==="pending"?"Ожидание": "Нет команды";
 const timeout=s=>s===0?"Не выключать":s<60?s+" секунд":s/60+" минут";
+const storageBytes=n=>Number.isFinite(n)&&n>0
+    ?(n>=1073741824?(n/1073741824).toFixed(2)+" ГБ":
+      n>=1048576?(n/1048576).toFixed(1)+" МБ":
+      (n/1024).toFixed(0)+" КБ"):"—";
 function text(id,v){const n=$(id);if(n)n.textContent=v==null?"—":String(v)}
 function show(id,on){const n=$(id);if(n)n.classList.toggle("hidden",!on)}
 function notice(message,problem=false){
@@ -190,45 +201,19 @@ function updateDetail(){
  const line=document.createElementNS("http://www.w3.org/2000/svg","polyline");
  line.setAttribute("points",points);line.setAttribute("fill","none");line.setAttribute("stroke","#71ccfa");line.setAttribute("stroke-width","2.5");svg.append(line);
 }
-function button(label,action,props={}){
- const n=document.createElement("button");n.textContent=label;n.dataset.action=action;
- if(props.id!=null)n.dataset.id=String(props.id);
- if(props.value!=null)n.dataset.value=String(props.value);
- if(props.write)n.dataset.write="1";
- if(props.css)n.className=props.css;
- if(props.disabled)n.disabled=true;
- return n;
-}
 function renderEquipment(){
- const d=current||{},e=d.equipment||[],holder=$("equipment-list");
- const scroll=window.scrollY;
+ const d=current||{},items=d.equipment||[],holder=$("equipment-list");
  holder.replaceChildren();
  for(let i=0;i<names.length;i++){
-   const item=e[i]||{};
+   const item=items[i]||{};
    const card=document.createElement("div");card.className="card equip";
-   const h=document.createElement("h3");h.textContent=names[i];
-   const row=document.createElement("p");row.textContent="Режим: "+mode(item.mode);
-   const fact=document.createElement("p");fact.className="tiny muted";fact.textContent="Фактическая работа: нет данных";
-   const cmd=document.createElement("p");cmd.className="tiny muted";cmd.textContent="Запрос: "+outcome(item.request);
-   const actions=document.createElement("div");actions.className="actions";
-   actions.append(
-      button("Включить","demo_on",{id:i,write:true,disabled:!d.authorized||!item.can_on}),
-      button("Выключить","demo_off",{id:i,write:true,css:"ghost",disabled:!d.authorized||!item.can_off})
-   );
-   card.append(h,row,fact,cmd,actions);
+   const heading=document.createElement("h3");heading.textContent=item.name||names[i];
+   const status=document.createElement("p");status.className="error";
+   status.textContent=item.connected?"Подключено":"Контроллер не подключён";
+   const explanation=document.createElement("p");explanation.className="tiny muted";
+   explanation.textContent="Фактическое состояние неизвестно. Команды недоступны до назначения и проверки контроллера.";
+   card.append(heading,status,explanation);
    holder.append(card);
- }
-}
-function renderJournal(){
- const d=current||{},n=$("journal"),events=d.journal||[];
- n.replaceChildren();
- if(!events.length){n.textContent="Событий пока нет";return}
- for(const e of events){
-   const item=document.createElement("div");item.className="event";
-   const id=Number(e.id),title=names[id]||"Устройство";
-   item.textContent=title+" · "+(e.requested?"Включить":"Выключить")+
-     " · "+outcome(e.status)+" · "+mode(e.mode)+" · "+numeric(e.at_s)+" с от запуска";
-   n.append(item);
  }
 }
 function renderAP(){
@@ -283,7 +268,7 @@ function updateView(){
  text("fuel-status",d.fuel_level_text);
  const reed=(item)=>item&&item.valid?(item.reached?"Уровень достигнут":"Уровень не достигнут"):"Нет данных";
  text("lower-status",reed(d.fuel&&d.fuel.lower));text("upper-status",reed(d.fuel&&d.fuel.upper));
- text("fuel-mode",mode(d.equipment&&d.equipment[6]&&d.equipment[6].mode));
+ text("fuel-controller","Не подключён");
  const wifi=d.wifi||{},ble=d.ble||{},screen=d.screen||{},tm=d.time||{},service=d.service||{};
  text("wifi-connected",wifi.connected?"Подключено":"Не подключено");
  text("wifi-ssid",d.authorized?(wifi.ssid||"Нет данных"):"Сопряжение требуется");
@@ -301,7 +286,15 @@ function updateView(){
  text("lvgl-touch",service.lvgl_ms+" / "+service.touch_ms+" мс");
  text("host-version",d.host_version||"—");text("c6-version",d.c6_version||"—");
  text("service-wifi",wifi.connected?"Подключён":"Не подключён");text("service-ip",wifi.ip||"—");
- if(document.activeElement!==$("demo-outcome"))$("demo-outcome").value=d.demo_outcome||"accepted";
+ const sd=d.storage||{};
+ text("sd-state",sd.mounted?"Карта смонтирована":sd.started?"Карта не смонтирована":"Инициализация");
+ text("sd-card",storageBytes(sd.card_bytes));
+ text("sd-total",storageBytes(sd.total_bytes));
+ text("sd-used",sd.mounted?storageBytes(sd.used_bytes):"—");
+ text("sd-free",sd.mounted?storageBytes(sd.free_bytes):"—");
+ text("sd-logging",sd.logging?"Запись включена":"Отключена");
+ text("sd-events",(sd.written_events||0)+" / "+(sd.written_samples||0));
+ text("sd-message",sd.message||"");
  if(document.activeElement!==$("zone-select"))$("zone-select").value=String(tm.zone||0);
  if(document.activeElement!==$("screen-select"))$("screen-select").value=String(screen.timeout_s||0);
  for(const b of document.querySelectorAll('[data-write="1"]')){
@@ -311,7 +304,7 @@ function updateView(){
    b.disabled=!d.authorized || (wifi.busy&&(wifiAction||bleAction||b.dataset.action==="zone"||b.dataset.action==="clock"||b.dataset.action==="screen"))
      || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction);
  }
- renderAP();renderBLE();renderEquipment();renderJournal();
+ renderAP();renderBLE();renderEquipment();
 }
 async function sendPost(path,data,secret){
  const headers={"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"};
@@ -360,14 +353,9 @@ function handleAction(b){
  if(action==="refresh"){poll();return}
  if(action==="wifi_forget"&&!confirm("Удалить сохранённую сеть и отключить автоподключение на панели?"))return;
  if(action==="wifi_disconnect"&&!confirm("Отключить Wi-Fi? Веб-интерфейс может стать недоступным."))return;
- if(action==="demo_reset"&&!confirm("Сбросить только локальные ДЕМО-состояния и журнал?"))return;
  if(action==="zone"){command("zone",{value:$("zone-select").value});return}
  if(action==="clock"){command("clock",{value:$("manual-clock").value.trim()});return}
  if(action==="screen"){command("screen",{value:$("screen-select").value});return}
- if(action==="demo-outcome"){command("demo_outcome",{value:$("demo-outcome").value});return}
- if(action==="demo_on"||action==="demo_off"){
-   command(action,{id:b.dataset.id});return;
- }
  command(action);
 }
 document.addEventListener("click",e=>{
