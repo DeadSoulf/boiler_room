@@ -1,7 +1,8 @@
 // microSD for GUITION JC4880P443 / ESP32-P4.
 // Display BSP already powers the TF slot from LDO channel 4 (3.3V).
 // Card uses SDMMC SLOT 0 (GPIO43/44/39/40/41/42). C6 uses SLOT 1.
-// Never format: SD_MMC.begin(..., format_if_mount_failed=false).
+// Default format_if_mount_failed=false; one-shot service requires
+// BOILER_SD_FORMAT_MAINTENANCE and explicit USB command.
 #include <Arduino.h>
 #include <SD_MMC.h>
 #include <time.h>
@@ -103,7 +104,7 @@ bool makeDirectories() {
   if(!SD_MMC.exists(kLogs) && !SD_MMC.mkdir(kLogs))return false;
   return true;
 }
-bool mountCard() {
+bool mountCard(bool allowFormat=false) {
 #ifdef SOC_SDMMC_IO_POWER_EXTERNAL
   // Arduino's P4 variant defaults to BOARD_SDMMC_POWER_CHANNEL=4, but
   // board_p4_display_init() has ALREADY acquired LDO4 for TF_VCC.
@@ -116,9 +117,18 @@ bool mountCard() {
                      BOARD_P4_SD_D1,BOARD_P4_SD_D2,BOARD_P4_SD_D3)){
     mounted=false;failure("Ошибка настройки SDMMC GPIO");return false;
   }
-  // Four-bit SDMMC at normal 20 MHz. NEVER format a user's existing card.
-  if(!SD_MMC.begin("/sdcard",false,false,SDMMC_FREQ_DEFAULT,3)){
-    mounted=false;failure("Нет карты или неподдерживаемая файловая система");return false;
+  // Ordinary boots use allowFormat=false.
+#ifndef BOILER_SD_FORMAT_MAINTENANCE
+  if(allowFormat){
+    mounted=false;failure("Форматирование отключено в основной сборке");return false;
+  }
+#endif
+  if(!SD_MMC.begin("/sdcard",false,allowFormat,SDMMC_FREQ_DEFAULT,3)){
+    mounted=false;
+    failure(allowFormat ? "Не удалось создать FAT: ошибка карты/чтения"
+                        : "Нет карты или неподдерживаемая файловая система");
+    Serial.printf("[BP-SD] mount failed; allowFormat=%u\n", unsigned(allowFormat));
+    return false;
   }
   mounted=true;
   writable=false;
@@ -195,6 +205,83 @@ bool writeMeasurements(const Item& entry) {
   line[n++]='\n';line[n]=0;
   return appendLine(kSamples,line,size_t(n),kSampleLimit);
 }
+
+#ifdef BOILER_SD_FORMAT_MAINTENANCE
+// A physically connected COM3 console can authorize ONE attempt per boot.
+// This function runs inside the SD card worker, not LVGL or the Wi-Fi worker.
+void maintenanceConsole(){
+  static char line[28]={};
+  static uint8_t pos=0;
+  static bool overflow=false;
+  static bool tried=false;
+  for(unsigned n=0;n<56 && Serial.available()>0;n++){
+    const int c=Serial.read();
+    if(c=='\n'||c=='\r'){
+      if(!overflow && pos>0){
+        line[pos]=0;
+        if(strcmp(line,"SD INFO")==0){
+          Snapshot status{};
+          if(stateLock && xSemaphoreTake(stateLock,pdMS_TO_TICKS(30))==pdTRUE){
+            status=published;
+            xSemaphoreGive(stateLock);
+          }
+          Serial.printf("[BP-SD-MAINT] INFO mounted=%u logging=%u card=%llu total=%llu free=%llu status=%s\n",
+            unsigned(status.mounted),unsigned(status.logging),
+            (unsigned long long)status.cardBytes,
+            (unsigned long long)status.totalBytes,
+            (unsigned long long)status.freeBytes,status.message);
+        }else if(strcmp(line,"SD FORMAT FAT32")==0){
+          if(tried){
+            Serial.println("[BP-SD-MAINT] REFUSED already attempted formatting this boot");
+          }else if(mounted){
+            Serial.println("[BP-SD-MAINT] ALREADY MOUNTED; no formatting needed");
+          }else{
+            tried=true;
+            Serial.println("[BP-SD-MAINT] EXPLICIT ONE-SHOT FORMAT REQUEST ACCEPTED, SLOT 0 ONLY");
+            Serial.println("[BP-SD-MAINT] All existing microSD partitions and files may be erased");
+            SD_MMC.end();
+            lastAttempt=millis();
+            if(mountCard(true)){
+              Snapshot st{};
+              if(stateLock && xSemaphoreTake(stateLock,pdMS_TO_TICKS(30))==pdTRUE){
+                st=published;xSemaphoreGive(stateLock);
+              }
+              Serial.printf("[BP-SD-MAINT] FORMAT_MOUNT_OK card=%llu total=%llu free=%llu\n",
+                (unsigned long long)st.cardBytes,
+                (unsigned long long)st.totalBytes,
+                (unsigned long long)st.freeBytes);
+              Item verify{};
+              verify.type=ItemKind::Event;
+              verify.at=millis();
+              verify.wall=time(nullptr);
+              safeText(verify.code,sizeof(verify.code),"storage");
+              safeText(verify.detail,sizeof(verify.detail),"Storage provisioned on panel");
+              const bool wrote=writable && writeEvent(verify);
+              if(wrote)countWritten(false);
+              File check=SD_MMC.open(kEvents,FILE_READ);
+              const bool verified=wrote && check && check.size()>0;
+              if(check)check.close();
+              Serial.printf("[BP-SD-MAINT] WRITE_READ_VERIFY=%s\n",verified?"PASS":"FAIL");
+              if(!verified)failure("Проверка записи/чтения журнала не прошла");
+            }else{
+              Serial.println("[BP-SD-MAINT] FORMAT_FAILED (no automatic retry)");
+            }
+          }
+        }else{
+          Serial.println("[BP-SD-MAINT] UNKNOWN COMMAND. Use SD INFO or SD FORMAT FAT32");
+        }
+      }
+      pos=0;
+      line[0]=0;
+      overflow=false;
+    }else if(c>=32 && c<=126){
+      if(pos<sizeof(line)-1 && !overflow)line[pos++]=char(c);
+      else overflow=true;
+    }
+  }
+}
+#endif
+
 void worker(void*) {
   // The UI first frame and Wi-Fi initialization must not wait for SD card I/O.
   vTaskDelay(pdMS_TO_TICKS(3500));
@@ -209,6 +296,9 @@ void worker(void*) {
     else{failure("Ошибка записи первого события");countDropped();}
   }
   for(;;) {
+#ifdef BOILER_SD_FORMAT_MAINTENANCE
+    maintenanceConsole();
+#endif
     const uint32_t now=millis();
     if(!mounted && uint32_t(now-lastAttempt)>=kRetryMs){
       lastAttempt=now;
@@ -239,7 +329,10 @@ bool begin(){
     workerTask=nullptr;return false;
   }
   publishState("Проверка microSD...");
-  Serial.println("[BP-SD] initializing asynchronously; formatting disabled");
+  Serial.println("[BP-SD] initializing asynchronously; autoformat disabled");
+#ifdef BOILER_SD_FORMAT_MAINTENANCE
+  Serial.println("[BP-SD-MAINT] READY: SD INFO or SD FORMAT FAT32 via USB COM3");
+#endif
   return true;
 }
 bool snapshot(Snapshot& out){
