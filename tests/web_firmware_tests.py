@@ -13,7 +13,7 @@ equipment=(root/"src/panel_equipment.h").read_text(encoding="utf-8")
 radio=(root/"src/panel_radio.cpp").read_text(encoding="utf-8")
 version=(root/"src/panel_types.h").read_text(encoding="utf-8")
 
-assert 'VERSION = "v0.5.6"' in version
+assert 'VERSION = "v0.5.8"' in version
 assert "recoverIdleWifiForScan" in radio
 assert '#include "panel_equipment.h"' in main and '#include "panel_equipment.h"' in web
 assert "panel_web::publish(measurements,fuelLevel,millis())" in main
