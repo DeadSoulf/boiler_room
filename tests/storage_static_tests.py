@@ -9,10 +9,10 @@ main=(root/"src/main.cpp").read_text(encoding="utf-8")
 web=(root/"src/panel_web.cpp").read_text(encoding="utf-8")
 page=(root/"src/panel_web_page.h").read_text(encoding="utf-8")
 version=(root/"src/panel_types.h").read_text(encoding="utf-8")
-assert 'VERSION = "v0.5.6"' in version
+assert 'VERSION = "v0.5.7"' in version
 assert 'SD_MMC.setPins(BOARD_P4_SD_CLK,BOARD_P4_SD_CMD,BOARD_P4_SD_D0' in cpp
 assert 'BOARD_P4_SD_D1,BOARD_P4_SD_D2,BOARD_P4_SD_D3' in cpp
-assert 'SD_MMC.begin("/sdcard",false,false,SDMMC_FREQ_DEFAULT,3)' in cpp
+assert 'SD_MMC.begin("/sdcard",false,allowFormat,SDMMC_FREQ_DEFAULT,3)' in cpp
 assert 'SD_MMC.setPowerChannel(-1)' in cpp
 assert 'SDMMC SLOT 0' in cpp
 for forbidden in ('format_if_mount_failed=true','SD_MMC.format','mkfs','f_mkfs','format()','eraseFlash','formatOnFail'):
