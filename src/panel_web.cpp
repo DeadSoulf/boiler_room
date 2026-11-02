@@ -14,6 +14,7 @@
 #include "panel_equipment.h"
 #include "panel_screen.h"
 #include "panel_storage.h"
+#include "panel_config.h"
 #if defined(CONFIG_ESP_WIFI_REMOTE_ENABLED) && CONFIG_ESP_WIFI_REMOTE_ENABLED
 #define BP_WEB_ENABLED 1
 #include <WebServer.h>
@@ -265,6 +266,24 @@ void statusRequest() {
   j+=",\"format_remaining_s\":";j+=String(storage.formatRemainingSeconds);
   j+=",\"format_message\":";jsonQuote(j,storage.formatMessage);
   j+=",\"message\":";jsonQuote(j,storage.message);j+='}';
+  panel_config::State cfg;
+  const bool hasConfig=panel_config::snapshot(cfg);
+  j+=",\"connections\":{\"revision\":";
+  j+=String(hasConfig?cfg.revision:0);
+  j+=",\"drivers_active\":false,\"message\":";
+  jsonQuote(j,"GPIO drivers not activated until connector mapping verified");
+  j+=",\"items\":[";
+  for(unsigned i=0;i<panel_config::COUNT;i++){
+    if(i)j+=',';
+    const auto& a=cfg.item[i];
+    j+="{\"channel\":";j+=String(i);
+    j+=",\"type\":";jsonQuote(j,panel_config::typeName(a.type));
+    j+=",\"gpio\":";j+=String(a.gpio);
+    j+=",\"address\":";j+=String(a.busAddress);
+    j+=",\"debounce_ms\":";j+=String(a.debounceMs);
+    j+=",\"active\":false}";
+  }
+  j+="]}";
   j+=",\"service\":{\"free_heap\":";j+=String(snap.freeHeap);
   j+=",\"display_ms\":";j+=String(snap.displayMs);
   j+=",\"lvgl_ms\":";j+=String(snap.lvglMs);
@@ -287,6 +306,27 @@ void commandRequest() {
       errorResponse(409,"sd_format_busy_or_already_attempted");return;
     }
     jsonResponse(202,"{\"ok\":true,\"status\":\"awaiting_physical_confirmation\",\"expires_in_s\":90}");
+    return;
+  }
+  if(kind=="connection_set"){
+    const String channel=server.arg("channel"),kindValue=server.arg("type"),
+      pinValue=server.arg("gpio"),addrValue=server.arg("address"),debValue=server.arg("debounce");
+    if(!allDigits(channel,1,1)||channel.toInt()>=int(panel_config::COUNT)||
+       !allDigits(kindValue,1,1)||kindValue.toInt()>5 ||
+       pinValue.length()>3||(!pinValue.startsWith("-")&&!allDigits(pinValue,1,2))||
+       !allDigits(addrValue,1,3)||!allDigits(debValue,1,4)){
+      errorResponse(400,"invalid_connection_fields");return;
+    }
+    const int pin=pinValue.toInt();
+    if(pin<-1||pin>54||addrValue.toInt()>247||debValue.toInt()>5000){
+      errorResponse(400,"invalid_connection_range");return;
+    }
+    if(!panel_config::set(static_cast<panel_config::Channel>(channel.toInt()),
+         static_cast<panel_config::Type>(kindValue.toInt()),pin,
+         uint8_t(addrValue.toInt()),uint16_t(debValue.toInt()))){
+      errorResponse(409,"connection_conflict_or_nvs_error");return;
+    }
+    jsonResponse(202,"{\"ok\":true,\"saved\":true,\"drivers_active\":false}");
     return;
   }
   panel::Command cmd;
