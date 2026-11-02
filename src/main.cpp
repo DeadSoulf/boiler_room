@@ -47,7 +47,7 @@ bool rebuild=false, closeDialog=false;
 lv_obj_t *tempValue[CHANNELS]={},*tempState[CHANNELS]={},*tempTrend[CHANNELS]={},*freshBar[CHANNELS]={};
 lv_obj_t *sensorSummary=nullptr,*sensorHint=nullptr,*liveTime=nullptr,*activity=nullptr,*activityDot=nullptr;
 lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText=nullptr,*detailGraph=nullptr;
-lv_obj_t *webPairLabel=nullptr,*sdStatusLabel=nullptr;
+lv_obj_t *webPairLabel=nullptr,*sdStatusLabel=nullptr,*sdFormatNotice=nullptr,*sdFormatAccept=nullptr,*sdFormatReject=nullptr;
 int renderedPage=-1,renderedView=-1,detailChannel=-1;
 uint32_t activityStart=0,detailRevision=0;
 bool wifiLogSeen=false,wifiLogWasOnline=false;
@@ -95,9 +95,10 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,WebAccess=80,WebNewCode,WebRevoke,Ap0=100};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,WebAccess=80,WebNewCode,WebRevoke,Ap0=100,SdFormatApprove=120,SdFormatCancel};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
+void updateStorageLabel();
 void subsection(const char* title);
 lv_obj_t* scrollList(int y,int height);
 lv_obj_t* button(lv_obj_t* parent,const char* title,int x,int y,int w,int h,uintptr_t code,uint32_t fill=0x214258,bool enabled=true){
@@ -337,6 +338,8 @@ void action(lv_event_t* e){
     case WebAccess:view=5;rebuild=true;break;
     case WebNewCode:panel_web::armPairing();rebuild=true;break;
     case WebRevoke:panel_web::revokePairing();rebuild=true;break;
+    case SdFormatApprove:panel_storage::confirmFormatPhysically();updateStorageLabel();break;
+    case SdFormatCancel:panel_storage::cancelFormatPhysically();updateStorageLabel();break;
     case Wifi:view=1;rebuild=true;break;
     case Ble:view=2;rebuild=true;break;
     case Time:view=3;rebuild=true;break;
@@ -635,6 +638,26 @@ void updateStorageLabel(){
       data.message);
   }
   lv_label_set_text(sdStatusLabel,out);
+  if(sdFormatNotice){
+    char warning[220];
+    const bool awaiting=data.formatPhase==panel_storage::FormatPhase::AwaitingPhysical;
+    if(awaiting){
+      snprintf(warning,sizeof(warning),
+        "УДАЛИТЬ ВСЁ С microSD? Веб-запрос подтверждается здесь.\n"
+        "Осталось %lu с. Отмена безопасна.",
+        (unsigned long)data.formatRemainingSeconds);
+    }else{
+      snprintf(warning,sizeof(warning),"%s",
+        data.formatMessage[0]?data.formatMessage:
+        "Форматирование выполняется только по подтверждённому запросу из браузера.");
+    }
+    lv_label_set_text(sdFormatNotice,warning);
+    for(auto* b:{sdFormatAccept,sdFormatReject})
+      if(b){
+        if(awaiting)lv_obj_clear_flag(b,LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(b,LV_OBJ_FLAG_HIDDEN);
+      }
+  }
 }
 void service(){
   auto* list=scrollList(10,650);
@@ -655,14 +678,17 @@ void service(){
     (unsigned long)t.setupAt,(unsigned long)t.displayMs,(unsigned long)t.lvglMs,
     (unsigned long)t.firstFrameAt,(unsigned long)t.touchMs);
   label(timing,b,14,48,406,&boiler_font_14,MUTED);
-  auto* sdCard=box(list,0,543,438,210);
+  auto* sdCard=box(list,0,543,438,366);
   label(sdCard,"microSD / хранилище",14,10,408,&boiler_font_19,SKY);
   sdStatusLabel=label(sdCard,"Проверка карты...",14,48,410,&boiler_font_14,MUTED);
+  sdFormatNotice=label(sdCard,"Форматирование microSD доступно из браузера\nс физическим подтверждением.",14,215,410,&boiler_font_14,AMBER);
+  sdFormatAccept=button(sdCard,"Стереть microSD",14,291,195,49,SdFormatApprove,0x754042);
+  sdFormatReject=button(sdCard,"Отменить",226,291,197,49,SdFormatCancel,0x28455A);
   updateStorageLabel();
-  auto* symbolsBox=box(list,0,769,438,98);label(symbolsBox,"Проверка символов",14,11,406,&boiler_font_19);
+  auto* symbolsBox=box(list,0,927,438,98);label(symbolsBox,"Проверка символов",14,11,406,&boiler_font_19);
   label(symbolsBox,"+ - --.- 12:34 23.5°C",14,49,406,&boiler_font_25,SKY);
-  button(list,"Обновить сведения",0,883,438,52,ServiceRefresh);
-  label(list,"microSD доступна только панели. Её нельзя форматировать здесь.\nC6 не обновляется. Датчики и выходы ещё не назначены.",14,955,406,&boiler_font_14,MUTED);
+  button(list,"Обновить сведения",0,1041,438,52,ServiceRefresh);
+  label(list,"microSD доступна только панели. Её нельзя форматировать здесь.\nC6 не обновляется. Датчики и выходы ещё не назначены.",14,1113,406,&boiler_font_14,MUTED);
 }
 void updateLive(){
   updateFuel();updateDetail();updateEquipmentReadings();const uint32_t now=millis();char text[120];unsigned fresh=0;
@@ -696,7 +722,7 @@ uint32_t signature(){
 void render(){
   const lv_coord_t scrollY=resultList && renderedPage==page && renderedView==view?lv_obj_get_scroll_y(resultList):0;
   if(body)lv_obj_del(body);
-  webPairLabel=sdStatusLabel=nullptr;
+  webPairLabel=sdStatusLabel=sdFormatNotice=sdFormatAccept=sdFormatReject=nullptr;
   equipmentFuelTemp=equipmentFuelLevel=nullptr;
   fuelCardLabels={};
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;
