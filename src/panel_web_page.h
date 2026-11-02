@@ -147,7 +147,19 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
  <div class="row"><span>Журналы</span><b id="sd-logging">—</b></div>
  <div class="row"><span>Записано событий / измерений</span><b id="sd-events">—</b></div>
  <p id="sd-message" class="hint"></p>
- <p class="tiny muted">Каталог: <code>/boiler-panel/logs/</code>. Только данные этой панели. Автоматическое форматирование, просмотр личных файлов карты и сетевой доступ к ним отсутствуют.</p>
+ <p class="tiny muted">Каталог: <code>/boiler-panel/logs/</code>. Только данные этой панели. Форматирование при загрузке отключено; произвольные файлы карты недоступны через HTTP.</p>
+ <div class="notice warn">
+  <strong>Форматирование microSD — полное удаление данных!</strong>
+  <p>Существующие файлы и разделы карты будут уничтожены. Будет создана совместимая FAT-файловая система.
+  Настройки ESP32-P4, прошивка ESP32-C6 и накопители компьютера не затрагиваются.</p>
+  <p>Нужно сопряжение браузера с дисплеем. После запроса в браузере подтвердите стирание <strong>физически на дисплее</strong> в разделе «Сервис → microSD» в течение 90 секунд.</p>
+ </div>
+ <div class="field">
+  <label for="sd-format-phrase">Чтобы разрешить операцию, введите точно: СТЕРЕТЬ MICROSD</label>
+  <input id="sd-format-phrase" autocomplete="off" spellcheck="false" maxlength="24" placeholder="СТЕРЕТЬ MICROSD">
+ </div>
+ <div class="actions"><button class="danger" id="sd-format-button" data-action="sd_format_prepare" data-write="1">Запросить форматирование microSD</button></div>
+ <div id="sd-format-progress" class="notice hidden" role="status"></div>
 </div>
 <div class="actions"><button data-action="refresh" class="primary">Обновить сведения</button></div>
 <div class="notice">Эта страница не записывает новую прошивку. OTA, управление реальными выходами и аппаратные датчики пока не реализованы.</div>
@@ -295,6 +307,16 @@ function updateView(){
  text("sd-logging",sd.logging?"Запись включена":"Отключена");
  text("sd-events",(sd.written_events||0)+" / "+(sd.written_samples||0));
  text("sd-message",sd.message||"");
+ const formatPhases=["Нет запроса","Ожидается подтверждение на дисплее","Запрос в очереди","Форматирование microSD","Проверка чтения/записи","Форматирование завершено","Ошибка форматирования","Отменено на дисплее","Время подтверждения истекло"];
+ const phase=numeric(sd.format_state||0);
+ const formatActive=phase>=1&&phase<=4;
+ show("sd-format-progress",phase!==0);
+ text("sd-format-progress",(formatPhases[phase]||"Неизвестное состояние")+
+   (phase===1?" · осталось "+(sd.format_remaining_s||0)+" сек":"")+
+   (sd.format_message?" · "+sd.format_message:""));
+ const formButton=$("sd-format-button");
+ formButton.disabled=!d.authorized || !!sd.format_attempted || formatActive;
+ // The last step still requires physically touching the separate panel button.
  if(document.activeElement!==$("zone-select"))$("zone-select").value=String(tm.zone||0);
  if(document.activeElement!==$("screen-select"))$("screen-select").value=String(screen.timeout_s||0);
  for(const b of document.querySelectorAll('[data-write="1"]')){
@@ -302,7 +324,8 @@ function updateView(){
    const bleAction=b.dataset.action==="ble_scan";
    const needsTouch=b.dataset.action==="screen"&&numeric($("screen-select").value)>0;
    b.disabled=!d.authorized || (wifi.busy&&(wifiAction||bleAction||b.dataset.action==="zone"||b.dataset.action==="clock"||b.dataset.action==="screen"))
-     || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction);
+     || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction)
+     || (b.dataset.action==="sd_format_prepare" && (!!sd.format_attempted || formatActive));
  }
  renderAP();renderBLE();renderEquipment();
 }
@@ -343,6 +366,20 @@ async function logout(){
  notice("Веб-управление отключено");
  await poll();
 }
+async function requestStorageFormat(){
+ if(!token){show("pairbox",true);notice("Сначала сопрягите браузер с физическим дисплеем",true);return}
+ const phrase=$("sd-format-phrase").value.trim();
+ if(phrase!=="СТЕРЕТЬ MICROSD"){
+   notice("Введите точную фразу: СТЕРЕТЬ MICROSD",true);return;
+ }
+ if(!confirm("Все файлы и разделы на microSD будут уничтожены. Продолжить запрос?"))return;
+ try {
+   const r=await sendPost("/api/command",{action:"sd_format_prepare",confirm:phrase},true);
+   $("sd-format-phrase").value="";
+   notice("Запрос принят. Теперь подтвердите стирание на ФИЗИЧЕСКОМ дисплее в «Сервис → microSD».");
+   await poll();
+ }catch(e){notice("Форматирование не запрошено: "+e.message,true)}
+}
 function handleAction(b){
  const action=b.dataset.action;
  if(action==="show-pair"){show("pairbox",true);$("paircode").focus();return}
@@ -356,6 +393,7 @@ function handleAction(b){
  if(action==="zone"){command("zone",{value:$("zone-select").value});return}
  if(action==="clock"){command("clock",{value:$("manual-clock").value.trim()});return}
  if(action==="screen"){command("screen",{value:$("screen-select").value});return}
+ if(action==="sd_format_prepare"){requestStorageFormat();return}
  command(action);
 }
 document.addEventListener("click",e=>{
