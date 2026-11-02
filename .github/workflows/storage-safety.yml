@@ -1,0 +1,28 @@
+name: microSD and web safety checks
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'tests/storage_static_tests.py'
+      - 'tests/web_firmware_tests.py'
+      - '.github/workflows/storage-safety.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/storage_static_tests.py'
+      - 'tests/web_firmware_tests.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify no SD autoformat, bounded writes, no fake readings
+        run: python3 tests/storage_static_tests.py
+      - name: Verify web and equipment remain read-only/unconnected
+        run: python3 tests/web_firmware_tests.py
