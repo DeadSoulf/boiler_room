@@ -12,8 +12,9 @@
 #include "lvgl_glue.h"
 #include "panel_radio.h"
 #include "panel_web.h"
+#include "panel_storage.h"
 #include "panel_screen.h"
-#include "equipment_demo.h"
+#include "panel_equipment.h"
 #if !LV_USE_BTNMATRIX || !LV_USE_TEXTAREA
 #error "BoilerPanel requires LV_USE_BTNMATRIX=1 and LV_USE_TEXTAREA=1 in the existing lv_conf.h"
 #endif
@@ -33,12 +34,7 @@ const char* const SENSOR_NAMES[]={"В котельной","На улице","Т�
 const uint32_t ACCENT[]={0x6BDDB5,0x72BDF8,0xF3B876,0xB9A4EF};
 Measurement measurements[CHANNELS]; // Invalid until a future, explicit sensor integration.
 FuelLevel fuelLevel; // No default readings. A hardware adapter must normalize both reeds.
-namespace demo=panel::equipment_demo;
-demo::State equipmentDemo; // Local UI simulation only. Never submitted to panel_radio.
-lv_obj_t *equipmentMode[demo::COUNT]={},*equipmentCommand[demo::COUNT]={};
-lv_obj_t *equipmentOn[demo::COUNT]={},*equipmentOff[demo::COUNT]={};
-lv_obj_t *equipmentFuelTemp=nullptr,*equipmentFuelLevel=nullptr,*equipmentWarning=nullptr;
-uint32_t renderedDemoRevision=0;
+lv_obj_t *equipmentFuelTemp=nullptr,*equipmentFuelLevel=nullptr;
 struct FuelLevelLabels {
   lv_obj_t *summary=nullptr,*upper=nullptr,*lower=nullptr,*upperDot=nullptr,*lowerDot=nullptr;
 };
@@ -51,9 +47,10 @@ bool rebuild=false, closeDialog=false;
 lv_obj_t *tempValue[CHANNELS]={},*tempState[CHANNELS]={},*tempTrend[CHANNELS]={},*freshBar[CHANNELS]={};
 lv_obj_t *sensorSummary=nullptr,*sensorHint=nullptr,*liveTime=nullptr,*activity=nullptr,*activityDot=nullptr;
 lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText=nullptr,*detailGraph=nullptr;
-lv_obj_t *webPairLabel=nullptr;
+lv_obj_t *webPairLabel=nullptr,*sdStatusLabel=nullptr;
 int renderedPage=-1,renderedView=-1,detailChannel=-1;
 uint32_t activityStart=0,detailRevision=0;
+bool wifiLogSeen=false,wifiLogWasOnline=false;
 AccessPoint displayedAps[MAX_AP];uint8_t displayedApCount=0;
 bool displaySettingsLoaded=false;
 uint16_t appliedDisplayTimeout=0;
@@ -98,9 +95,9 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,EquipmentJournal,DemoAccepted=80,DemoRejected,DemoTimeout,DemoReset,WebAccess,WebNewCode,WebRevoke,Ap0=100,EquipmentOn0=200,EquipmentOff0=220};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,WebAccess=80,WebNewCode,WebRevoke,Ap0=100};
 void action(lv_event_t* e);
-void updateEquipmentLive();
+void updateEquipmentReadings();
 void subsection(const char* title);
 lv_obj_t* scrollList(int y,int height);
 lv_obj_t* button(lv_obj_t* parent,const char* title,int x,int y,int w,int h,uintptr_t code,uint32_t fill=0x214258,bool enabled=true){
@@ -238,7 +235,7 @@ void sensorDetails(unsigned i){
   dismiss();dialogKind=3;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
   label(overlay,i==3?"Температура топлива":SENSOR_NAMES[i],18,24,310,&boiler_font_25);button(overlay,"Домой",350,14,112,50,Home);
   detailChannel=int(i);detailText=label(overlay,"",20,112,440,&boiler_font_19,MUTED);updateDetail();
-  label(overlay,"История хранится в ОЗУ до перезапуска.\nНет демо-значений и управления выходами.",20,557,440,&boiler_font_14,MUTED);
+  label(overlay,"История хранится в ОЗУ до перезапуска.\nДанные поступают только от подключённых датчиков.",20,557,440,&boiler_font_14,MUTED);
   button(overlay,i==3?"Назад к топливу":"Закрыть",20,650,440,54,i==3?FuelOverview:Cancel);
 }
 const char* fuelStatusText(FuelLevelStatus status){
@@ -319,7 +316,7 @@ void fuelDetails(){
   fuelTemperatureValue=label(temp,"--.- °C",16,47,150,&boiler_font_25,ACCENT[3]);
   fuelTemperatureState=label(temp,"Нет данных температуры",171,55,260,&boiler_font_14,MUTED);
   button(temp,"История температуры",16,98,416,42,FuelHistory);
-  button(overlay,"Подогрев топлива до 80 °C",16,652,448,48,EquipmentFuel);
+  button(overlay,"Подогрев топлива (состояние)",16,652,448,48,EquipmentFuel);
   button(overlay,"Закрыть",16,720,448,52,Cancel);updateFuel();
 }
 const uint16_t DISPLAY_TIMEOUTS[]={0,30,60,120,300,600,1800};
@@ -333,12 +330,6 @@ void action(lv_event_t* e){
     if(code==Temp3)fuelDetails();else sensorDetails(unsigned(code-Temp0));return;
   }
   if(code>=Timeout0 && code<=Timeout6){cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=DISPLAY_TIMEOUTS[code-Timeout0];send(cmd);return;}
-  if((code>=EquipmentOn0 && code<EquipmentOn0+demo::COUNT) || (code>=EquipmentOff0 && code<EquipmentOff0+demo::COUNT)){
-    const bool enabled=code<EquipmentOff0;
-    const auto id=static_cast<demo::Id>(code-(enabled?EquipmentOn0:EquipmentOff0));
-    equipmentDemo.request(id,enabled,millis());updateEquipmentLive();return;
-  }
-
   switch(code){
     case Home:closeDialog=true;pendingPage=0;slideDirection=-1;view=0;break;
     case Back:view=0;rebuild=true;break;
@@ -378,12 +369,8 @@ void action(lv_event_t* e){
     case ServiceRefresh:rebuild=true;break;
     case FuelHistory:sensorDetails(3);break;
     case FuelOverview:fuelDetails();break;
-    case EquipmentDhw:case EquipmentElectric:case EquipmentDiesel:case EquipmentFuel:case EquipmentJournal:
+    case EquipmentDhw:case EquipmentElectric:case EquipmentDiesel:case EquipmentFuel:
       closeDialog=true;pendingPage=1;view=int(code-EquipmentDhw)+1;break;
-    case DemoAccepted:case DemoRejected:case DemoTimeout:
-      equipmentDemo.nextOutcome=code==DemoAccepted?demo::Outcome::Accepted:code==DemoRejected?demo::Outcome::Rejected:demo::Outcome::Timeout;
-      rebuild=true;break;
-    case DemoReset:equipmentDemo.reset();rebuild=true;updateEquipmentLive();break;
     default:break;
   }
 }
@@ -398,7 +385,7 @@ void makeHeader(){
   clockLabel=dateLabel=nullptr;
   header=box(lv_scr_act(),0,0,480,100,BG,0);lv_obj_set_style_border_width(header,0,0);
   label(header,page==0?"КОТЕЛЬНАЯ":PAGES[page],18,21,310,&boiler_font_25);
-  equipmentWarning=label(header,page==0?"Температура и уровень топлива":page==1?"Визуализация / ДЕМО":"Самостоятельная панель",18,62,310,&boiler_font_14,MUTED);
+  label(header,page==0?"Температура и уровень топлива":page==1?"Состояние оборудования":"Самостоятельная панель",18,62,310,&boiler_font_14,MUTED);
   if(page==0){
     clockLabel=label(header,"--:--",337,18,125,&boiler_font_25,SKY);lv_obj_set_style_text_align(clockLabel,LV_TEXT_ALIGN_RIGHT,0);
     dateLabel=label(header,"Нет времени",326,59,136,&boiler_font_14,MUTED);lv_obj_set_style_text_align(dateLabel,LV_TEXT_ALIGN_RIGHT,0);updateClock();
@@ -451,139 +438,79 @@ void home(){
   sensorHint=label(status,radio.connected?"Wi-Fi подключён. Измерения не поступают":"Показания появятся после подключения датчиков",15,45,413,&boiler_font_14,MUTED);
   label(body,"Свайп влево / вправо - смена страницы",18,640,442,&boiler_font_14,MUTED);
 }
-const char* equipmentName(demo::Id id){
-  const char* names[]={"Бойлер косвенного нагрева","Электрокотёл","Контур 1","Контур 2","Контур 3","Дизельный отопитель","Подогрев топлива"};
-  const unsigned i=unsigned(id);return i<demo::COUNT?names[i]:"Неизвестное устройство";
+const char* equipmentName(unsigned i){
+  return panel_equipment::name(i);
 }
-const char* equipmentModeText(demo::Mode mode){
-  return mode==demo::Mode::Enabled?"Разрешён":mode==demo::Mode::Off?"Отключён":"Неизвестен";
-}
-const char* equipmentCommandText(demo::Status status){
-  switch(status){
-    case demo::Status::Pending:return "Ожидание демо-ответа";
-    case demo::Status::Accepted:return "Демо: подтверждено";
-    case demo::Status::Rejected:return "Демо: отказ";
-    case demo::Status::Timeout:return "Демо: нет ответа";
-    default:return "Команд пока нет";
+void updateEquipmentReadings(){
+  if(equipmentFuelTemp){
+    char value[24],text[48];
+    temperature(value,sizeof(value),measurements[3],millis());
+    snprintf(text,sizeof(text),"%s °C",value);
+    lv_label_set_text(equipmentFuelTemp,text);
   }
+  if(equipmentFuelLevel)
+    lv_label_set_text(equipmentFuelLevel,fuelStatusText(fuelLevel.status(millis())));
 }
-void equipmentButtonState(lv_obj_t* object,bool enabled){
-  if(!object)return;
-  if(enabled)lv_obj_clear_state(object,LV_STATE_DISABLED);else lv_obj_add_state(object,LV_STATE_DISABLED);
-  lv_obj_set_style_opa(object,enabled?LV_OPA_COVER:LV_OPA_40,0);
-}
-void updateEquipmentLive(){
-  bool warning=false;
-  for(unsigned i=0;i<demo::COUNT;i++){
-    const auto& node=equipmentDemo.devices[i];const auto id=static_cast<demo::Id>(i);
-    const bool failed=node.command.status==demo::Status::Rejected || node.command.status==demo::Status::Timeout;
-    warning|=failed;
-    if(equipmentMode[i]){
-      lv_label_set_text(equipmentMode[i],equipmentModeText(node.mode));
-      lv_obj_set_style_text_color(equipmentMode[i],c(node.mode==demo::Mode::Enabled?GREEN:node.mode==demo::Mode::Unknown?AMBER:MUTED),0);
-    }
-    if(equipmentCommand[i]){
-      lv_label_set_text(equipmentCommand[i],equipmentCommandText(node.command.status));
-      lv_obj_set_style_text_color(equipmentCommand[i],c(failed?AMBER:node.command.status==demo::Status::Pending?SKY:MUTED),0);
-    }
-    equipmentButtonState(equipmentOn[i],equipmentDemo.canRequest(id,true));
-    equipmentButtonState(equipmentOff[i],equipmentDemo.canRequest(id,false));
-  }
-  if(equipmentWarning){
-    lv_label_set_text(equipmentWarning,warning?"ДЕМО: проверьте ответы команд":page==0?"Температура и уровень топлива":page==1?"Визуализация / ДЕМО":"Самостоятельная панель");
-    lv_obj_set_style_text_color(equipmentWarning,c(warning?AMBER:MUTED),0);
-  }
-  if(equipmentFuelTemp){char value[24],text[48];temperature(value,sizeof(value),measurements[3],millis());snprintf(text,sizeof(text),"%s °C",value);lv_label_set_text(equipmentFuelTemp,text);}
-  if(equipmentFuelLevel)lv_label_set_text(equipmentFuelLevel,fuelStatusText(fuelLevel.status(millis())));
-}
-void demoResponseControls(){
-  label(body,"Ответ на следующую демо-команду",18,576,442,&boiler_font_14,MUTED);
-  const char* captions[]={"Подтвердить","Отказать","Без ответа"};
-  const demo::Outcome outcomes[]={demo::Outcome::Accepted,demo::Outcome::Rejected,demo::Outcome::Timeout};
-  for(unsigned i=0;i<3;i++)button(body,captions[i],16+int(i)*153,606,142,48,DemoAccepted+i,equipmentDemo.nextOutcome==outcomes[i]?0x245A59:0x214258);
-}
-void equipmentNotice(){
-  auto* notice=box(body,16,66,448,56,0x112C3B,12);
-  label(notice,"ДЕМО: кнопки меняют только макет.\nФизическое оборудование не подключено.",12,9,422,&boiler_font_14,SKY);
-}
-void equipmentStateCard(lv_obj_t* parent,demo::Id id,int y,int width=448,bool withTitle=false){
-  const unsigned i=unsigned(id);auto* card=box(parent,0,y,width,withTitle?200:164);
-  const int shift=withTitle?36:0;
-  if(withTitle)label(card,equipmentName(id),14,12,width-28,&boiler_font_19,SKY);
-  label(card,"Режим / демо",14,13+shift,150,&boiler_font_14,MUTED);
-  equipmentMode[i]=label(card,"Отключён",180,8+shift,width-194,&boiler_font_19);
-  label(card,"Фактическая работа: нет данных",14,45+shift,width-28,&boiler_font_14,MUTED);
-  equipmentCommand[i]=label(card,"Команд пока нет",14,72+shift,width-28,&boiler_font_14,MUTED);
-  const int bw=(width-42)/2;
-  const char* on=id==demo::Id::Dhw?"Запросить нагрев":id==demo::Id::Diesel?"Запросить запуск":id==demo::Id::FuelHeat?"Включить":"Разрешить";
-  const char* off=id==demo::Id::Dhw?"Отменить запрос":id==demo::Id::Diesel?"Запросить стоп":"Выключить";
-  equipmentOn[i]=button(card,on,14,106+shift,bw,48,EquipmentOn0+i,0x245A59);
-  equipmentOff[i]=button(card,off,28+bw,106+shift,bw,48,EquipmentOff0+i,0x39465A);
+void equipmentInfoCard(lv_obj_t* parent,const char* title,int y,int width){
+  auto* card=box(parent,0,y,width,126);
+  label(card,title,14,11,width-28,&boiler_font_19,SKY);
+  label(card,"Контроллер не подключён",14,51,width-28,&boiler_font_19,AMBER);
+  label(card,"Управление недоступно до настройки подключения",14,87,width-28,&boiler_font_14,MUTED);
 }
 void control(){
   label(body,"Оборудование котельной",18,12,442,&boiler_font_19);
-  const demo::Id ids[]={demo::Id::Dhw,demo::Id::Electric,demo::Id::Diesel,demo::Id::FuelHeat};
-  const char* titles[]={"Бойлер косвенного\nнагрева","Электрокотёл","Дизельный\nотопитель","Подогрев\nтоплива"};
-  const char* hints[]={"Горячая вода / ГВС","Три контура","Отдельный источник","Два геркона / до 80 °C"};
+  const char* titles[]={"Бойлер косвенного\nнагрева","Электрокотёл",
+                       "Дизельный\nотопитель","Подогрев\nтоплива"};
+  const char* hints[]={"Горячая вода / ГВС","Три контура",
+                     "Отдельный источник","Уровень топлива / до 80 °C"};
   for(unsigned n=0;n<4;n++){
-    const unsigned i=unsigned(ids[n]);auto* card=box(body,16+int(n%2)*232,52+int(n/2)*248,216,232);
-    label(card,titles[n],14,14,188,&boiler_font_19,n==3?GREEN:ACCENT[n]);
-    label(card,hints[n],14,68,188,&boiler_font_14,MUTED);
-    label(card,"Режим / демо",14,99,188,&boiler_font_14,MUTED);
-    equipmentMode[i]=label(card,"Отключён",14,122,188,&boiler_font_19);
-    label(card,"Работа: нет данных",14,151,188,&boiler_font_14,MUTED);
-    button(card,"Открыть",14,180,188,42,EquipmentDhw+n);
+    auto* card=box(body,16+int(n%2)*232,52+int(n/2)*248,216,232);
+    label(card,titles[n],14,13,188,&boiler_font_19,n==3?GREEN:ACCENT[n]);
+    label(card,hints[n],14,71,188,&boiler_font_14,MUTED);
+    label(card,"Не подключено",14,121,188,&boiler_font_19,AMBER);
+    label(card,"Нет данных о работе",14,149,188,&boiler_font_14,MUTED);
+    button(card,"Открыть",14,181,188,41,EquipmentDhw+n);
   }
-  button(body,"События оборудования",16,562,448,48,EquipmentJournal);
-  label(body,"ДЕМО / выходы не назначены.\nСвайп влево - настройки панели.",18,626,442,&boiler_font_14,MUTED);
+  label(body,"Контроллеры оборудования ещё не настроены.\nКоманды включения и выключения недоступны.",
+        18,573,442,&boiler_font_14,MUTED);
 }
 void equipmentPage(){
-  const demo::Id id=view==1?demo::Id::Dhw:view==2?demo::Id::Electric:view==3?demo::Id::Diesel:demo::Id::FuelHeat;
-  subsection(view==1?"Бойлер / ГВС":view==2?"Электрокотёл":view==3?"Дизельный отопитель":"Подогрев топлива");
-  equipmentNotice();
+  subsection(view==1?"Бойлер / ГВС":view==2?"Электрокотёл":
+             view==3?"Дизельный отопитель":"Подогрев топлива");
+  auto* notice=box(body,16,70,448,57,0x112C3B,12);
+  label(notice,"Контроллер не подключён.\nКоманды недоступны.",12,9,422,&boiler_font_14,AMBER);
   if(view==2){
-    auto* list=scrollList(134,424);
-    equipmentStateCard(list,demo::Id::Electric,0,438,true);
-    for(unsigned i=0;i<3;i++)equipmentStateCard(list,static_cast<demo::Id>(unsigned(demo::Id::Circuit1)+i),214+int(i)*214,438,true);
-    label(list,"Контуры пока показаны как три ветки.\nСвязи и алгоритм управления не назначены.",14,870,406,&boiler_font_14,MUTED);
+    auto* list=scrollList(145,476);
+    equipmentInfoCard(list,"Электрокотёл",0,438);
+    equipmentInfoCard(list,"Контур 1",138,438);
+    equipmentInfoCard(list,"Контур 2",276,438);
+    equipmentInfoCard(list,"Контур 3",414,438);
+    label(list,"Тип контуров, схема реле и обратная связь\nбудут назначены после подключения контроллера.",
+          14,554,410,&boiler_font_14,MUTED);
   }else{
-    auto* measure=box(body,16,136,448,124);
+    auto* measure=box(body,16,142,448,182);
     if(view==1){
-      label(measure,"Бойлер косвенного нагрева",14,12,418,&boiler_font_19,SKY);
-      label(measure,"--.- °C",14,48,150,&boiler_font_25);
-      label(measure,"Нет данных температуры",172,58,260,&boiler_font_14,MUTED);
-      label(measure,"Источник тепла и уставка не заданы",14,94,418,&boiler_font_14,MUTED);
+      label(measure,"Бойлер косвенного нагрева",14,11,416,&boiler_font_19,SKY);
+      label(measure,"Температура: нет данных",14,55,416,&boiler_font_19,MUTED);
+      label(measure,"Источник тепла, насос, клапан и уставка\nне назначены.",14,106,416,&boiler_font_14,MUTED);
     }else if(view==3){
-      label(measure,"Дизельный отопитель",14,12,418,&boiler_font_19,AMBER);
-      label(measure,"Тип и модель: не выбраны\nКонтроллер: не подключён\nПодтверждения пламени и работы нет",14,49,418,&boiler_font_14,MUTED);
+      label(measure,"Дизельный отопитель",14,11,416,&boiler_font_19,AMBER);
+      label(measure,"Контроллер: не подключён",14,58,416,&boiler_font_19,MUTED);
+      label(measure,"Тип, модель, статус пламени и работа\nне определены.",14,108,416,&boiler_font_14,MUTED);
     }else{
-      label(measure,"Подогрев топлива до 80 °C",14,12,418,&boiler_font_19,GREEN);
-      equipmentFuelTemp=label(measure,"--.- °C",14,48,150,&boiler_font_25);
-      equipmentFuelLevel=label(measure,"Нет данных",172,58,260,&boiler_font_14,MUTED);
-      label(measure,"80 °C - требование, регулятор не задан",14,94,418,&boiler_font_14,MUTED);
+      label(measure,"Подогрев топлива до 80 °C",14,11,416,&boiler_font_19,GREEN);
+      equipmentFuelTemp=label(measure,"--.- °C",14,58,150,&boiler_font_25,ACCENT[3]);
+      equipmentFuelLevel=label(measure,"Нет данных",176,65,260,&boiler_font_14,MUTED);
+      label(measure,"80 °C — проектное требование.\nРегулятор и исполнительный выход не назначены.",
+            14,111,416,&boiler_font_14,MUTED);
     }
-    auto* holder=box(body,16,274,448,164,BG,0);lv_obj_set_style_border_width(holder,0,0);equipmentStateCard(holder,id,0);
-    label(body,view==1?"Приоритет ГВС, насос и клапан не заданы.":view==3?"Запуск и остановка здесь имитируются.":"Демо-кнопки не включают нагреватель.",18,455,442,&boiler_font_14,MUTED);
-    button(body,view==4?"Уровень и температура топлива":"События оборудования",16,498,448,48,view==4?FuelOverview:EquipmentJournal);
+    auto* status=box(body,16,340,448,118);
+    label(status,"Фактическое состояние",14,12,414,&boiler_font_14,MUTED);
+    label(status,"Нет данных / не подключено",14,47,414,&boiler_font_19,AMBER);
+    label(body,"Подключение и управление будут доступны\nпосле назначения оборудования и защиты.",
+          18,483,442,&boiler_font_14,MUTED);
+    if(view==4)button(body,"Уровень и температура топлива",16,555,448,50,FuelOverview);
   }
-  demoResponseControls();
-}
-void equipmentJournalPage(){
-  subsection("События / ДЕМО");
-  label(body,"Последние 16 событий этой сессии",18,70,442,&boiler_font_14,MUTED);
-  auto* list=scrollList(102,468);
-  if(!equipmentDemo.eventCount)label(list,"Команд пока нет.\nЗапросите действие в карточке оборудования.",14,18,406,&boiler_font_19,MUTED);
-  for(unsigned i=0;i<equipmentDemo.eventCount;i++){
-    const auto* event=equipmentDemo.event(i);if(!event)continue;
-    auto* card=box(list,0,int(i)*130,438,118);char text[128];
-    label(card,equipmentName(event->device),14,10,410,&boiler_font_19,SKY);
-    snprintf(text,sizeof(text),"%s / %s",event->requested?"Запрос ВКЛ":"Запрос ВЫКЛ",equipmentCommandText(event->status));
-    label(card,text,14,42,410,&boiler_font_14,MUTED);
-    snprintf(text,sizeof(text),"Режим: %s / %lu с от запуска",equipmentModeText(event->mode),(unsigned long)(event->at/1000U));
-    label(card,text,14,86,410,&boiler_font_14,MUTED);
-  }
-  button(body,"Сбросить демонстрацию",16,592,448,48,DemoReset);
-  label(body,"Сброс меняет только макет и его журнал.",18,649,442,&boiler_font_14,MUTED);
 }
 void settings(){
   const char* titles[]={"Wi-Fi","Bluetooth устройства","Дата и время","Экран","Веб-доступ"};
@@ -618,7 +545,7 @@ void wifiPage(){
   button(body,"Отключить",16,280,216,44,WifiDisconnect,0x214258,radio.ready && (radio.connected || (radio.busy && radio.job==Job::Connect)));
   button(body,"Забыть сеть",248,280,216,44,WifiForget,0x643B48,radio.ready && radio.hasSaved);
   auto* list=scrollList(342,290);
-  if(!radio.apCount)label(list,radio.busy?"Идёт поиск или подключение...":"Нажмите Найти сети.\nЗдесь нет демонстрационных сетей.",10,15,420,&boiler_font_19,MUTED);
+  if(!radio.apCount)label(list,radio.busy?"Идёт поиск или подключение...":"Нажмите Найти сети.\nСписок появится после поиска.",10,15,420,&boiler_font_19,MUTED);
   for(unsigned i=0;i<radio.apCount;i++){
     auto* row=button(list,"",0,int(i)*78,438,69,Ap0+i,0x192D42,available);
     auto* name=label(row,radio.aps[i].ssid,12,7,408,&boiler_font_19);lv_label_set_long_mode(name,LV_LABEL_LONG_DOT);lv_obj_set_height(name,25);
@@ -650,7 +577,7 @@ void timePage(){
   for(unsigned i=0;i<3;i++)button(body,panel_radio::zoneName(i),16,268+i*59,448,48,Zone0+i,radio.zone==i?0x147C90:0x214258,radio.ready && !radio.busy);
   button(body,"Установить дату и время вручную",16,466,448,52,ManualClock,0x214258,radio.ready && !radio.busy);
   label(body,radio.timeMessage,18,538,442,&boiler_font_14,SKY);
-  label(body,"Часовой пояс сохраняется. После полного\nотключения питания время снова устанавливается\nпо сети или вручную. Значения не имитируются.",18,589,442,&boiler_font_14,MUTED);
+  label(body,"Часовой пояс сохраняется. После полного\nотключения питания время снова устанавливается\nпо сети или вручную. ",18,589,442,&boiler_font_14,MUTED);
 }
 void displayPage(){
   subsection("Экран");
@@ -675,6 +602,40 @@ void webAccessPage(){
   button(body,"Отозвать доступ и код",16,482,448,57,WebRevoke,0x643B48);
   label(body,"Откройте адрес на компьютере в той же сети.\nНажмите «Сопряжение» и введите код с дисплея.\nСессия действует 1 час; новый код отзывает старую.\nБез кода в браузере доступен только просмотр.\nНе открывайте порт 80 в интернет.",18,563,438,&boiler_font_14,MUTED);
 }
+void capacityString(uint64_t bytes,char out[24]){
+  const double gb=double(bytes)/1073741824.0;
+  const double mb=double(bytes)/1048576.0;
+  if(bytes>=1073741824ULL)snprintf(out,24,"%.2f ГБ",gb);
+  else if(bytes>=1048576ULL)snprintf(out,24,"%.1f МБ",mb);
+  else snprintf(out,24,"%llu Б",(unsigned long long)bytes);
+}
+void updateStorageLabel(){
+  if(!sdStatusLabel)return;
+  panel_storage::Snapshot data;
+  if(!panel_storage::snapshot(data)){
+    lv_label_set_text(sdStatusLabel,"Ожидание подсистемы хранения");
+    return;
+  }
+  char out[350];
+  if(!data.mounted){
+    snprintf(out,sizeof(out),"Статус: не смонтирована\n%s\n"
+      "Форматирование отключено. Проверьте FAT32 и установку карты.",
+      data.message[0]?data.message:"Проверка носителя...");
+  } else {
+    char card[24],volume[24],used[24],free[24];
+    capacityString(data.cardBytes,card);
+    capacityString(data.totalBytes,volume);
+    capacityString(data.usedBytes,used);
+    capacityString(data.freeBytes,free);
+    snprintf(out,sizeof(out),"Карта: %s\nФайловая система: %s\n"
+      "Занято: %s  /  Свободно: %s\n"
+      "Логи: %s  (событий %lu, измерений %lu)\n%s",
+      card,volume,used,free,data.logging?"записываются":"не записываются",
+      (unsigned long)data.writtenEvents,(unsigned long)data.writtenSamples,
+      data.message);
+  }
+  lv_label_set_text(sdStatusLabel,out);
+}
 void service(){
   auto* list=scrollList(10,650);
   // Five uint32 values plus Russian UTF-8 text need more than 160 bytes.
@@ -694,13 +655,17 @@ void service(){
     (unsigned long)t.setupAt,(unsigned long)t.displayMs,(unsigned long)t.lvglMs,
     (unsigned long)t.firstFrameAt,(unsigned long)t.touchMs);
   label(timing,b,14,48,406,&boiler_font_14,MUTED);
-  auto* symbolsBox=box(list,0,543,438,98);label(symbolsBox,"Проверка символов",14,11,406,&boiler_font_19);
+  auto* sdCard=box(list,0,543,438,210);
+  label(sdCard,"microSD / хранилище",14,10,408,&boiler_font_19,SKY);
+  sdStatusLabel=label(sdCard,"Проверка карты...",14,48,410,&boiler_font_14,MUTED);
+  updateStorageLabel();
+  auto* symbolsBox=box(list,0,769,438,98);label(symbolsBox,"Проверка символов",14,11,406,&boiler_font_19);
   label(symbolsBox,"+ - --.- 12:34 23.5°C",14,49,406,&boiler_font_25,SKY);
-  button(list,"Обновить сведения",0,657,438,52,ServiceRefresh);
-  label(list,"Прокрутите вверх / вниз. C6 не обновляется.\nИзмерительных датчиков и выходов пока нет.",14,730,406,&boiler_font_14,MUTED);
+  button(list,"Обновить сведения",0,883,438,52,ServiceRefresh);
+  label(list,"microSD доступна только панели. Её нельзя форматировать здесь.\nC6 не обновляется. Датчики и выходы ещё не назначены.",14,955,406,&boiler_font_14,MUTED);
 }
 void updateLive(){
-  updateFuel();updateDetail();updateEquipmentLive();const uint32_t now=millis();char text[120];unsigned fresh=0;
+  updateFuel();updateDetail();updateEquipmentReadings();const uint32_t now=millis();char text[120];unsigned fresh=0;
   for(unsigned i=0;i<CHANNELS;i++)if(tempValue[i]){
     const auto& m=measurements[i];fresh+=m.fresh(now);temperature(text,sizeof(text),m,now);
     lv_label_set_text(tempValue[i],text);
@@ -731,15 +696,14 @@ uint32_t signature(){
 void render(){
   const lv_coord_t scrollY=resultList && renderedPage==page && renderedView==view?lv_obj_get_scroll_y(resultList):0;
   if(body)lv_obj_del(body);
-  webPairLabel=nullptr;
-  for(unsigned i=0;i<demo::COUNT;i++)equipmentMode[i]=equipmentCommand[i]=equipmentOn[i]=equipmentOff[i]=nullptr;
+  webPairLabel=sdStatusLabel=nullptr;
   equipmentFuelTemp=equipmentFuelLevel=nullptr;
   fuelCardLabels={};
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;
   sensorSummary=sensorHint=liveTime=activity=activityDot=resultList=heapLabel=uptimeLabel=nullptr;
   body=box(lv_scr_act(),0,100,480,673,BG,0);lv_obj_set_style_border_width(body,0,0);
   makeHeader();makeFooter();
-  switch(page){case 0:home();break;case 1:if(view>=1 && view<=4)equipmentPage();else if(view==5)equipmentJournalPage();else control();break;case 2:if(view==1)wifiPage();else if(view==2)blePage();else if(view==3)timePage();else if(view==4)displayPage();else if(view==5)webAccessPage();else settings();break;default:service();break;}
+  switch(page){case 0:home();break;case 1:if(view>=1 && view<=4)equipmentPage();else control();break;case 2:if(view==1)wifiPage();else if(view==2)blePage();else if(view==3)timePage();else if(view==4)displayPage();else if(view==5)webAccessPage();else settings();break;default:service();break;}
   if(page==2 && (view==1 || view==2) && radio.busy){
     activity=label(body,"Операция выполняется",18,635,440,&boiler_font_14,AMBER);
     auto* track=box(body,18,665,444,4,LINE,2);lv_obj_set_style_border_width(track,0,0);
@@ -748,7 +712,7 @@ void render(){
   if(resultList){lv_obj_update_layout(resultList);lv_obj_scroll_to_y(resultList,scrollY,LV_ANIM_OFF);}
   renderedPage=page;renderedView=view;updateLive();
   if(slideDirection){lv_anim_t a;lv_anim_init(&a);lv_anim_set_var(&a,body);lv_anim_set_exec_cb(&a,animX);lv_anim_set_values(&a,slideDirection>0?480:-480,0);lv_anim_set_time(&a,160);lv_anim_set_path_cb(&a,lv_anim_path_ease_out);lv_anim_start(&a);slideDirection=0;}
-  renderedRevision=radio.revision;renderedSignature=signature();renderedDemoRevision=equipmentDemo.revision;
+  renderedRevision=radio.revision;renderedSignature=signature();
 }
 void gesture(lv_event_t*){
   if(overlay || pendingPage>=0)return;
@@ -760,31 +724,13 @@ void gesture(lv_event_t*){
 }
 void refresh(lv_timer_t*){
   if(closeDialog)dismiss();
-  panel_web::DemoAction webCmd;
-  if(panel_web::takeDemoAction(webCmd)){
-    bool accepted=false;
-    switch(webCmd.type){
-      case panel_web::DemoActionType::Enable:
-      case panel_web::DemoActionType::Disable:
-        if(webCmd.id<demo::COUNT)
-          accepted=equipmentDemo.request(static_cast<demo::Id>(webCmd.id),
-            webCmd.type==panel_web::DemoActionType::Enable,millis());
-        break;
-      case panel_web::DemoActionType::Outcome:
-        if(webCmd.outcome<=2){
-          equipmentDemo.nextOutcome=static_cast<demo::Outcome>(webCmd.outcome);
-          accepted=true;
-        }
-        break;
-      case panel_web::DemoActionType::Reset:
-        equipmentDemo.reset();accepted=true;break;
-    }
-    panel_web::recordDemoResult(accepted);
-    updateEquipmentLive();rebuild=true;
-  }
-  if(equipmentDemo.tick(millis()))updateEquipmentLive();
-  if(page==1 && view==5 && renderedDemoRevision!=equipmentDemo.revision)rebuild=true;
   const bool wasBusy=radio.busy;panel_radio::snapshot(radio);
+  if(radio.ready && radio.wifiSupported){
+    if(!wifiLogSeen || wifiLogWasOnline!=radio.connected){
+      wifiLogSeen=true;wifiLogWasOnline=radio.connected;
+      panel_storage::event("wifi",radio.connected?"Connected and IP assigned":"Disconnected");
+    }
+  }
   if(radio.busy && !wasBusy)activityStart=millis();
   if(radio.ready && (!displaySettingsLoaded || appliedDisplayTimeout!=radio.displayTimeoutSec)){
     displaySettingsLoaded=true;appliedDisplayTimeout=radio.displayTimeoutSec;
@@ -799,8 +745,9 @@ void refresh(lv_timer_t*){
   if(rebuild && !overlay && !touching){rebuild=false;render();}
   if(activityDot)lv_obj_set_x(activityDot,6+int((millis()/20U)%400U));
   if(uint32_t(millis()-lastTick)>=1000U){
-    lastTick=millis();updateClock();updateLive();
-    panel_web::publish(measurements,fuelLevel,equipmentDemo,millis());
+    lastTick=millis();updateClock();updateLive();updateStorageLabel();
+    panel_storage::measurements(measurements,millis());
+    panel_web::publish(measurements,fuelLevel,millis());
     if(webPairLabel){
       char code[7];uint32_t remaining=0;
       char line[100];
@@ -828,7 +775,8 @@ void setup(){
   start=millis();const bool touchOK=board_p4_touch_init()==ESP_OK && board_p4_get_touch_handle()!=nullptr;
   const uint32_t touchMs=millis()-start;
   if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
-  Serial.begin(115200);panel_radio::begin();panel_web::begin();
-  char timing[180];snprintf(timing,sizeof(timing),"[BoilerPanel] %s equipment=LOCAL_DEMO outputs=NONE display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",VERSION,(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
+  Serial.begin(115200);panel_radio::begin();panel_web::begin();panel_storage::begin();
+  char timing[180];snprintf(timing,sizeof(timing),"[BoilerPanel] %s equipment=NOT_CONNECTED outputs=NONE display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",VERSION,(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
+  panel_storage::event("boot","Panel application started");
 }
 void loop(){delay(20);}
