@@ -13,6 +13,7 @@
 #include "panel_radio.h"
 #include "panel_web.h"
 #include "panel_storage.h"
+#include "panel_config.h"
 #include "panel_screen.h"
 #include "panel_equipment.h"
 #if !LV_USE_BTNMATRIX || !LV_USE_TEXTAREA
@@ -342,7 +343,6 @@ void action(lv_event_t* e){
     case SdFormatCancel:panel_storage::cancelFormatPhysically();updateStorageLabel();break;
     case Wifi:view=1;rebuild=true;break;
     case Ble:view=2;rebuild=true;break;
-    case Time:view=3;rebuild=true;break;
     case WifiScan:cmd.job=Job::WifiScan;send(cmd);break;
     case WifiManual:credentials(nullptr);break;
     case WifiDisconnect:cmd.job=Job::Disconnect;send(cmd);break;
@@ -516,17 +516,17 @@ void equipmentPage(){
   }
 }
 void settings(){
-  const char* titles[]={"Wi-Fi","Bluetooth устройства","Дата и время","Экран","Веб-доступ"};
+  const char* titles[]={"Wi-Fi","Bluetooth устройства","Экран","Веб-доступ"};
   const char* hints[]={radio.connected?"Подключено к сети":"Поиск и подключение",
-    "Реальный поиск BLE, без сопряжения","NTP, часовой пояс, ручная установка",
-    "Таймер подсветки и пробуждение касанием","Управление через браузер с кодом на панели"};
-  const uintptr_t actions[]={Wifi,Ble,Time,Display,WebAccess};
-  const uint32_t inks[]={ACCENT[0],ACCENT[1],ACCENT[2],ACCENT[3],SKY};
-  for(unsigned i=0;i<5;i++){
-    auto* card=box(body,16,12+int(i)*125,448,115);
-    label(card,titles[i],18,7,410,&boiler_font_19,inks[i]);
-    label(card,hints[i],18,39,410,&boiler_font_14,MUTED);
-    button(card,"Открыть",18,69,410,37,actions[i]);
+    "Поиск устройств BLE","Таймер подсветки и пробуждение касанием",
+    "Защищённый доступ из браузера"};
+  const uintptr_t actions[]={Wifi,Ble,Display,WebAccess};
+  const uint32_t inks[]={ACCENT[0],ACCENT[1],ACCENT[3],SKY};
+  for(unsigned i=0;i<4;i++){
+    auto* card=box(body,16,12+int(i)*155,448,138);
+    label(card,titles[i],18,10,410,&boiler_font_19,inks[i]);
+    label(card,hints[i],18,48,410,&boiler_font_14,MUTED);
+    button(card,"Открыть",18,87,410,41,actions[i]);
   }
 }
 void subsection(const char* title){button(body,"Назад",16,10,105,44,Back);label(body,title,139,16,323,&boiler_font_25);}
@@ -685,10 +685,9 @@ void service(){
   sdFormatAccept=button(sdCard,"Стереть microSD",14,291,195,49,SdFormatApprove,0x754042);
   sdFormatReject=button(sdCard,"Отменить",226,291,197,49,SdFormatCancel,0x28455A);
   updateStorageLabel();
-  auto* symbolsBox=box(list,0,927,438,98);label(symbolsBox,"Проверка символов",14,11,406,&boiler_font_19);
-  label(symbolsBox,"+ - --.- 12:34 23.5°C",14,49,406,&boiler_font_25,SKY);
-  button(list,"Обновить сведения",0,1041,438,52,ServiceRefresh);
-  label(list,"microSD доступна только панели. Её нельзя форматировать здесь.\nC6 не обновляется. Датчики и выходы ещё не назначены.",14,1113,406,&boiler_font_14,MUTED);
+
+  button(list,"Обновить сведения",0,927,438,52,ServiceRefresh);
+  label(list,"microSD доступна только панели. Её нельзя форматировать здесь.\nC6 не обновляется. Датчики и выходы ещё не назначены.",14,991,406,&boiler_font_14,MUTED);
 }
 void updateLive(){
   updateFuel();updateDetail();updateEquipmentReadings();const uint32_t now=millis();char text[120];unsigned fresh=0;
@@ -729,7 +728,7 @@ void render(){
   sensorSummary=sensorHint=liveTime=activity=activityDot=resultList=heapLabel=uptimeLabel=nullptr;
   body=box(lv_scr_act(),0,100,480,673,BG,0);lv_obj_set_style_border_width(body,0,0);
   makeHeader();makeFooter();
-  switch(page){case 0:home();break;case 1:if(view>=1 && view<=4)equipmentPage();else control();break;case 2:if(view==1)wifiPage();else if(view==2)blePage();else if(view==3)timePage();else if(view==4)displayPage();else if(view==5)webAccessPage();else settings();break;default:service();break;}
+  switch(page){case 0:home();break;case 1:if(view>=1 && view<=4)equipmentPage();else control();break;case 2:if(view==1)wifiPage();else if(view==2)blePage();else if(view==4)displayPage();else if(view==5)webAccessPage();else settings();break;default:service();break;}
   if(page==2 && (view==1 || view==2) && radio.busy){
     activity=label(body,"Операция выполняется",18,635,440,&boiler_font_14,AMBER);
     auto* track=box(body,18,665,444,4,LINE,2);lv_obj_set_style_border_width(track,0,0);
@@ -801,7 +800,7 @@ void setup(){
   start=millis();const bool touchOK=board_p4_touch_init()==ESP_OK && board_p4_get_touch_handle()!=nullptr;
   const uint32_t touchMs=millis()-start;
   if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
-  Serial.begin(115200);panel_radio::begin();panel_web::begin();panel_storage::begin();
+  Serial.begin(115200);panel_radio::begin();panel_web::begin();panel_storage::begin();panel_config::begin();
   char timing[180];snprintf(timing,sizeof(timing),"[BoilerPanel] %s equipment=NOT_CONNECTED outputs=NONE display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",VERSION,(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
   panel_storage::event("boot","Panel application started");
 }
