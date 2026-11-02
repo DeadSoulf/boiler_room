@@ -1,35 +1,28 @@
-# Панель котельной · Boiler Panel v0.5.0
+# Boiler Panel — GUITION JC4880P443 (ESP32-P4 + ESP32-C6)
 
-Самостоятельный интерфейс GUITION JC4880P443, ESP32-P4 ES v1.3 и ESP32-C6.
-Сохраняет основу v0.3.1/v0.4.0 и добавляет визуализацию оборудования на дисплее.
-Русское меню, четыре температуры, свайпы, часы, Wi-Fi/BLE и сон подсветки с
-пробуждением первым касанием без случайной команды.
+**Current firmware: v0.5.6.** This repository is an independent boiler-room touch-panel project. It is not the heater-control firmware or a relay controller.
 
-- **[Полная инструкция на русском](README_RU.md)**: установка, обновление, диагностика, откат.
-- **[Согласованные требования из чата](docs/project-requirements.md)**: страницы, навигация, топливо, подогрев и границы интеграции.
-- [Веб-интерфейс дисплея](web/boiler-panel/README.md): интерактивная демонстрация и её проверки.
-- [Аудит и ограничения проверки](AUDIT_RU.md).
-- [Сборки и результаты GitHub Actions](https://github.com/DeadSoulf/boiler_room/actions).
-- [Как устроена сборка](ci/README.md).
-- [Загрузка визуализации через COM3](docs/flash-panel.md): проверка устройства, резервная копия и запись приложения.
+[Инструкция на русском](README_RU.md) · [microSD](docs/microsd-storage.md) · [Web interface](docs/web-on-panel.md) · [Safe flashing](docs/flash-panel.md)
 
-В `src/` находятся интерфейс панели, модели показаний и работа с Wi-Fi/BLE.
-Веб-приложение использует явно обозначенные демонстрационные данные и команды.
-На физической панели добавлены бойлер косвенного нагрева, электрокотёл с тремя
-контурами, дизельный отопитель и подогрев топлива «до 80 °C». Кнопки работают
-в явно обозначенной локальной демонстрации: ожидание, подтверждение, отказ,
-отсутствие ответа и журнал последних 16 событий. Фактическая работа остаётся
-неизвестной. Физические выходы и алгоритм регулирования требуют согласования.
+## What works
 
-В рабочем комплекте исходников внесены поправки экранной клавиатуры, отображения
-SSID, обработки отказов Wi-Fi/BLE, установщика и комплектации артефактов.
-Состояние замечаний A01–A08 описано в [AUDIT_RU.md](AUDIT_RU.md). Это не заявление
-об аппаратном испытании или установке на устройство. Проверки v0.5 фиксируются
-отдельно для её точного коммита.
+- 480×800 LVGL portrait display, horizontal swipe navigation, first-frame startup, touch wake, configurable backlight timeout.
+- Four temperature channels and two fuel-level reed switch channels, without invented data. Actual electrical sensors are not yet connected.
+- Wi-Fi through the ESP32-C6 ESP-Hosted co-processor (host/C6 firmware 2.9.6), Wi-Fi scan/connect, BLE discovery, time and timezone.
+- Embedded Russian HTTP browser interface with live status, physically initiated pairing for configuration changes. Use **trusted local LAN only**, never expose HTTP port 80 to the internet.
+- Equipment inventory: indirect water heater, electric boiler and three circuits, diesel heater, fuel heater. None is connected to a confirmed actuator controller, so **no physical commands and no simulations** are provided.
+- microSD monitor and bounded logging under `/boiler-panel/logs/` only when mounting a supported filesystem succeeds. No automatic formatting; storage access runs outside the LVGL and networking tasks.
 
-Используйте только артефакты успешного запуска для нужного коммита.
-Компиляция не заменяет проверку на устройстве. Реальные датчики и выходы ещё
-не назначены; в прошивке отсутствующие показания не имитируются.
+## microSD status
 
-GitHub Actions не прошивает панель. C6 автоматически не обновляется.
-Не записывайте образ C6 в основной P4 и не стирайте память панели.
+The card is connected to P4 SDMMC **Slot 0** (CLK43/CMD44/D0–D3 GPIO39–42), powered by on-chip LDO4. The ESP32-C6 SDIO link uses Slot 1. The BSP already owns LDO4, so the Arduino SD_MMC wrapper must use `setPowerChannel(-1)`.
+
+**On-device test (Nov 2, 2026):** v0.5.6 boots and Wi-Fi/Web still work, but the inserted card returns `vfs_fat_sdmmc: mount_to_vfs failed (0xffffffff)`. It may use an unsupported filesystem such as exFAT, or there may be a filesystem/read error; capacity and free space are not yet verified, and no log files were written. No card format or erase was attempted. Follow [issue #5](https://github.com/DeadSoulf/boiler_room/issues/5) for nondestructive diagnosis.
+
+## Next milestone
+
+[Issue #4](https://github.com/DeadSoulf/boiler_room/issues/4): Tasmota-like hardware configuration page, exposing only verified, physically available GPIOs, supported sensor types, bus assignments, driver-specific settings, conflict validation, NVS-backed active configuration with rollback, and optional SD backup once the card mounts reliably.
+
+**Never assign GPIOs reserved for the display, GT911 touch, SDMMC, audio, or ESP-Hosted SDIO. Never enable live boiler/heater outputs without verified wiring, an actual control module and independent safety limits.**
+
+Build environment: PIOArduino 55.03.36-1 / Arduino-ESP32 3.3.6 / LVGL 8.3.11 / ESP32-P4 ES rev1.3 at 360 MHz. The safe flasher only writes the P4 app partition after chip, layout and backup checks; it never overwrites the C6 firmware or NVS.
