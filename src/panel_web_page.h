@@ -56,7 +56,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 <button data-page="home" class="active">Главная</button>
 <button data-page="equipment">Управление</button>
 <button data-page="fuel">Топливо</button>
-<button data-page="settings">Настройки</button>
+<button data-page="settings">Настройки</button><button data-page="connections">Устройства</button>
 <button data-page="service">Сервис</button>
 </nav>
 <div id="pairbox" class="card hidden">
@@ -120,6 +120,44 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
  <p>Для управления создайте одноразовый код на физическом дисплее: <b>Настройки → Веб-доступ</b>, затем нажмите «Сопряжение» вверху браузера. Сессия — 1 час.</p>
  <button data-action="show-pair">Ввести код с дисплея</button>
  <div class="notice warn">Обычный HTTP в локальной сети не шифруется. Не включайте перенаправление порта 80 на маршрутизаторе.</div></div>
+</section>
+<section id="connections" class="page hidden">
+<h2>Подключение устройств / GPIO</h2>
+<div class="notice warn">Конфигурация сохраняется в NVS с резервной записью и проверкой целостности. Драйверы физических GPIO пока не включены: доступность контактов на разъёме JC4880P443 должна быть подтверждена. Никаких ДЕМО и управляющих выходов.</div>
+<div class="card">
+  <div class="row"><span>Ревизия конфигурации</span><strong id="cfg-revision">0</strong></div>
+  <div class="row"><span>Применение GPIO</span><strong id="cfg-state">Не активировано</strong></div>
+  <div class="field"><label for="cfg-channel">Канал / назначение</label>
+  <select id="cfg-channel">
+    <option value="0">Температура котельной</option>
+    <option value="1">Температура улицы</option>
+    <option value="2">Температура теплоносителя</option>
+    <option value="3">Температура топлива</option>
+    <option value="4">Нижний геркон топлива</option>
+    <option value="5">Верхний геркон топлива</option>
+  </select></div>
+  <div class="field"><label for="cfg-type">Тип датчика/источника</label>
+  <select id="cfg-type">
+    <option value="0">Не назначено</option>
+    <option value="1">DS18B20 / OneWire (только температура)</option>
+    <option value="2">Геркон NO (только уровень)</option>
+    <option value="3">Геркон NC (только уровень)</option>
+    <option value="4">Modbus RTU / RS-485 (требует контроллер)</option>
+    <option value="5">MQTT (требует настроенный брокер)</option>
+  </select></div>
+  <div class="field"><label for="cfg-gpio">GPIO ESP32-P4 (для локального датчика)</label>
+  <input id="cfg-gpio" type="number" min="-1" max="54" value="-1" step="1">
+  <p class="tiny muted">Пока принимаются только назначения для будущего подключения. Выводы дисплея, GT911, Wi-Fi/C6, SDMMC и аудио заблокированы для работы; GPIO не переключаются.</p></div>
+  <div class="field"><label for="cfg-address">Адрес Modbus (0–247)</label><input id="cfg-address" type="number" min="0" max="247" value="0"></div>
+  <div class="field"><label for="cfg-debounce">Подавление дребезга геркона, мс</label><input id="cfg-debounce" type="number" min="0" max="5000" value="50"></div>
+  <div class="actions"><button class="primary" data-action="connection_set" data-write="1">Сохранить назначение</button><button class="ghost" data-action="connection_reset" data-write="1">Сбросить канал</button></div>
+  <p id="cfg-message" class="hint"></p>
+</div>
+<div class="card section">
+<h3>Сохранённые назначения</h3>
+<div id="cfg-table" class="feed muted">Нет конфигурации.</div>
+<p class="tiny muted">Никакие реальные котлы, реле и подогреватели не включаются. На этом этапе сохраняются параметры, но аппаратные драйверы ещё не активированы.</p>
+</div>
 </section>
 <section id="service" class="page hidden">
 <h2>Сервис</h2><div class="two">
@@ -307,6 +345,22 @@ function updateView(){
  text("sd-logging",sd.logging?"Запись включена":"Отключена");
  text("sd-events",(sd.written_events||0)+" / "+(sd.written_samples||0));
  text("sd-message",sd.message||"");
+ const cfg=d.connections||{};
+ text("cfg-revision",cfg.revision||0);
+ text("cfg-state",cfg.drivers_active?"Работает":"Ожидает подтверждения аппаратной схемы");
+ text("cfg-message",cfg.message||"");
+ const holder=$("cfg-table");if(holder){
+    holder.replaceChildren();
+    const channels=["Котельная","Улица","Теплоноситель","Топливо","Нижний геркон","Верхний геркон"];
+    for(const item of (cfg.items||[])){
+      const row=document.createElement("div");row.className="row";
+      const title=document.createElement("span");title.textContent=channels[item.channel]||"Канал";
+      const detail=document.createElement("span");
+      detail.textContent=(item.type||"none")+" · "+(item.gpio>=0?"GPIO "+item.gpio:"нет GPIO")+
+        (item.active?" · подключено":" · не активировано");
+      row.append(title,detail);holder.append(row);
+    }
+ }
  const formatPhases=["Нет запроса","Ожидается подтверждение на дисплее","Запрос в очереди","Форматирование microSD","Проверка чтения/записи","Форматирование завершено","Ошибка форматирования","Отменено на дисплее","Время подтверждения истекло"];
  const phase=numeric(sd.format_state||0);
  const formatActive=phase>=1&&phase<=4;
@@ -393,6 +447,19 @@ function handleAction(b){
  if(action==="zone"){command("zone",{value:$("zone-select").value});return}
  if(action==="clock"){command("clock",{value:$("manual-clock").value.trim()});return}
  if(action==="screen"){command("screen",{value:$("screen-select").value});return}
+ if(action==="connection_set"){
+   command("connection_set",{
+     channel:$("cfg-channel").value,type:$("cfg-type").value,
+     gpio:$("cfg-gpio").value,address:$("cfg-address").value,
+     debounce:$("cfg-debounce").value
+   });return;
+ }
+ if(action==="connection_reset"){
+   command("connection_set",{
+     channel:$("cfg-channel").value,type:"0",
+     gpio:"-1",address:"0",debounce:"50"
+   });return;
+ }
  if(action==="sd_format_prepare"){requestStorageFormat();return}
  command(action);
 }
