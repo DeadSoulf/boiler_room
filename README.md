@@ -1,8 +1,12 @@
-# Boiler Room Touch Panel — v0.6.1
+# Boiler Room Touch Panel — v0.6.2
 
 A standalone GUITION JC4880P443C_I_W boiler-room panel, ESP32-P4 rev v1.3 + ESP32-C6 (ESP-Hosted 2.9.6), 480×800 LVGL portrait display. Source of truth: [GitHub](https://github.com/DeadSoulf/boiler_room).
 
 [Русская документация](README_RU.md) · [Real DS18B20/reed wiring and JP1 GPIOs](docs/real-sensors-v061.md) · [Web UI](docs/web-on-panel.md) · [microSD](docs/microsd-storage.md) · [Safe flashing](docs/flash-panel.md)
+
+## v0.6.2 maintenance update
+
+Retires the unused demo simulator code, keeps seven real-equipment entries explicitly disconnected, and updates regression tests. The v0.6.1 sensor drivers, safety gates and pin assignments are unchanged.
 
 ## Implemented
 
