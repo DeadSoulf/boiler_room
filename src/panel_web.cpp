@@ -15,6 +15,8 @@
 #include "panel_screen.h"
 #include "panel_storage.h"
 #include "panel_config.h"
+#include "panel_sensors.h"
+#include "panel_pin_profile.h"
 #if defined(CONFIG_ESP_WIFI_REMOTE_ENABLED) && CONFIG_ESP_WIFI_REMOTE_ENABLED
 #define BP_WEB_ENABLED 1
 #include <WebServer.h>
@@ -268,10 +270,15 @@ void statusRequest() {
   j+=",\"message\":";jsonQuote(j,storage.message);j+='}';
   panel_config::State cfg;
   const bool hasConfig=panel_config::snapshot(cfg);
+  panel_sensors::Snapshot sensors;
+  const bool hasSensors=panel_sensors::snapshot(sensors);
+  bool anyInputRunning=false;
+  if(hasSensors)for(const auto& c:sensors.channels)if(c.active)anyInputRunning=true;
   j+=",\"connections\":{\"revision\":";
   j+=String(hasConfig?cfg.revision:0);
-  j+=",\"drivers_active\":false,\"message\":";
-  jsonQuote(j,"GPIO drivers not activated until connector mapping verified");
+  j+=",\"drivers_active\":";j+=anyInputRunning?"true":"false";
+  j+=",\"message\":";
+  jsonQuote(j,"JP1 sensor drivers activate only on validated NVS assignments; other controllers remain offline");
   j+=",\"items\":[";
   for(unsigned i=0;i<panel_config::COUNT;i++){
     if(i)j+=',';
@@ -281,7 +288,17 @@ void statusRequest() {
     j+=",\"gpio\":";j+=String(a.gpio);
     j+=",\"address\":";j+=String(a.busAddress);
     j+=",\"debounce_ms\":";j+=String(a.debounceMs);
-    j+=",\"active\":false}";
+    const auto& st=sensors.channels[i];
+    const bool fresh=hasSensors && sensors.configRevision==cfg.revision;
+    j+=",\"active\":";j+=(fresh&&st.active)?"true":"false";
+    j+=",\"online\":";j+=(fresh&&st.valid)?"true":"false";
+    j+=",\"jp1_pin\":";j+=String(panel_pins::connectorPin(a.gpio));
+    j+=",\"last_seen_ms\":";j+=String(fresh?st.lastGoodMs:0);
+    j+=",\"errors\":";j+=String(fresh?st.errors:0);
+    j+=",\"found\":";j+=String(fresh?st.found:0);
+    j+=",\"rom\":";jsonQuote(j,fresh?st.rom:"");
+    j+=",\"status\":";jsonQuote(j,fresh?st.status:"Awaiting sensor worker");
+    j+='}';
   }
   j+="]}";
   j+=",\"service\":{\"free_heap\":";j+=String(snap.freeHeap);
@@ -306,6 +323,13 @@ void commandRequest() {
       errorResponse(409,"sd_format_busy_or_already_attempted");return;
     }
     jsonResponse(202,"{\"ok\":true,\"status\":\"awaiting_physical_confirmation\",\"expires_in_s\":90}");
+    return;
+  }
+  if(kind=="connection_rollback"){
+    if(!panel_config::rollback()){
+      errorResponse(409,"no_valid_previous_configuration");return;
+    }
+    jsonResponse(200,"{\"ok\":true,\"restored_previous\":true}");
     return;
   }
   if(kind=="connection_set"){
