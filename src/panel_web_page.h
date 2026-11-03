@@ -123,7 +123,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 </section>
 <section id="connections" class="page hidden">
 <h2>Подключение устройств / GPIO</h2>
-<div class="notice warn">Конфигурация сохраняется в NVS с резервной записью и проверкой целостности. Драйверы физических GPIO пока не включены: доступность контактов на разъёме JC4880P443 должна быть подтверждена. Никаких ДЕМО и управляющих выходов.</div>
+<div class="notice warn">Конфигурация сохраняется в NVS с резервной записью и проверкой целостности. Драйверы физических GPIO пока не включены: доступность контактов на разъёме JC4880P443 должна быть подтверждена. Управляющие выходы не подключены.</div>
 <div class="card">
   <div class="row"><span>Ревизия конфигурации</span><strong id="cfg-revision">0</strong></div>
   <div class="row"><span>Применение GPIO</span><strong id="cfg-state">Не активировано</strong></div>
