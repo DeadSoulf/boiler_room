@@ -1,5 +1,5 @@
 from pathlib import Path
-import shutil,json,re,importlib.util
+import shutil,json,re,importlib.util,os,hashlib
 from portrait import transform
 root=Path(__file__).resolve().parents[1]
 bsp=root/'.build/bsp'; example=bsp/'examples/LvglUi'
@@ -14,7 +14,11 @@ assert s.count('lvgl@8.3.11')==1
 s=s.replace('lvgl@8.3.11','lvgl@8.3.11\n    '+ow)
 url='https://github.com/pioarduino/platform-espressif32/releases/download/55.03.36-1/platform-espressif32.zip'
 assert s.count(url)==1
-s=s.replace(url,(root/'.build/platform-espressif32.zip').as_uri())
+# Verify the pinned platform archive independently of OS-specific PlatformIO URI handling.
+archive=root/'.build/platform-espressif32.zip'
+assert hashlib.sha256(archive.read_bytes()).hexdigest()=='837ff736b9a088186ecb99a96b830a1eaccc7f16bb0ee6c73c4e76c2ef3d936e'
+# PlatformIO on Windows treats file:///C:/... as /C:/...; use the pinned release URL.
+s=s.replace(url,url if os.name=='nt' else archive.as_uri())
 s,n=re.subn(r'-DCORE_DEBUG_LEVEL=\d+', '-DCORE_DEBUG_LEVEL=0',s)
 assert n==1
 assert 'board_build.f_cpu' not in s
