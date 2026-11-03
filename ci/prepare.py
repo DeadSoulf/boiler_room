@@ -8,6 +8,10 @@ assert board['build']['chip_variant']=='esp32p4_es'
 ini=example/'platformio.ini'; s=ini.read_text()
 assert s.count('lvgl@~8.3.0')==1
 s=s.replace('lvgl@~8.3.0','lvgl@8.3.11')
+# Arduino-ESP32 3.x / IDF 5.x RMT-backed DS18B20 library, fixed commit.
+ow='https://github.com/junkfix/esp32-ds18b20.git#c2aa0147aa7414419fce61e89ed07ef6ff1d535b'
+assert s.count('lvgl@8.3.11')==1
+s=s.replace('lvgl@8.3.11','lvgl@8.3.11\n    '+ow)
 url='https://github.com/pioarduino/platform-espressif32/releases/download/55.03.36-1/platform-espressif32.zip'
 assert s.count(url)==1
 s=s.replace(url,(root/'.build/platform-espressif32.zip').as_uri())
