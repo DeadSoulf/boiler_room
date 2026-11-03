@@ -34,7 +34,7 @@ def main():
             payload[path.relative_to(root).as_posix()] = path.read_bytes()
     payload['SOURCE.txt'] = (f'Boiler Panel {version}\nGitHub commit: {commit}\n'
                              'Target: GUITION JC4880P443 / ESP32-P4 ES v1.3 / 16MB\n'
-                             'Equipment controls: LOCAL DEMONSTRATION ONLY\n'
+                             'Equipment controls: NOT CONNECTED; no actuator commands\n'
                              'Hardware upload and display test: not performed by CI\n').encode()
     payload['START_HERE.txt'] = (
         f'Панель котельной {version} / COM3\n\n'
@@ -42,7 +42,7 @@ def main():
         '2. Прочитайте docs/flash-panel.md. Нужны Python 3.10+ и esptool 5.1.0.\n'
         '3. Запустите scripts/flash_COM3.cmd. Проверки и резервирование выполняются перед записью.\n'
         '4. После успешной записи проверьте версию в Сервисе и экраны Управления.\n\n'
-        'Команды оборудования являются локальной демонстрацией. Реальные выходы не назначены.\n'
+        'Команды управления оборудованием не реализованы. Реальные выходы не назначены.\n'
         'NVS, загрузчик, разделы и C6 не записываются. При несовпадении проверки запись отменяется.\n'
         'Резервные копии сохраняйте на своём компьютере; они могут содержать приватные данные.\n'
     ).encode('utf-8')
