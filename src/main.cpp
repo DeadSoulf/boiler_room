@@ -14,6 +14,7 @@
 #include "panel_web.h"
 #include "panel_storage.h"
 #include "panel_config.h"
+#include "panel_sensors.h"
 #include "panel_screen.h"
 #include "panel_equipment.h"
 #if !LV_USE_BTNMATRIX || !LV_USE_TEXTAREA
@@ -33,8 +34,8 @@ constexpr uint32_t MUTED=0x96ABC1, SKY=0x62CFFF, GREEN=0x66DDB4, AMBER=0xF4C083,
 const char* const PAGES[]={"Главная","Управление","Настройки","Сервис"};
 const char* const SENSOR_NAMES[]={"В котельной","На улице","Теплоноситель","Топливо"};
 const uint32_t ACCENT[]={0x6BDDB5,0x72BDF8,0xF3B876,0xB9A4EF};
-Measurement measurements[CHANNELS]; // Invalid until a future, explicit sensor integration.
-FuelLevel fuelLevel; // No default readings. A hardware adapter must normalize both reeds.
+Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sensor events.
+FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
 lv_obj_t *equipmentFuelTemp=nullptr,*equipmentFuelLevel=nullptr;
 struct FuelLevelLabels {
   lv_obj_t *summary=nullptr,*upper=nullptr,*lower=nullptr,*upperDot=nullptr,*lowerDot=nullptr;
@@ -45,6 +46,7 @@ RadioState radio;
 int page=0, pendingPage=-1, slideDirection=0, view=0;
 uint32_t clicks=0, lastGesture=0, lastTick=0, renderedRevision=0, renderedSignature=0;
 bool rebuild=false, closeDialog=false;
+uint32_t lastSensorConfigRevision=0xffffffffU;
 lv_obj_t *tempValue[CHANNELS]={},*tempState[CHANNELS]={},*tempTrend[CHANNELS]={},*freshBar[CHANNELS]={};
 lv_obj_t *sensorSummary=nullptr,*sensorHint=nullptr,*liveTime=nullptr,*activity=nullptr,*activityDot=nullptr;
 lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText=nullptr,*detailGraph=nullptr;
@@ -749,6 +751,24 @@ void gesture(lv_event_t*){
 }
 void refresh(lv_timer_t*){
   if(closeDialog)dismiss();
+  panel_config::State liveConfig;
+  if(panel_config::snapshot(liveConfig) &&
+     liveConfig.revision!=lastSensorConfigRevision){
+    lastSensorConfigRevision=liveConfig.revision;
+    for(auto& value:measurements)value=Measurement{};
+    fuelLevel.clear();
+    // Drop queued measurements from previous hardware assignments.
+  }
+  panel_sensors::Event sensorEvent;
+  for(unsigned n=0;n<18&&panel_sensors::poll(sensorEvent);n++){
+    if(sensorEvent.revision!=lastSensorConfigRevision)continue;
+    if(sensorEvent.channel<CHANNELS)
+      measurements[sensorEvent.channel].put(sensorEvent.temperature,sensorEvent.atMs);
+    else if(sensorEvent.channel==uint8_t(panel_config::Channel::FuelLower))
+      fuelLevel.lower.put(sensorEvent.reedReached,sensorEvent.atMs);
+    else if(sensorEvent.channel==uint8_t(panel_config::Channel::FuelUpper))
+      fuelLevel.upper.put(sensorEvent.reedReached,sensorEvent.atMs);
+  }
   const bool wasBusy=radio.busy;panel_radio::snapshot(radio);
   if(radio.ready && radio.wifiSupported){
     if(!wifiLogSeen || wifiLogWasOnline!=radio.connected){
@@ -800,7 +820,7 @@ void setup(){
   start=millis();const bool touchOK=board_p4_touch_init()==ESP_OK && board_p4_get_touch_handle()!=nullptr;
   const uint32_t touchMs=millis()-start;
   if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
-  Serial.begin(115200);panel_radio::begin();panel_web::begin();panel_storage::begin();panel_config::begin();
+  Serial.begin(115200);panel_config::begin();panel_sensors::begin();panel_radio::begin();panel_web::begin();panel_storage::begin();
   char timing[180];snprintf(timing,sizeof(timing),"[BoilerPanel] %s equipment=NOT_CONNECTED outputs=NONE display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",VERSION,(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
   panel_storage::event("boot","Panel application started");
 }
