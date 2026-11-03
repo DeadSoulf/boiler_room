@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
-// Persistent definitions only. Hardware adapters are activated separately
-// after verified schematics; this configuration never drives GPIO or relays.
+// Persistent channel bindings. Real sensor inputs are restricted to
+// externally routed, validated JP1 GPIOs. Never controls actuator outputs.
 namespace panel_config {
 enum class Type:uint8_t { None=0,DS18B20=1,ReedNO=2,ReedNC=3,RemoteModbus=4,RemoteMQTT=5 };
 enum class Channel:uint8_t { Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5 };
@@ -21,8 +21,9 @@ bool begin();
 bool snapshot(State& out);
 bool set(Channel channel,Type type,int16_t gpio,uint8_t address,uint16_t debounceMs);
 bool reset(Channel channel);
+bool rollback();
 const char* typeName(Type type);
-// A pin can be allocated only if board profile explicitly permits its physical
-// terminal. No unverified connector GPIOs are enabled by default.
 const char* pinRestriction(int gpio);
+bool isLocal(Type type);
+bool isValid(Channel ch,const Assignment& a);
 } // namespace panel_config
