@@ -138,12 +138,12 @@ class FlashTests(unittest.TestCase):
         # Real ESP-IDF first-install layout: seq=1 with validated CRC, plus
         # an exact 0x00000000 + 0xFF secondary placeholder.
         primary = ota_entry(1, 0xFFFFFFFF)
-        placeholder = b"\\x00" * 4 + b"\\xff" * (0x1000 - 4)
+        placeholder = b"\x00" * 4 + b"\xff" * (0x1000 - 4)
         self.assertEqual(flash.selected_slot(primary + placeholder), 0)
         self.dev = FakeDevice(self.package, primary + placeholder)
         self.assertIsNone(self.run_upload(write=False))
         self.assertEqual(self.dev.writes, [])
-        for other in (ota_entry(2), ota_entry(1, 1), b"\\xff" * 0x1000):
+        for other in (ota_entry(2), ota_entry(1, 1), b"\xff" * 0x1000):
             with self.subTest(first=other[:4]), self.assertRaises(flash.Refusal):
                 flash.selected_slot(other + placeholder)
         mutated = bytearray(placeholder)
