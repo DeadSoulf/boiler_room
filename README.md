@@ -1,32 +1,30 @@
-# Boiler Panel — GUITION JC4880P443 (ESP32-P4 + ESP32-C6)
+# Boiler Room Touch Panel — v0.6.1
 
-**Current firmware: v0.5.8.** This repository is an independent boiler-room touch-panel project. It is not the heater-control firmware or a relay controller.
+A standalone GUITION JC4880P443C_I_W boiler-room panel, ESP32-P4 rev v1.3 + ESP32-C6 (ESP-Hosted 2.9.6), 480×800 LVGL portrait display. Source of truth: [GitHub](https://github.com/DeadSoulf/boiler_room).
 
-[Инструкция на русском](README_RU.md) · [microSD](docs/microsd-storage.md) · [Web interface](docs/web-on-panel.md) · [Safe flashing](docs/flash-panel.md)
+[Русская документация](README_RU.md) · [Real DS18B20/reed wiring and JP1 GPIOs](docs/real-sensors-v061.md) · [Web UI](docs/web-on-panel.md) · [microSD](docs/microsd-storage.md) · [Safe flashing](docs/flash-panel.md)
 
-## What works
+## Implemented
 
-- 480×800 LVGL portrait display, horizontal swipe navigation, first-frame startup, touch wake, configurable backlight timeout.
-- Four temperature channels and two fuel-level reed switch channels, without invented data. Actual electrical sensors are not yet connected.
-- Wi-Fi through the ESP32-C6 ESP-Hosted co-processor (host/C6 firmware 2.9.6), Wi-Fi scan/connect, BLE discovery, time and timezone.
-- Embedded Russian HTTP browser interface with live status, physically initiated pairing for configuration changes. Use **trusted local LAN only**, never expose HTTP port 80 to the internet.
-- Equipment inventory: indirect water heater, electric boiler and three circuits, diesel heater, fuel heater. None is connected to a confirmed actuator controller, so **no physical commands and no simulations** are provided.
-- microSD monitor and bounded logging under `/boiler-panel/logs/` only when mounting a supported filesystem succeeds. No automatic formatting; storage access runs outside the LVGL and networking tasks.
+- Four temperature channels (room, outside, coolant, fuel), freshness, history, minimum/maximum, and two reed fuel-level switches. No fabricated measurements.
+- **v0.6.1 real input drivers:** hardware RMT-backed OneWire DS18B20 (single thermometer per assigned GPIO, ROM and scratchpad CRC checks, delayed conversion), and NO/NC reed contacts (input pull-up, configurable debounce, periodic state refresh). All electrical I/O runs in a separate low-priority task and feeds the LVGL/web data model through a bounded queue.
+- Sensors can only use verified external JP1 header pins: GPIO **52, 33, 51, 31, 50, 30, 49, 29, 34, 32, 28**. Display/touch, ESP32-C6/SDIO, SDMMC, audio, RS-485, UART and BOOT-strapping pins are blocked. See [JP1 pin numbers and wiring](docs/real-sensors-v061.md).
+- The local Russian HTTP UI offers authenticated **Devices** configuration (four temperature channels, two fuel-level contacts, type, GPIO, debounce), real sensor status and DS18B20 ROM, and rollback of the previous NVS configuration. Two NVS slots with integrity verification preserve earlier settings on write failure. The physical display's Date/Time settings and Symbol Check are removed; clock/timezone controls remain in the web UI.
+- ESP32-C6 Wi-Fi and BLE scan, touch wake and screen sleep settings, real SDMMC microSD capacity, free space and bounded event/temperature logs. Manual SD formatting from HTTP always needs separate physical touchscreen confirmation; **no autoformat**.
+- Equipment inventory (indirect hot-water boiler, electric boiler and its three circuits, diesel heater, fuel heater) is marked **not connected** until real external controllers are installed. There are **no simulated device commands** and no physical heat/pump/relay outputs.
 
-## microSD status
+## On-device status — November 3, 2026
 
-The card is connected to P4 SDMMC **Slot 0** (CLK43/CMD44/D0–D3 GPIO39–42), powered by on-chip LDO4. The ESP32-C6 SDIO link uses Slot 1. The BSP already owns LDO4, so the Arduino SD_MMC wrapper must use `setPowerChannel(-1)`.
+Built for ESP32-P4/PIOArduino 55.03.36-1 (Arduino-ESP32 3.3.6; LVGL 8.3.11). The real DS18B20 driver uses the MIT-licensed [esp32-ds18b20](https://github.com/junkfix/esp32-ds18b20) dependency pinned to commit `c2aa0147aa7414419fce61e89ed07ef6ff1d535b`.
 
-**On-device test (Nov 2, 2026):** v0.5.6 boots and Wi-Fi/Web still work, but the inserted card returns `vfs_fat_sdmmc: mount_to_vfs failed (0xffffffff)`. It may use an unsupported filesystem such as exFAT, or there may be a filesystem/read error; capacity and free space are not yet verified, and no log files were written. No card format or erase was attempted. Follow [issue #5](https://github.com/DeadSoulf/boiler_room/issues/5) for nondestructive diagnosis.
+**v0.6.1 successfully flashed** to the P4 application partition via Asus COM3 at 115200 baud after backing up the previous v0.6.0 app. The safe flasher verified the written image byte-by-byte. NVS, C6 firmware, bootloader, partition table and the inserted microSD were not erased.
 
-## Next milestone
+From the physical panel's local address `http://192.168.144.125/` (may change with DHCP): GET `/`, `/health`, `/api/status` all returned HTTP 200, Wi-Fi connected, SD mounted with logging enabled. There are six unassigned sensor channels in NVS (revision 0); as expected, no sensor GPIOs are active. Unauthenticated POSTs to change sensors or roll back configuration return HTTP 401. [Independent sensor safety CI](https://github.com/DeadSoulf/boiler_room/actions/runs/41594675942) passed.
 
-[Issue #4](https://github.com/DeadSoulf/boiler_room/issues/4): Tasmota-like hardware configuration page, exposing only verified, physically available GPIOs, supported sensor types, bus assignments, driver-specific settings, conflict validation, NVS-backed active configuration with rollback, and optional SD backup once the card mounts reliably.
+**Hardware sensor validation is still pending.** No DS18B20 or reed sensor was physically assigned or measured in that smoke test. Real wiring must be verified at 3.3 V; DS18B20 needs an external 4.7 kΩ data pull-up. The present driver requires one DS18B20 per GPIO. Unsupervised reed switches cannot distinguish an open contact from a broken wire.
 
-**Never assign GPIOs reserved for the display, GT911 touch, SDMMC, audio, or ESP-Hosted SDIO. Never enable live boiler/heater outputs without verified wiring, an actual control module and independent safety limits.**
+Modbus RTU/RS-485 and MQTT appear as configuration source types but their hardware/network adapters are not active yet. Live heating outputs are intentionally absent until actual controller wiring and safety protections are verified.
 
-Build environment: PIOArduino 55.03.36-1 / Arduino-ESP32 3.3.6 / LVGL 8.3.11 / ESP32-P4 ES rev1.3 at 360 MHz. The safe flasher only writes the P4 app partition after chip, layout and backup checks; it never overwrites the C6 firmware or NVS.
+## Development
 
-## Manual microSD formatting
-
-Web Service can request one-time FAT preparation. It permanently destroys existing card data and requires an authenticated paired browser, exact confirmation phrase, and a separate physical confirmation button within 90 seconds. No automatic formatting occurs at boot. [Instructions](docs/microSD-format-web.md).
+The active feature branch is `feature/real-sensors-v0.6.1` (draft pull request against v0.6.0). Other project firmware must not be mixed into this board. For manufacturing or destructive SD operations, follow the safety documentation; never flash the ESP32-C6 image directly to the P4 COM3 port.
