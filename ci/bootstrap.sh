@@ -16,8 +16,8 @@ host)
  checkout https://github.com/lvgl/lvgl.git 74d0a816a440eea53e030c4f1af842a94f7ce3d3 .build/lvgl
  g++ -std=c++17 -Wall -Wextra -Isrc tests/model_tests.cpp -o .build/model_tests
  .build/model_tests | tee artifacts/model.log
- g++ -std=c++17 -Wall -Wextra -Werror -pedantic -Isrc tests/equipment_demo_tests.cpp -o .build/equipment_demo_tests
- .build/equipment_demo_tests | tee artifacts/equipment-demo.log
+ g++ -std=c++17 -Wall -Wextra -Werror -pedantic -Isrc tests/equipment_inventory_tests.cpp -o .build/equipment_inventory_tests
+ .build/equipment_inventory_tests | tee artifacts/equipment-inventory.log
  bash tests/run_radio_tests.sh | tee artifacts/radio.log
  g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/display_idle_tests.cpp -o .build/display_tests
  .build/display_tests | tee artifacts/display.log
