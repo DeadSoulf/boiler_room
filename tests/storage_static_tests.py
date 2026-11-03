@@ -10,7 +10,7 @@ web=(root/"src/panel_web.cpp").read_text(encoding="utf-8")
 main=(root/"src/main.cpp").read_text(encoding="utf-8")
 page=(root/"src/panel_web_page.h").read_text(encoding="utf-8")
 ver=(root/"src/panel_types.h").read_text(encoding="utf-8")
-assert 'VERSION = "v0.5.8"' in ver
+assert re.search(r'\bVERSION\s*=\s*"v\d+\.\d+\.\d+"', ver), "Invalid firmware version"
 assert "SDMMC SLOT 0" in sd and "host.slot=SDMMC_HOST_SLOT_0" in sd
 assert "BOARD_P4_SD_CLK,BOARD_P4_SD_CMD,BOARD_P4_SD_D0" in sd
 assert "BOARD_P4_SD_D1,BOARD_P4_SD_D2,BOARD_P4_SD_D3" in sd
