@@ -1,130 +1,176 @@
+// Versioned dual NVS slots; all changes validated and read back before activation.
+// GPIO assignments always belong to physically mapped JP1 sensor pins.
 #include <Arduino.h>
 #include <Preferences.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <string.h>
 #include "panel_config.h"
+#include "panel_pin_profile.h"
 
 namespace panel_config {
 namespace {
 struct Persist {
- uint32_t magic=0, schema=1, revision=0;
- Assignment item[COUNT];
- uint32_t hash=0;
+  uint32_t magic=0,schema=1,revision=0;
+  Assignment item[COUNT];
+  uint32_t hash=0;
 };
-constexpr uint32_t MAGIC=0x42504336; // BPC6
+constexpr uint32_t MAGIC=0x42504336U;
 SemaphoreHandle_t lock=nullptr;
 State current;
 uint8_t activeSlot=0;
 bool ready=false;
+bool sawInvalidStored=false;
 uint32_t fnv(const uint8_t* p,size_t n){
- uint32_t h=2166136261U;
- for(size_t i=0;i<n;i++){h^=p[i];h*=16777619U;}
- return h;
+  uint32_t h=2166136261U;
+  for(size_t i=0;i<n;i++){h^=p[i];h*=16777619U;}
+  return h;
 }
-bool decode(unsigned slot,Persist& entry){
- Preferences prefs;
- if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",true))return false;
- const bool valid=prefs.getBytesLength("config")==sizeof(entry) &&
-   prefs.getBytes("config",&entry,sizeof(entry))==sizeof(entry);
- prefs.end();
- if(!valid||entry.magic!=MAGIC||entry.schema!=1)return false;
- const uint32_t checksum=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
- return checksum==entry.hash;
-}
-bool save(unsigned slot,const State& next){
- Persist entry{};
- entry.magic=MAGIC;entry.schema=1;entry.revision=next.revision;
- for(unsigned i=0;i<COUNT;i++)entry.item[i]=next.item[i];
- entry.hash=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
- Preferences prefs;
- if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false))return false;
- const bool written=prefs.putBytes("config",&entry,sizeof(entry))==sizeof(entry);
- prefs.end();
- Persist check{};
- return written&&decode(slot,check)&&check.hash==entry.hash&&check.revision==entry.revision;
-}
-bool allowedType(Channel ch,Type t) {
- if(uint8_t(t)>uint8_t(Type::RemoteMQTT))return false;
- const bool temp=uint8_t(ch)<4;
- if(t==Type::None)return true;
- return temp?(t==Type::DS18B20||t==Type::RemoteModbus||t==Type::RemoteMQTT):
+bool allowedType(Channel ch,Type t){
+  if(uint8_t(t)>uint8_t(Type::RemoteMQTT))return false;
+  if(t==Type::None)return true;
+  const bool temperature=uint8_t(ch)<4;
+  return temperature?
+    (t==Type::DS18B20||t==Type::RemoteModbus||t==Type::RemoteMQTT):
     (t==Type::ReedNO||t==Type::ReedNC||t==Type::RemoteModbus||t==Type::RemoteMQTT);
+}
+bool checked(const Assignment (&list)[COUNT]){
+  for(unsigned i=0;i<COUNT;i++){
+    if(!isValid(static_cast<Channel>(i),list[i]))return false;
+    if(list[i].gpio<0)continue;
+    for(unsigned j=i+1;j<COUNT;j++){
+      if(list[i].gpio==list[j].gpio)return false;
+    }
+  }
+  return true;
+}
+bool readSlot(unsigned slot,Persist& entry){
+  Preferences prefs;
+  if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",true))return false;
+  const bool have=prefs.getBytesLength("config")==sizeof(entry) &&
+    prefs.getBytes("config",&entry,sizeof(entry))==sizeof(entry);
+  prefs.end();
+  if(!have)return false;
+  if(entry.magic!=MAGIC||entry.schema!=1)return false;
+  const uint32_t h=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
+  if(h!=entry.hash || !checked(entry.item))return false;
+  return true;
+}
+bool writeSlot(unsigned slot,const State& next){
+  Persist entry{};
+  entry.magic=MAGIC;entry.schema=1;entry.revision=next.revision;
+  for(unsigned i=0;i<COUNT;i++)entry.item[i]=next.item[i];
+  entry.hash=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
+  Preferences prefs;
+  if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false))return false;
+  const bool stored=prefs.putBytes("config",&entry,sizeof(entry))==sizeof(entry);
+  prefs.end();
+  Persist verification{};
+  return stored&&readSlot(slot,verification)&&
+         verification.revision==entry.revision&&
+         memcmp(verification.item,entry.item,sizeof(entry.item))==0;
+}
+bool commit(const State& next){
+  const unsigned target=activeSlot^1U;
+  if(!writeSlot(target,next))return false;
+  current=next;
+  activeSlot=target;
+  return true;
 }
 } // namespace
 
-const char* pinRestriction(int gpio){
- if(gpio<0||gpio>54)return "GPIO вне диапазона ESP32-P4";
- switch(gpio){
- case 3:case 5:case 7:case 8:case 23:return "Занят дисплеем или сенсором GT911";
- case 14:case 15:case 16:case 17:case 18:case 19:case 54:return "Зарезервирован для ESP32-C6 / SDIO";
- case 39:case 40:case 41:case 42:case 43:case 44:return "Занят microSD / SDMMC";
- case 9:case 10:case 11:case 12:case 13:case 48:return "Зарезервирован для аудио";
- case 26:case 27:return "Зарезервирован для RS-485";
- case 35:return "Кнопка BOOT";
- case 37:case 38:return "USB/UART";
- default:return "Нет подтверждения доступности на физическом разъёме";
- }
+bool isLocal(Type type){
+  return type==Type::DS18B20||type==Type::ReedNO||type==Type::ReedNC;
 }
-const char* typeName(Type t){
- switch(t){
- case Type::None:return "none";
- case Type::DS18B20:return "ds18b20";
- case Type::ReedNO:return "reed_no";
- case Type::ReedNC:return "reed_nc";
- case Type::RemoteModbus:return "modbus";
- case Type::RemoteMQTT:return "mqtt";
- default:return "invalid";
- }
+const char* pinRestriction(int gpio){
+  const char* restricted=panel_pins::blockReason(gpio);
+  return restricted?restricted:"Available: verified JP1 GPIO";
+}
+bool isValid(Channel ch,const Assignment& a){
+  if(unsigned(ch)>=COUNT||!allowedType(ch,a.type))return false;
+  if(a.debounceMs>5000 || a.busAddress>247)return false;
+  if(isLocal(a.type)){
+    if(!panel_pins::sensorPin(a.gpio) || a.busAddress!=0)return false;
+    if(a.type==Type::DS18B20 && a.debounceMs!=50)return false;
+    return true;
+  }
+  if(a.gpio!=-1)return false;
+  if(a.type==Type::RemoteModbus)return a.busAddress>=1;
+  return a.busAddress==0;
+}
+const char* typeName(Type type){
+  switch(type){
+    case Type::None:return "none";
+    case Type::DS18B20:return "ds18b20";
+    case Type::ReedNO:return "reed_no";
+    case Type::ReedNC:return "reed_nc";
+    case Type::RemoteModbus:return "modbus";
+    case Type::RemoteMQTT:return "mqtt";
+    default:return "invalid";
+  }
 }
 bool begin(){
- if(ready)return true;
- lock=xSemaphoreCreateMutex();
- if(!lock)return false;
- Persist a{},b{};
- const bool validA=decode(0,a),validB=decode(1,b);
- if(validA||validB){
-   activeSlot=(validB&&(!validA||int32_t(b.revision-a.revision)>0))?1:0;
-   const Persist& v=activeSlot?b:a;
-   current.revision=v.revision;
-   for(unsigned i=0;i<COUNT;i++)current.item[i]=v.item[i];
-   snprintf(current.message,sizeof(current.message),"NVS: profile %lu loaded",(unsigned long)v.revision);
- }else{
-   current=State{};
-   snprintf(current.message,sizeof(current.message),"No GPIO assignments; configure in web");
- }
- ready=true;
- return true;
+  if(ready)return true;
+  lock=xSemaphoreCreateMutex();
+  if(!lock)return false;
+  Persist a{},b{};
+  const bool okA=readSlot(0,a),okB=readSlot(1,b);
+  if(okA||okB){
+    activeSlot=(okB&&(!okA||int32_t(b.revision-a.revision)>0))?1:0;
+    const Persist& source=activeSlot?b:a;
+    current.revision=source.revision;
+    for(unsigned i=0;i<COUNT;i++)current.item[i]=source.item[i];
+    snprintf(current.message,sizeof(current.message),"NVS revision %lu verified",
+      (unsigned long)current.revision);
+  }else{
+    current=State{};
+    snprintf(current.message,sizeof(current.message),"No validated sensor connections in NVS");
+  }
+  ready=true;
+  return true;
 }
 bool snapshot(State& out){
- if(!ready||xSemaphoreTake(lock,pdMS_TO_TICKS(5))!=pdTRUE)return false;
- out=current;xSemaphoreGive(lock);return true;
+  if(!ready||xSemaphoreTake(lock,pdMS_TO_TICKS(10))!=pdTRUE)return false;
+  out=current;xSemaphoreGive(lock);return true;
 }
-bool set(Channel ch,Type type,int16_t gpio,uint8_t addr,uint16_t debounce){
- if(!ready||unsigned(ch)>=COUNT||!allowedType(ch,type))return false;
- if(type==Type::DS18B20||type==Type::ReedNO||type==Type::ReedNC){
-   // Design-time assignments until board connector is physically verified.
-   // This firmware deliberately refuses to drive unconfirmed GPIOs.
-   if(gpio<0||gpio>54)return false;
-   if(strcmp(pinRestriction(gpio),"Нет подтверждения доступности на физическом разъёме")!=0)return false;
- }else if(gpio!=-1)return false;
- if(addr>247||debounce>5000)return false;
- if(xSemaphoreTake(lock,pdMS_TO_TICKS(40))!=pdTRUE)return false;
- State next=current;
- for(unsigned i=0;i<COUNT;i++)if(i!=unsigned(ch) && gpio>=0 && next.item[i].gpio==gpio){
-   xSemaphoreGive(lock);return false;
- }
- next.item[unsigned(ch)].type=type;
- next.item[unsigned(ch)].gpio=gpio;
- next.item[unsigned(ch)].busAddress=addr;
- next.item[unsigned(ch)].debounceMs=debounce;
- next.revision++;
- snprintf(next.message,sizeof(next.message),"Saved. GPIO drivers not activated pending connector verification.");
- const unsigned target=activeSlot^1;
- const bool good=save(target,next);
- if(good){current=next;activeSlot=target;}
- xSemaphoreGive(lock);
- return good;
+bool set(Channel ch,Type type,int16_t gpio,uint8_t address,uint16_t debounceMs){
+  if(!ready)return false;
+  Assignment assignment{};
+  assignment.type=type;
+  assignment.gpio=gpio;
+  assignment.busAddress=address;
+  assignment.debounceMs=debounceMs;
+  if(!isValid(ch,assignment))return false;
+  if(xSemaphoreTake(lock,pdMS_TO_TICKS(45))!=pdTRUE)return false;
+  State next=current;
+  next.item[unsigned(ch)]=assignment;
+  if(!checked(next.item)){
+    xSemaphoreGive(lock);return false;
+  }
+  const bool unchanged=memcmp(current.item,next.item,sizeof(next.item))==0;
+  if(unchanged){xSemaphoreGive(lock);return true;}
+  ++next.revision;
+  snprintf(next.message,sizeof(next.message),"NVS saved and verified (rev %lu)",
+       (unsigned long)next.revision);
+  const bool ok=commit(next);
+  xSemaphoreGive(lock);
+  return ok;
 }
-bool reset(Channel ch){return set(ch,Type::None,-1,0,50);}
+bool reset(Channel ch){
+  return set(ch,Type::None,-1,0,50);
+}
+bool rollback(){
+  if(!ready||xSemaphoreTake(lock,pdMS_TO_TICKS(45))!=pdTRUE)return false;
+  Persist previous{};
+  const bool oldValid=readSlot(activeSlot^1U,previous);
+  if(!oldValid || previous.revision==current.revision){
+    xSemaphoreGive(lock);return false;
+  }
+  State restored=current;
+  for(unsigned i=0;i<COUNT;i++)restored.item[i]=previous.item[i];
+  ++restored.revision;
+  snprintf(restored.message,sizeof(restored.message),"Restored previous NVS configuration");
+  const bool ok=commit(restored);
+  xSemaphoreGive(lock);return ok;
+}
 } // namespace panel_config
