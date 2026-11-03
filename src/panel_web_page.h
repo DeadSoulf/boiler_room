@@ -146,17 +146,30 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
     <option value="5">MQTT (требует настроенный брокер)</option>
   </select></div>
   <div class="field"><label for="cfg-gpio">GPIO ESP32-P4 (для локального датчика)</label>
-  <input id="cfg-gpio" type="number" min="-1" max="54" value="-1" step="1">
-  <p class="tiny muted">Пока принимаются только назначения для будущего подключения. Выводы дисплея, GT911, Wi-Fi/C6, SDMMC и аудио заблокированы для работы; GPIO не переключаются.</p></div>
+  <select id="cfg-gpio">
+   <option value="-1">Без GPIO (не назначено / удалённый источник)</option>
+   <option value="52">GPIO52 — JP1 контакт 7</option>
+   <option value="33">GPIO33 — JP1 контакт 8</option>
+   <option value="51">GPIO51 — JP1 контакт 9</option>
+   <option value="31">GPIO31 — JP1 контакт 10</option>
+   <option value="50">GPIO50 — JP1 контакт 11</option>
+   <option value="30">GPIO30 — JP1 контакт 12</option>
+   <option value="49">GPIO49 — JP1 контакт 13</option>
+   <option value="29">GPIO29 — JP1 контакт 14</option>
+   <option value="34">GPIO34 — JP1 контакт 17</option>
+   <option value="32">GPIO32 — JP1 контакт 19</option>
+   <option value="28">GPIO28 — JP1 контакт 21</option>
+  </select>
+  <p class="tiny muted">Только физические выводы JP1. GPIO35 — BOOT, его использовать нельзя. Датчики DS18B20 подключаются по одному на линию с внешней подтяжкой 4,7 кОм к 3,3 В. Герконы — контакт GPIO ↔ GND; обрыв провода обычным входом не диагностируется.</p></div>
   <div class="field"><label for="cfg-address">Адрес Modbus (0–247)</label><input id="cfg-address" type="number" min="0" max="247" value="0"></div>
   <div class="field"><label for="cfg-debounce">Подавление дребезга геркона, мс</label><input id="cfg-debounce" type="number" min="0" max="5000" value="50"></div>
-  <div class="actions"><button class="primary" data-action="connection_set" data-write="1">Сохранить назначение</button><button class="ghost" data-action="connection_reset" data-write="1">Сбросить канал</button></div>
+  <div class="actions"><button class="primary" data-action="connection_set" data-write="1">Применить реальное подключение</button><button class="ghost" data-action="connection_reset" data-write="1">Отключить канал</button><button class="ghost" data-action="connection_rollback" data-write="1">Вернуть прошлую конфигурацию</button></div>
   <p id="cfg-message" class="hint"></p>
 </div>
 <div class="card section">
 <h3>Сохранённые назначения</h3>
 <div id="cfg-table" class="feed muted">Нет конфигурации.</div>
-<p class="tiny muted">Никакие реальные котлы, реле и подогреватели не включаются. На этом этапе сохраняются параметры, но аппаратные драйверы ещё не активированы.</p>
+<p class="tiny muted">Поддерживаются реальные входные датчики на JP1: DS18B20 (один на GPIO) и герконы NO/NC. До подключения датчика статус «Не найден». Modbus/MQTT пока только описываются, без работы драйвера. Реле, котлы и нагреватели не управляются.</p>
 </div>
 </section>
 <section id="service" class="page hidden">
@@ -347,7 +360,7 @@ function updateView(){
  text("sd-message",sd.message||"");
  const cfg=d.connections||{};
  text("cfg-revision",cfg.revision||0);
- text("cfg-state",cfg.drivers_active?"Работает":"Ожидает подтверждения аппаратной схемы");
+ text("cfg-state",cfg.drivers_active?"Считывание входов запущено":"Нет активных местных датчиков");
  text("cfg-message",cfg.message||"");
  const holder=$("cfg-table");if(holder){
     holder.replaceChildren();
@@ -356,8 +369,11 @@ function updateView(){
       const row=document.createElement("div");row.className="row";
       const title=document.createElement("span");title.textContent=channels[item.channel]||"Канал";
       const detail=document.createElement("span");
-      detail.textContent=(item.type||"none")+" · "+(item.gpio>=0?"GPIO "+item.gpio:"нет GPIO")+
-        (item.active?" · подключено":" · не активировано");
+      detail.textContent=(item.type||"none")+" · "+
+        (item.gpio>=0?"GPIO "+item.gpio+" / JP1-"+(item.jp1_pin||"?"):"удалённый вход")+
+        (item.active?(item.online?" · показания получены":" · ожидание датчика"):" · неактивно")+
+        (item.rom?" · ROM "+item.rom:"")+
+        (item.status?" · "+item.status:"");
       row.append(title,detail);holder.append(row);
     }
  }
@@ -454,6 +470,11 @@ function handleAction(b){
      debounce:$("cfg-debounce").value
    });return;
  }
+ if(action==="connection_rollback"){
+   if(confirm("Восстановить предыдущую сохранённую конфигурацию датчиков?"))
+     command("connection_rollback");
+   return;
+ }
  if(action==="connection_reset"){
    command("connection_set",{
      channel:$("cfg-channel").value,type:"0",
@@ -474,6 +495,15 @@ document.addEventListener("click",e=>{
  if(temperature){detail=Number(temperature.dataset.temp);page="home";drawPage();$("temperature-detail").scrollIntoView({behavior:"smooth",block:"nearest"});return}
  const button=target.closest("[data-action]");
  if(button){if(button.disabled)return;handleAction(button)}
+});
+$("cfg-type").addEventListener("change",e=>{
+ const t=Number(e.target.value);
+ $("cfg-gpio").disabled=t===0||t===4||t===5;
+ if($("cfg-gpio").disabled)$("cfg-gpio").value="-1";
+ $("cfg-address").disabled=t!==4;
+ $("cfg-address").value=t===4?"1":"0";
+ $("cfg-debounce").disabled=t!==2&&t!==3;
+ $("cfg-debounce").value="50";
 });
 $("wifi-open").addEventListener("change",e=>{
  const isOpen=e.target.checked;$("wifi-pass").disabled=isOpen;
