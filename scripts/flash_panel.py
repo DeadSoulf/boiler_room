@@ -102,6 +102,12 @@ def selected_slot(data: bytes) -> int:
         require(sector[32:] == b"\xff" * (0x1000 - 32), "Неизвестный формат otadata.")
         seq = struct.unpack_from("<I", sector)[0]
         state, crc = struct.unpack_from("<II", sector, 24)
+        # ESP-IDF initial OTA layout: valid seq=1 in sector 0, uninitialized
+        # sector 1 has seq=0 followed by 0xFF. Accept only this exact case.
+        if offset == 0x1000 and seq == 0 and valid == [1]:
+            require(sector[:32] == b"\x00" * 4 + b"\xff" * 28,
+                    "Неизвестная вторая запись OTA; запись отменена.")
+            continue
         require(0 < seq < 0xFFFFFFFF and zlib.crc32(sector[:4], 0xFFFFFFFF) == crc,
                 "Повреждена запись otadata; автоматическая запись отменена.")
         require(state in (2, 0xFFFFFFFF),
