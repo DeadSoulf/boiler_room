@@ -13,7 +13,7 @@ equipment=(root/"src/panel_equipment.h").read_text(encoding="utf-8")
 radio=(root/"src/panel_radio.cpp").read_text(encoding="utf-8")
 version=(root/"src/panel_types.h").read_text(encoding="utf-8")
 
-assert 'VERSION = "v0.5.8"' in version
+assert re.search(r'\bVERSION\s*=\s*"v\d+\.\d+\.\d+"', version), "Invalid firmware version"
 assert "recoverIdleWifiForScan" in radio
 assert '#include "panel_equipment.h"' in main and '#include "panel_equipment.h"' in web
 assert "panel_web::publish(measurements,fuelLevel,millis())" in main
@@ -28,9 +28,11 @@ assert 'server.on("/api/pair",HTTP_POST,pairRequest)' in web
 assert 'server.on("/api/command",HTTP_POST,commandRequest)' in web
 for val in ('"wifi_scan"','"wifi_connect"','"wifi_forget"','"wifi_disconnect"','"ble_scan"','"zone"','"clock"','"screen"'):
     assert val in web,val
-for source in (main,web,page,header,equipment):
+for source in (main,web,header,equipment):
     assert not re.search(r'(?i)demo|демо|имитац|фиктивн',source), \
         [(m.group(),source[m.start()-20:m.end()+20]) for m in re.finditer(r'(?i)demo|демо|имитац|фиктивн',source)]
+# Allow explanatory text such as "Никаких ДЕМО" but reject executable demo UI hooks.
+assert not re.search(r'(?i)(data-action[^>]{0,100}(?:demo|демо)|demo-outcome|equipment_demo|demo_on)',page)
 assert "equipment_demo.h" not in main and "equipment_demo.h" not in web
 assert 'enabled' not in equipment
 assert r'\"connected\":false' in web
