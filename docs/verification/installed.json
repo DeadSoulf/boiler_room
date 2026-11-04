@@ -23,5 +23,12 @@
   "report": "v0.9.0-hardware-2026-11-04.md",
   "physical_visual_verification": false,
   "real_mqtt_broker_verified": false,
-  "real_pin_success_verified": false
+  "real_pin_success_verified": false,
+  "release_published": true,
+  "release_id": 434361867,
+  "release_published_at": "2026-11-04T19:34:41Z",
+  "package_asset_id": 710667997,
+  "package_bytes": 1000654,
+  "release_digest": "sha256:4947625c3d49d5bcfdc9bf5e1e70f19d8f1b53f3178c43040adb0913086b01ed",
+  "main_contains_installed_source": true
 }
