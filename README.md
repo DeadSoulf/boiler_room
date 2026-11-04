@@ -1,10 +1,16 @@
-# Boiler Room Touch Panel — v0.6.2
+# Boiler Room Touch Panel — v0.7.0 (development)
 
 A standalone GUITION JC4880P443C_I_W boiler-room panel, ESP32-P4 rev v1.3 + ESP32-C6 (ESP-Hosted 2.9.6), 480×800 LVGL portrait display. Source of truth: [GitHub](https://github.com/DeadSoulf/boiler_room).
 
 [Русская документация](README_RU.md) · [Real DS18B20/reed wiring and JP1 GPIOs](docs/real-sensors-v061.md) · [Web UI](docs/web-on-panel.md) · [microSD](docs/microsd-storage.md) · [Safe flashing](docs/flash-panel.md)
 
-## v0.6.2 maintenance update
+## Home Assistant integration — v0.7.0 candidate
+
+Opt-in MQTT Discovery exposes 12 read-only telemetry entities, with physical pairing before broker settings can be saved. Credentials use separate NVS slots and are never returned by the status API. MQTT/TCP is LAN-only without TLS in this first version. No actuators or remote sensor import are enabled.
+
+[Setup and limitations](docs/home-assistant.md) · [PR #16](https://github.com/DeadSoulf/boiler_room/pull/16). ESP32-P4 compilation and dedicated MQTT tests pass. **This candidate has not been installed on the panel or verified against a real broker/Home Assistant. The installed version remains v0.6.2.**
+
+## Previous v0.6.2 maintenance update
 
 Retires the unused demo simulator code, keeps seven real-equipment entries explicitly disconnected, and updates regression tests. The v0.6.1 sensor drivers, safety gates and pin assignments are unchanged.
 
@@ -33,4 +39,4 @@ DS18B20 and reed switches require real 3.3 V wiring, a 4.7 kΩ DS18B20 pull-up a
 
 ## Development
 
-The **default branch `main`** contains the v0.6.2 source that was installed and verified on the panel. Experimental Neon/exFAT work remains in a separate draft PR and must not be confused with the installed release. Other project firmware must not be mixed into this board. For manufacturing or destructive SD operations, follow the safety documentation; never flash the ESP32-C6 image directly to the P4 COM3 port.
+The default branch `main` is the installed v0.6.2 baseline. This feature branch `feature/home-assistant-mqtt-v0.7.0` contains the uninstalled Home Assistant candidate. Experimental Neon/exFAT work remains in a separate draft PR and must not be confused with the installed release. Other project firmware must not be mixed into this board. For manufacturing or destructive SD operations, follow the safety documentation; never flash the ESP32-C6 image directly to the P4 COM3 port.

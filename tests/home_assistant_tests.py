@@ -61,4 +61,5 @@ with tempfile.TemporaryDirectory() as td:
  subprocess.run(['node','--check',str(path)],check=True)
  assert 'addEventListener("submit",saveHA)' in script
  assert 'values.password=""' in script and 'haFormRevision' in script
+subprocess.run(['node',str(r/'tests/ha_web_tests.mjs')],check=True)
 print('PASS: pairing guards, secret redaction, config validation, bounded worker, HTML IDs/JavaScript; no actuator path')

@@ -822,7 +822,7 @@ void setup(){
   start=millis();const bool touchOK=board_p4_touch_init()==ESP_OK && board_p4_get_touch_handle()!=nullptr;
   const uint32_t touchMs=millis()-start;
   if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
-  Serial.begin(115200);panel_config::begin();panel_sensors::begin();panel_radio::begin();panel_web::begin();panel_storage::begin();panel_ha::begin();
+  Serial.begin(115200);panel_config::begin();panel_sensors::begin();panel_radio::begin();panel_storage::begin();panel_ha::begin();panel_web::begin();
   char timing[180];snprintf(timing,sizeof(timing),"[BoilerPanel] %s equipment=NOT_CONNECTED outputs=NONE display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",VERSION,(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
   panel_storage::event("boot","Panel application started");
 }

@@ -49,7 +49,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 </style></head>
 <body><div class="container">
 <header>
- <div class="brand"><div class="mark">°</div><div><h1>КОТЕЛЬНАЯ</h1><p>Boiler Panel <span id="version">v0.5.4</span> · ESP32-P4</p></div></div>
+ <div class="brand"><div class="mark">°</div><div><h1>КОТЕЛЬНАЯ</h1><p>Boiler Panel <span id="version">подключение...</span> · ESP32-P4</p></div></div>
  <div class="toolbar"><span id="net" class="status">Подключение…</span><span id="authstate" class="tag">Только просмотр</span><button id="pairbutton" data-action="show-pair">Сопряжение</button><button id="logout" data-action="logout" class="ghost hidden">Выход</button></div>
 </header>
 <nav>
