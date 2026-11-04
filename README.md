@@ -19,16 +19,18 @@ Retires the unused demo simulator code, keeps seven real-equipment entries expli
 
 ## On-device status — November 3, 2026
 
-Built for ESP32-P4/PIOArduino 55.03.36-1 (Arduino-ESP32 3.3.6; LVGL 8.3.11). The real DS18B20 driver uses the MIT-licensed [esp32-ds18b20](https://github.com/junkfix/esp32-ds18b20) dependency pinned to commit `c2aa0147aa7414419fce61e89ed07ef6ff1d535b`.
+**v0.6.2 is installed on the physical JC4880P443 panel.** An isolated PlatformIO build (PIOArduino 55.03.36-1 / Arduino-ESP32 3.3.6 / LVGL 8.3.11) succeeded. The ESP32-P4 app image is 1,608,224 bytes, SHA-256 `276d5041fb69dfb0babe0d58181564260a61bb5c171928c4d2fa4f1f14711986`.
 
-**v0.6.1 successfully flashed** to the P4 application partition via Asus COM3 at 115200 baud after backing up the previous v0.6.0 app. The safe flasher verified the written image byte-by-byte. NVS, C6 firmware, bootloader, partition table and the inserted microSD were not erased.
+On Asus COM3 (115200 baud), the updater validated the ESP32-P4 v1.3, 16 MB Flash, the current bootloader, partition table and OTA data. A complete previous app0 backup was saved before writing. The initial read-back was interrupted by a transient USB transfer failure; an independent full read of the written image subsequently confirmed **byte-for-byte identity** with the firmware. Partition and OTA metadata were read back unchanged.
 
-From the physical panel's local address `http://192.168.144.125/` (may change with DHCP): GET `/`, `/health`, `/api/status` all returned HTTP 200, Wi-Fi connected, SD mounted with logging enabled. There are six unassigned sensor channels in NVS (revision 0); as expected, no sensor GPIOs are active. Unauthenticated POSTs to change sensors or roll back configuration return HTTP 401. [Independent sensor safety CI](https://github.com/DeadSoulf/boiler_room/actions/runs/41594675942) passed.
+After boot, `GET /`, `GET /health`, and `GET /api/status` returned HTTP 200: firmware version `v0.6.2`, Wi-Fi connected, microSD mounted and logging. All six sensor inputs remain unassigned (`revision=0`, `drivers_active=false`); real DS18B20 and reed wiring is **not yet hardware validated**. There are no physical heating commands or simulated outputs. The installation did not write NVS, the bootloader, partition table, OTA, ESP32-C6 firmware, or the microSD card.
 
-**Hardware sensor validation is still pending.** No DS18B20 or reed sensor was physically assigned or measured in that smoke test. Real wiring must be verified at 3.3 V; DS18B20 needs an external 4.7 kΩ data pull-up. The present driver requires one DS18B20 per GPIO. Unsupervised reed switches cannot distinguish an open contact from a broken wire.
+[Complete hardware verification and SHA-256 evidence](docs/verification/v0.6.2-hardware-2026-11-03.md). Separate sensor, configuration, storage/web and Windows launcher CI checks pass. The general legacy native build workflow still fails on outdated `esp_wifi.h` host mocks; that CI failure is not a successful general CI run.
 
-Modbus RTU/RS-485 and MQTT appear as configuration source types but their hardware/network adapters are not active yet. Live heating outputs are intentionally absent until actual controller wiring and safety protections are verified.
+## Remaining integration
+
+DS18B20 and reed switches require real 3.3 V wiring, a 4.7 kΩ DS18B20 pull-up and physically validated JP1 pin assignments. The present driver requires one DS18B20 per GPIO. Unsupervised reed switches cannot distinguish an open contact from a broken wire. Modbus RTU/RS-485 and MQTT source types are configuration-only; hardware/network adapters are not active. Live heating controls remain absent until an external actuator controller and safety protections are verified.
 
 ## Development
 
-The active feature branch is `feature/real-sensors-v0.6.1` (draft pull request against v0.6.0). Other project firmware must not be mixed into this board. For manufacturing or destructive SD operations, follow the safety documentation; never flash the ESP32-C6 image directly to the P4 COM3 port.
+The **default branch `main`** contains the v0.6.2 source that was installed and verified on the panel. Experimental Neon/exFAT work remains in a separate draft PR and must not be confused with the installed release. Other project firmware must not be mixed into this board. For manufacturing or destructive SD operations, follow the safety documentation; never flash the ESP32-C6 image directly to the P4 COM3 port.
