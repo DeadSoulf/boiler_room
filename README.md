@@ -1,14 +1,20 @@
-# Boiler Room Touch Panel — v0.7.0 (development)
+# Boiler Room Touch Panel — v0.8.0 (calm physical menu candidate)
 
 A standalone GUITION JC4880P443C_I_W boiler-room panel, ESP32-P4 rev v1.3 + ESP32-C6 (ESP-Hosted 2.9.6), 480×800 LVGL portrait display. Source of truth: [GitHub](https://github.com/DeadSoulf/boiler_room).
 
 [Русская документация](README_RU.md) · [Real DS18B20/reed wiring and JP1 GPIOs](docs/real-sensors-v061.md) · [Web UI](docs/web-on-panel.md) · [microSD](docs/microsd-storage.md) · [Safe flashing](docs/flash-panel.md)
 
-## Home Assistant integration — v0.7.0 candidate
+## Calm physical menu — v0.8.0 candidate
+
+[Native LVGL screenshots, before/after and review](docs/calm-menu/README.md). The four roots are Home, Equipment, Fuel and Settings. Secondary details are nested; swipe navigation, the clock, Home and one-level Back are preserved. Native pointer tests and 334 layout checks pass without clipped labels. No device upload was performed. Network/MQTT/sensor/NVS/storage backends and the web UI are unchanged.
+
+This is based on the Home Assistant v0.7.0 feature branch, rather than dropping the already-installed integration by starting from the older main firmware. Review the menu before requesting a separate device update.
+
+## Base: Home Assistant integration v0.7.0
 
 Opt-in MQTT Discovery exposes 12 read-only telemetry entities, with physical pairing before broker settings can be saved. Credentials use separate NVS slots and are never returned by the status API. MQTT/TCP is LAN-only without TLS in this first version. No actuators or remote sensor import are enabled.
 
-[Setup and limitations](docs/home-assistant.md) · [PR #16](https://github.com/DeadSoulf/boiler_room/pull/16). ESP32-P4 compilation and dedicated MQTT tests pass. **This candidate has not been installed on the panel or verified against a real broker/Home Assistant. The installed version remains v0.6.2.**
+[Setup and limitations](docs/home-assistant.md) · [PR #16](https://github.com/DeadSoulf/boiler_room/pull/16). ESP32-P4 compilation and dedicated MQTT tests pass. **The previous task installed v0.7.0 and verified HTTP at 192.168.144.207. MQTT is ready but disabled; a real broker/Home Assistant connection has not been verified. The v0.8.0 menu in this branch is not installed.**
 
 ## Previous v0.6.2 maintenance update
 

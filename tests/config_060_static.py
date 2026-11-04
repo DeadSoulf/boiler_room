@@ -6,8 +6,12 @@ cfg=(root/"src/panel_config.cpp").read_text(encoding="utf-8")
 web=(root/"src/panel_web.cpp").read_text(encoding="utf-8")
 html=(root/"src/panel_web_page.h").read_text(encoding="utf-8")
 types=(root/"src/panel_types.h").read_text(encoding="utf-8")
-assert 'VERSION = "v0.7.0"' in types
-assert 'const char* titles[]={"Wi-Fi","Bluetooth устройства","Экран","Веб-доступ"};' in main
+assert 'VERSION = "v0.8.0"' in types
+# The physical UI now groups connectivity and service; no capabilities removed.
+for title in ('Подключения','Экран','Веб-доступ','Сервис'):
+ assert ('menuRow(body,"'+title+'"') in main,title
+for route in ('case WifiView:wifiPage();','case BleView:blePage();','case WebView:webAccessPage();','case HaView:haPage();'):
+ assert route in main,route
 assert 'Проверка символов' not in main
 assert 'case Time:view=3;' not in main
 assert 'if(kind=="clock")' in web and 'if(kind=="zone")' in web
@@ -28,4 +32,4 @@ js=html.split("<script>",1)[1].split("</script>",1)[0]
 with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)/"app.js";p.write_text(js,encoding="utf-8")
  subprocess.run(["node","--check",str(p)],check=True)
-print("PASS: v0.7.0 navigation, web clock, six-channel NVS dual slots, pin guards, no physical commands")
+print("PASS: v0.8.0 grouped navigation, web clock, six-channel NVS dual slots, pin guards, no physical commands")

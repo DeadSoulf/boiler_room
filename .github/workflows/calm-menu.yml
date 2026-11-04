@@ -1,0 +1,50 @@
+name: Calm physical menu
+on:
+  push:
+    paths: ['src/**', 'tests/calm_ui/**', 'tests/config_060_static.py', 'tests/web_firmware_tests.py', 'tests/sensors_static_tests.py', '.github/workflows/calm-menu.yml']
+  pull_request:
+    paths: ['src/**', 'tests/calm_ui/**', 'tests/config_060_static.py', 'tests/web_firmware_tests.py', 'tests/sensors_static_tests.py', '.github/workflows/calm-menu.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-menu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Fetch exact LVGL 8.3.11
+        run: |
+          mkdir -p .build/lvgl
+          git -C .build/lvgl init
+          git -C .build/lvgl remote add origin https://github.com/lvgl/lvgl.git
+          git -C .build/lvgl fetch --depth=1 origin 74d0a816a440eea53e030c4f1af842a94f7ce3d3
+          git -C .build/lvgl checkout --detach FETCH_HEAD
+          test "$(git -C .build/lvgl rev-parse HEAD)" = 74d0a816a440eea53e030c4f1af842a94f7ce3d3
+      - name: Actual LVGL pointer tests and captures
+        run: |
+          cmake -S tests/calm_ui -B .build/calm-native -DLVGL_DIR="$PWD/.build/lvgl"
+          cmake --build .build/calm-native --parallel 2
+          mkdir -p artifacts/calm-ui
+          set -o pipefail
+          (cd artifacts/calm-ui && ../../.build/calm-native/calm_test) | tee artifacts/calm-ui.log
+          python3 tests/calm_ui/render_preview.py
+      - name: Existing safety and MQTT checks
+        run: |
+          python3 tests/storage_static_tests.py
+          python3 tests/web_firmware_tests.py
+          python3 tests/config_060_static.py
+          python3 tests/sensors_static_tests.py
+          python3 tests/home_assistant_tests.py
+          python3 tests/flash_panel_tests.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: calm-menu-review
+          path: |
+            docs/calm-menu/*.png
+            docs/calm-menu/preview.html
+            artifacts/calm-ui.log
+          retention-days: 14
