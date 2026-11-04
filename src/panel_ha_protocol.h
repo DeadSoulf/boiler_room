@@ -60,7 +60,7 @@ inline bool fresh(const Telemetry& t,unsigned i,uint32_t now){
 }
 struct Entity {const char* key;const char* name;const char* kind;const char* deviceClass;const char* unit;bool diagnostic;};
 constexpr Entity ENTITIES[]={
-  {"room","Температура в котельной","sensor","temperature","°C",false},
+  {"room","Температура в доме","sensor","temperature","°C",false},
   {"outside","Температура на улице","sensor","temperature","°C",false},
   {"coolant","Температура теплоносителя","sensor","temperature","°C",false},
   {"fuel_temp","Температура топлива","sensor","temperature","°C",false},

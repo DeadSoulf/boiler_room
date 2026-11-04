@@ -50,6 +50,28 @@ int main(){
 #else
  assert(!strcmp(PAGES[2],"Топливо")&&!strcmp(PAGES[3],"Настройки"));
  for(unsigned i=0;i<3;i++){assert(tempValue[i]&&strstr(lv_label_get_text(tempValue[i]),"--"));assert(lv_obj_get_style_text_font(tempValue[i],0)==&boiler_font_55);assert(!freshBar[i]&&!tempTrend[i]);}
+ assert(!strcmp(SENSOR_NAMES[0],"В доме")&&find(body,"В доме")&&!find(body,"В котельной"));
+ for(unsigned i=0;i<3;i++){
+   assert(tempIcon[i]&&!lv_obj_has_flag(tempIcon[i],LV_OBJ_FLAG_CLICKABLE));
+   auto* tile=lv_obj_get_parent(tempIcon[i]);lv_area_t pict,value,status,card;
+   lv_obj_get_coords(tile,&card);lv_obj_get_coords(tempIcon[i],&pict);lv_obj_get_coords(tempValue[i],&value);lv_obj_get_coords(tempState[i],&status);
+   lv_area_t unit;lv_obj_get_coords(find(tile,"°C"),&unit);
+   assert(value.y2<unit.y1&&unit.y2<pict.y1&&pict.y2<status.y1&&pict.x1>=card.x1&&pict.x2<=card.x2);
+   // All decorative descendants stay passive, including line widgets.
+   std::vector<lv_obj_t*> nodes{tempIcon[i]};
+   for(size_t n=0;n<nodes.size();n++){
+     assert(!lv_obj_has_flag(nodes[n],LV_OBJ_FLAG_CLICKABLE));
+     lv_area_t a;lv_obj_get_coords(nodes[n],&a);
+     assert(a.x1>=pict.x1&&a.x2<=pict.x2&&a.y1>=pict.y1&&a.y2<=pict.y2);
+     for(unsigned k=0;k<lv_obj_get_child_cnt(nodes[n]);k++)nodes.push_back(lv_obj_get_child(nodes[n],k));
+   }
+   clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);assert(overlay&&detailChannel==int(i));
+   assert(find(overlay,SENSOR_NAMES[i]));touch("Назад");assert(!overlay&&page==0);
+ }
+ for(float value:{-55.0f,0.0f,125.0f}){
+   for(unsigned i=0;i<3;i++){measurements[i].put(value,millis());}updateLive();check();
+ }
+ for(auto& reading:measurements){reading=Measurement{};}updateLive();check();save("home-icons-no-data");
  assert(!tempValue[3]&&fuelCanister.temperature&&fuelCanister.root);
  assert(lv_obj_get_style_text_font(fuelCanister.temperature,0)==&boiler_font_19);
  assert(lv_obj_get_child_cnt(body)==4&&!find(body,"Уровень топлива"));
@@ -116,7 +138,8 @@ int main(){
    }
    measurements[3].put(34.8f,millis());step(1100);check();
  };
- contacts(false,false);assert(fuelLevel.status(millis())==FuelLevelStatus::UpperReached);
+ for(unsigned i=0;i<4;i++)measurements[i].put(values[i],millis());
+ contacts(false,false);save("home-icons-values-fixture");assert(fuelLevel.status(millis())==FuelLevelStatus::UpperReached);
  assert(lv_obj_get_height(fuelCanister.fill)==CANISTER_FILL_HEIGHT&&!lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN));
  assert(!strcmp(lv_label_get_text(fuelCanister.glyph),""));save("canister-full-fixture");
  contacts(true,false);assert(fuelLevel.status(millis())==FuelLevelStatus::Between);
