@@ -142,8 +142,7 @@ void reed(unsigned i,uint32_t now){
   if(d.haveStable&&d.debounced==d.raw&&!due(now,d.due))return;
   d.debounced=d.raw;d.haveStable=true;
   d.due=now+PERIOD_MS; // Refresh stable level within the model's 30s stale window.
-  const bool reached=d.setting.type==panel_config::Type::ReedNO
-     ? !inputHigh : inputHigh;
+  const bool reached=panel_config::reedLevelReached(d.setting.type,inputHigh);
   publish(i,now,0,reached);
   success(i,"Reed stable; wiring not fault-supervised",now);
 }

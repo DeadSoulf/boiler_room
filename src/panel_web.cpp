@@ -1,5 +1,5 @@
 // JC4880P443 ESP32-P4 / Arduino 3.3.6. This is an on-device web server.
-// A physical touch action is required before any HTTP command is accepted.
+// A code displayed only on the physical panel is required before commands.
 // HTTP is NOT encrypted: local trusted LAN only, never port forward.
 #include <Arduino.h>
 #include <sdkconfig.h>
@@ -10,6 +10,8 @@
 #include <time.h>
 #include <string.h>
 #include "panel_web.h"
+#include "panel_pairing.h"
+#include "panel_ha.h"
 #include "panel_radio.h"
 #include "panel_equipment.h"
 #include "panel_screen.h"
@@ -47,19 +49,15 @@ struct Shared {
 Shared latest;
 SemaphoreHandle_t guard=nullptr;
 TaskHandle_t httpTask=nullptr;
-char physicalPin[7]="";
-uint32_t pinExpires=0;
-uint8_t failedCodes=0;
+panel_pairing::State pairing;
 char sessionToken[33]="";
 uint32_t sessionExpires=0;
 
 bool future(uint32_t deadline) {
   return deadline && int32_t(deadline-millis())>0;
 }
-void clearPairingLocked() {
-  memset(physicalPin,0,sizeof(physicalPin));
-  pinExpires=0;failedCodes=0;
-}
+void clearPairingLocked() { pairing.revoke(); }
+
 void clearSessionLocked() {
   memset(sessionToken,0,sizeof(sessionToken));sessionExpires=0;
 }
@@ -121,42 +119,63 @@ bool authorized() {
   xSemaphoreGive(guard);
   return result;
 }
+bool pairingOriginAllowed() {
+  const String base=String("http://")+WiFi.localIP().toString();
+  const String withPort=base+":80";
+  return panel_pairing::localRequest(server.header("X-Boiler-Pairing").c_str(),
+    server.header("Origin").c_str(),base.c_str(),withPort.c_str(),server.header("Sec-Fetch-Site").c_str());
+}
+void pairStartRequest() {
+  if(!pairingOriginAllowed()){errorResponse(403,"same_origin_required");return;}
+  const String ticket=server.arg("request_id");
+  if(ticket.length()!=32||!panel_pairing::ticket32(ticket.c_str())){errorResponse(400,"invalid_request_id");return;}
+  if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE){errorResponse(503,"busy");return;}
+  if(!latest.published||!latest.firstFrameMs){xSemaphoreGive(guard);errorResponse(503,"display_not_ready");return;}
+  char candidate[7];snprintf(candidate,sizeof(candidate),"%06lu",(unsigned long)(100000U+esp_random()%900000U));
+  const auto result=pairing.request(ticket.c_str(),candidate,millis());
+  panel_pairing::wipe(candidate,sizeof(candidate));
+  const uint32_t seconds=pairing.remaining(millis()),retry=pairing.retryAfter(millis());
+  xSemaphoreGive(guard);
+  if(result==panel_pairing::Request::Busy){errorResponse(409,"pairing_in_progress");return;}
+  if(result==panel_pairing::Request::Cooldown){server.sendHeader("Retry-After",String(retry));errorResponse(429,"pairing_rate_limited");return;}
+  if(result==panel_pairing::Request::Invalid){errorResponse(400,"invalid_request");return;}
+  // No code in response, logs, status JSON or MQTT. Starting does not revoke a session.
+  String j="{\"ok\":true,\"display_only\":true,\"expires_in_s\":";j+=String(seconds);j+='}';jsonResponse(202,j);
+}
+void pairCancelRequest() {
+  if(!pairingOriginAllowed()){errorResponse(403,"same_origin_required");return;}
+  const String ticket=server.arg("request_id");
+  if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE){errorResponse(503,"busy");return;}
+  const bool cancelled=pairing.cancel(ticket.c_str(),millis());xSemaphoreGive(guard);
+  jsonResponse(200,cancelled?"{\"ok\":true,\"cancelled\":true}":"{\"ok\":true,\"cancelled\":false}");
+}
 void pairRequest() {
-  const String entered=server.arg("code");
-  if(!allDigits(entered,6,6)){errorResponse(400,"invalid_code");return;}
-  if(!guard || xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE){errorResponse(503,"busy");return;}
-  const bool active=physicalPin[0]&&future(pinExpires)&&failedCodes<5;
-  unsigned char diff=0;
-  for(unsigned i=0;i<6;i++)diff|=uint8_t(entered[i])^uint8_t(physicalPin[i]);
-  if(!active || diff){
-    if(active){++failedCodes;if(failedCodes>=5)clearPairingLocked();}
-    xSemaphoreGive(guard);
-    errorResponse(403,"code_invalid_or_expired");
-    return;
+  if(!pairingOriginAllowed()){errorResponse(403,"same_origin_required");return;}
+  const String entered=server.arg("code"),ticket=server.arg("request_id");
+  if(!allDigits(entered,6,6)||!panel_pairing::ticket32(ticket.c_str())){errorResponse(400,"invalid_code");return;}
+  if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE){errorResponse(503,"busy");return;}
+  const auto result=pairing.verify(ticket.c_str(),entered.c_str(),millis());
+  if(result!=panel_pairing::Verify::Accepted){
+    xSemaphoreGive(guard);errorResponse(result==panel_pairing::Verify::Locked?429:403,
+      result==panel_pairing::Verify::Locked?"pairing_rate_limited":"code_invalid_or_expired");return;
   }
   static const char HEX_CHARS[]="0123456789abcdef";
-  uint8_t secret[16];
-  esp_fill_random(secret,sizeof(secret));
-  for(unsigned i=0;i<sizeof(secret);i++){
-    sessionToken[i*2]=HEX_CHARS[secret[i]>>4];
-    sessionToken[i*2+1]=HEX_CHARS[secret[i]&15];
-  }
-  sessionToken[32]=0;
-  memset(secret,0,sizeof(secret));
-  sessionExpires=millis()+3600000U; // Single session, one hour after physical pairing.
+  uint8_t secret[16];esp_fill_random(secret,sizeof(secret));
+  for(unsigned i=0;i<sizeof(secret);i++){sessionToken[i*2]=HEX_CHARS[secret[i]>>4];sessionToken[i*2+1]=HEX_CHARS[secret[i]&15];}
+  sessionToken[32]=0;panel_pairing::wipe(secret,sizeof(secret));
+  sessionExpires=millis()+3600000U;
   const String token(sessionToken);
-  clearPairingLocked(); // One-use pairing code.
   xSemaphoreGive(guard);
-  String j="{\"ok\":true,\"token\":";
-  jsonQuote(j,token.c_str());
-  j+=",\"expires_in_s\":3600}";
-  jsonResponse(200,j);
+  String j="{\"ok\":true,\"token\":";jsonQuote(j,token.c_str());j+=",\"expires_in_s\":3600}";
+  jsonResponse(200,j); // The accepted challenge was already erased; LVGL hides it next tick.
 }
+
 void statusRequest() {
   Shared snap;
   if(!guard || xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE){errorResponse(503,"busy");return;}
   snap=latest;
-  const bool pairingActive=physicalPin[0]&&future(pinExpires);
+  const bool pairingActive=pairing.active(millis());
+  const uint32_t pairingRemaining=pairing.remaining(millis());
   xSemaphoreGive(guard);
   if(!snap.published){errorResponse(503,"starting");return;}
   const bool admin=authorized();
@@ -175,6 +194,7 @@ void statusRequest() {
   j+=",\"clock\":";jsonQuote(j,clock);
   j+=",\"authorized\":";j+=admin?"true":"false";
   j+=",\"pair_available\":";j+=pairingActive?"true":"false";
+  j+=",\"pair_remaining_s\":";j+=String(pairingRemaining);
   j+=",\"physical_control\":false,\"data_origin\":\"device\"";
   j+=",\"wifi\":{\"connected\":";j+=radio.connected?"true":"false";
   j+=",\"ready\":";j+=radio.ready?"true":"false";
@@ -301,6 +321,25 @@ void statusRequest() {
     j+='}';
   }
   j+="]}";
+  panel_ha::Snapshot ha;
+  panel_ha::snapshot(ha);
+  j+=",\"home_assistant\":{\"ready\":";j+=ha.ready?"true":"false";
+  j+=",\"supported\":";j+=ha.supported?"true":"false";
+  j+=",\"enabled\":";j+=ha.enabled?"true":"false";
+  j+=",\"connected\":";j+=ha.connected?"true":"false";
+  j+=",\"revision\":";j+=String(ha.revision);
+  j+=",\"id\":";jsonQuote(j,ha.id);
+  j+=",\"message\":";jsonQuote(j,ha.message);
+  j+=",\"error_code\":";j+=String(ha.errorCode);
+  j+=",\"connections\":";j+=String(ha.connections);
+  j+=",\"discovery_messages\":";j+=String(ha.discoveryMessages);
+  j+=",\"last_publish_ms\":";j+=String(ha.lastPublishMs);
+  j+=",\"host\":";jsonQuote(j,admin?ha.host:"");
+  j+=",\"port\":";j+=String(admin?ha.port:0);
+  j+=",\"username\":";jsonQuote(j,admin?ha.username:"");
+  j+=",\"discovery_prefix\":";jsonQuote(j,admin?ha.prefix:"");
+  j+=",\"password_set\":";j+=(admin&&ha.passwordSet)?"true":"false";
+  j+=",\"transport\":\"mqtt_tcp_lan_only\",\"read_only\":true}";
   j+=",\"service\":{\"free_heap\":";j+=String(snap.freeHeap);
   j+=",\"display_ms\":";j+=String(snap.displayMs);
   j+=",\"lvgl_ms\":";j+=String(snap.lvglMs);
@@ -313,6 +352,41 @@ void statusRequest() {
 void commandRequest() {
   if(!authorized()){errorResponse(401,"pair_required");return;}
   const String kind=server.arg("action");
+  if(kind=="ha_discover"){
+    if(!panel_ha::requestDiscovery()){errorResponse(409,"ha_disabled_or_unavailable");return;}
+    jsonResponse(202,"{\"ok\":true,\"queued\":true}");return;
+  }
+  if(kind=="ha_save"){
+    const String host=server.arg("host"),user=server.arg("username"),prefix=server.arg("prefix"),
+      port=server.arg("port"),enabled=server.arg("enabled"),mode=server.arg("password_mode"),rev=server.arg("revision");
+    String secret=server.arg("password");
+    if(host.length()>128||user.length()>64||prefix.length()>64||secret.length()>128||
+       host.length()!=strlen(host.c_str())||user.length()!=strlen(user.c_str())||
+       prefix.length()!=strlen(prefix.c_str())||secret.length()!=strlen(secret.c_str())||
+       !allDigits(port,1,5)||asUint(port)==0||asUint(port)>65535||
+       !allDigits(rev,1,10)||strtoull(rev.c_str(),nullptr,10)>0xffffffffULL||
+       (enabled!="0"&&enabled!="1")||(mode!="keep"&&mode!="set"&&mode!="clear")||
+       (enabled=="1"&&server.arg("lan_confirm")!="1")){
+      errorResponse(400,"ha_invalid_fields_or_lan_confirmation");return;
+    }
+    panel_ha::Config request;
+    snprintf(request.host,sizeof(request.host),"%s",host.c_str());
+    snprintf(request.username,sizeof(request.username),"%s",user.c_str());
+    snprintf(request.prefix,sizeof(request.prefix),"%s",prefix.c_str());
+    snprintf(request.password,sizeof(request.password),"%s",secret.c_str());
+    request.enabled=enabled=="1";request.port=uint16_t(asUint(port));
+    const auto passwordMode=mode=="set"?panel_ha::PasswordMode::Set:
+        mode=="clear"?panel_ha::PasswordMode::Clear:panel_ha::PasswordMode::Keep;
+    const auto result=panel_ha::configure(request,passwordMode,uint32_t(strtoull(rev.c_str(),nullptr,10)));
+    panel_ha::wipe(&request,sizeof(request));
+    for(unsigned i=0;i<secret.length();i++)secret.setCharAt(i,0);
+    if(result==panel_ha::SaveResult::Invalid){errorResponse(400,"ha_invalid_or_password_required_for_new_broker");return;}
+    if(result==panel_ha::SaveResult::Conflict){errorResponse(409,"ha_configuration_changed_reload");return;}
+    if(result==panel_ha::SaveResult::StorageError){errorResponse(500,"ha_nvs_write_failed");return;}
+    if(result!=panel_ha::SaveResult::Saved){errorResponse(503,"ha_unavailable");return;}
+    jsonResponse(200,"{\"ok\":true,\"saved\":true}");return;
+  }
+
   if(kind=="sd_format_prepare"){
     // Strict exact phrase from browser + existing physical pairing.
     // This ONLY arms a temporary request; no SD API may be called here.
@@ -420,11 +494,13 @@ void notFound() {
   responseHeaders();server.send(404,"text/plain; charset=utf-8","Не найдено");
 }
 void worker(void*) {
-  const char* headers[]={"Authorization"};
-  server.collectHeaders(headers,1);
+  const char* headers[]={"Authorization","X-Boiler-Pairing","Origin","Sec-Fetch-Site"};
+  server.collectHeaders(headers,4);
   server.on("/",HTTP_GET,homepage);
   server.on("/health",HTTP_GET,[]{responseHeaders();server.send(200,"text/plain; charset=utf-8","ok");});
   server.on("/api/status",HTTP_GET,statusRequest);
+  server.on("/api/pair/start",HTTP_POST,pairStartRequest);
+  server.on("/api/pair/cancel",HTTP_POST,pairCancelRequest);
   server.on("/api/pair",HTTP_POST,pairRequest);
   server.on("/api/command",HTTP_POST,commandRequest);
   server.on("/api/logout",HTTP_POST,logoutRequest);
@@ -464,28 +540,15 @@ bool begin() {
   return false;
 #endif
 }
-bool armPairing() {
-  if(!guard || xSemaphoreTake(guard,pdMS_TO_TICKS(20))!=pdTRUE)return false;
-  clearSessionLocked();
-  clearPairingLocked();
-  const uint32_t pin=100000+esp_random()%900000U;
-  snprintf(physicalPin,sizeof(physicalPin),"%06lu",(unsigned long)pin);
-  pinExpires=millis()+120000U;
-  xSemaphoreGive(guard);
-  return true;
-}
-bool pairingCode(char out[7],uint32_t& remaining) {
+bool pairingCode(char out[7],uint32_t& remaining,uint32_t* generation) {
   if(!out)return false;
-  out[0]=0;remaining=0;
-  if(!guard||xSemaphoreTake(guard,0)!=pdTRUE)return false;
-  const bool active=physicalPin[0]&&future(pinExpires);
-  if(active){
-    snprintf(out,7,"%s",physicalPin);
-    remaining=(uint32_t(pinExpires-millis())+999U)/1000U;
-  }
-  xSemaphoreGive(guard);
-  return active;
+  out[0]=0;remaining=0;if(generation)*generation=0;
+  if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(10))!=pdTRUE)return false;
+  uint32_t current=0;const bool active=pairing.display(out,remaining,current,millis());
+  if(generation)*generation=current;
+  xSemaphoreGive(guard);return active;
 }
+
 void revokePairing() {
   if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(20))!=pdTRUE)return;
   clearPairingLocked();

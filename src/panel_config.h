@@ -6,6 +6,11 @@ namespace panel_config {
 enum class Type:uint8_t { None=0,DS18B20=1,ReedNO=2,ReedNC=3,RemoteModbus=4,RemoteMQTT=5 };
 enum class Channel:uint8_t { Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5 };
 constexpr unsigned COUNT=6;
+// INPUT_PULLUP: open contact = HIGH. Reached is a normalized fuel-height state,
+// NOT physical contact closure. User's open=full float arrangement uses ReedNC.
+inline bool reedLevelReached(Type type,bool inputHigh) {
+  return type==Type::ReedNO ? !inputHigh : inputHigh;
+}
 struct Assignment {
   Type type=Type::None;
   int16_t gpio=-1;

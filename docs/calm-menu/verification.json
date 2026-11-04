@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-04",
+  "candidate": "v0.8.0",
+  "base_commit": "bcb697d21df6ff2ec65f3144cb864e2e3b51ca7a",
+  "native_layout_checks": 334,
+  "clipped_labels": 0,
+  "hardware_uploaded": false,
+  "preview_data": "isolated test fixtures; not live readings",
+  "unchanged_backends": [
+    "src/panel_radio.cpp",
+    "src/panel_ha.cpp",
+    "src/panel_config.cpp",
+    "src/panel_sensors.cpp",
+    "src/panel_storage.cpp",
+    "src/panel_web.cpp",
+    "src/panel_web_page.h",
+    "src/panel_screen.cpp"
+  ],
+  "source_sha256": {
+    "src/main.cpp": "a80a24497474bf56b9fb03ee5af827bd68dc74d7042ad9e26a3af0f468833867",
+    "src/panel_types.h": "26966904afa9bc822f2d86a64f3d32428aebebec29f84332ae98eadb4d99d6fd",
+    "tests/calm_ui/host.cpp": "9de9fd096975efbfaae674d6d001f5264e6cba5a2c06857e02213696c394d403",
+    "tests/calm_ui/fakes.h": "13c38ac35e5ba5ad662c431ca3ad5ce4bcef10255bf3d93513e164f44b39efb3",
+    "tests/calm_ui/CMakeLists.txt": "ee5c82b173955609dcd9ed575bf9a62e2be414a46c0190c5ce20a2c0a9911d7e",
+    "tests/calm_ui/render_preview.py": "35f3c41d5ce6a4b6df95e764fab1ef3f673a555aff9f2ec4387d79696660dabe"
+  },
+  "native_result": "RESULT: 334 layout checks, clipped=0; actual LVGL pointer navigation, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access"
+}

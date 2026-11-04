@@ -8,8 +8,7 @@ namespace panel_web {
 bool begin();
 void publish(const panel::Measurement (&temps)[panel::CHANNELS],
              const panel::FuelLevel &fuel,uint32_t atMs);
-// Physical pairing controls are only called from the touchscreen.
-bool armPairing();
-bool pairingCode(char out[7],uint32_t& remaining);
+// Browser starts a challenge; only LVGL can read this code. Never expose it through HTTP.
+bool pairingCode(char out[7],uint32_t& remaining,uint32_t* generation=nullptr);
 void revokePairing();
 } // namespace panel_web

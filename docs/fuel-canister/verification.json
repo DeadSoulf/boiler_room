@@ -1,0 +1,13 @@
+{
+  "version": "v0.8.1",
+  "installed": false,
+  "base_sha": "b8dc226b9a07c6b7b4ec4f58bd338ee8219d7f1f",
+  "native_result": "RESULT: 347 layout checks, clipped=0; actual LVGL pointer navigation, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access",
+  "input_mode": "ReedNC for both physical contacts; config not changed",
+  "source_sha256": {
+    "src/main.cpp": "7632757e86e5bd0d9f3b5ee344ef1f9184fb3cac3045ff5921e06a7a566ecaa9",
+    "src/panel_config.h": "4e7d59ff2d09f51f18fb5017bac9c7a0299aa0d450ba8962d44b75db7ca726d6",
+    "src/panel_sensors.cpp": "04a6af23d864d6898179a2be7f1ed92fb424fa1b2cc41ff7ef0e338503ce7471",
+    "src/panel_types.h": "220a07a6b9999f8b5f011f2d35d0a3caab322863e79c646c2a1dea22df0f0873"
+  }
+}

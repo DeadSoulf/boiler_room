@@ -20,7 +20,7 @@ assert "panel_web::publish(measurements,fuelLevel,millis())" in main
 assert 'equipment=NOT_CONNECTED outputs=NONE' in main
 assert "panel_equipment::COUNT" in web
 assert "equipmentInfoCard(" in main
-assert "Контроллер не подключён" in main
+assert 'label(state,"Не подключён"' in main and '"Управление недоступно"' in main
 assert "gpio_set_level(" not in web
 assert "digitalWrite(" not in main and "digitalWrite(" not in web
 assert "panel_radio::submit(cmd)" in web

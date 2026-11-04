@@ -1,0 +1,26 @@
+name: Home Assistant MQTT safety
+on:
+  push:
+    paths: ['src/**', 'tests/**', '.github/workflows/ha-mqtt-safety.yml']
+  pull_request:
+    paths: ['src/**', 'tests/**', '.github/workflows/ha-mqtt-safety.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mqtt-telemetry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: MQTT protocol, actual adapter with host fakes, credential and web boundaries
+        run: python3 tests/home_assistant_tests.py
+      - name: Existing hardware safety contracts
+        run: |
+          python3 tests/storage_static_tests.py
+          python3 tests/web_firmware_tests.py
+          python3 tests/config_060_static.py
+          python3 tests/sensors_static_tests.py
+          python3 tests/flash_panel_tests.py
