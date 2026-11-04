@@ -67,7 +67,25 @@ int main(){
  touch("Отключить Wi-Fi");panel_radio::accept=false;touch("Отключить");assert(overlay&&dialogError&&strlen(lv_label_get_text(dialogError))>0);panel_radio::accept=true;touch("Отключить");assert(!overlay&&panel_radio::submitted==sent+1&&panel_radio::last.job==Job::Disconnect);
  touch("<");assert(view==WifiView);touch("<");assert(view==ConnectionsView);
  touch("Home Assistant");assert(view==HaView);save("home-assistant");touch("<");assert(view==ConnectionsView);touch("<");assert(view==Root);
- touch("Веб-доступ");assert(view==WebView);touch("Создать код");step(1100);assert(panel_web::newCodes==1&&strstr(lv_label_get_text(webPairLabel),"123456"));save("pairing-fixture");touch("Отозвать доступ");step(1100);assert(!panel_web::armed);touch("<");
+ // A browser request displays a code left of the clock, even from another page.
+ const char* pairTicket="0123456789abcdef0123456789abcdef";
+ assert(!find(lv_scr_act(),"Веб-доступ"));
+ assert(panel_web::challenge.request(pairTicket,"123456",millis())==panel_pairing::Request::Started);
+ step(300);assert(page==0&&pairBadge&&!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN));
+ assert(!strcmp(lv_label_get_text(pairDigits),"123456"));
+ lv_area_t pinBox,clockBox;lv_obj_get_coords(pairBadge,&pinBox);lv_obj_get_coords(clockLabel,&clockBox);assert(pinBox.x2<clockBox.x1);
+ check();save("pairing-header-fixture");
+ assert(panel_web::challenge.verify(pairTicket,"000000",millis())==panel_pairing::Verify::Rejected);
+ step(200);assert(!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN));
+ assert(panel_web::challenge.verify(pairTicket,"123456",millis())==panel_pairing::Verify::Accepted);
+ step(200);assert(lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN)&&!strlen(lv_label_get_text(pairDigits)));
+ // A remote pairing request wakes the panel, but does not change the persisted timeout.
+ step(31000);panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());
+ assert(panel_web::challenge.request(pairTicket,"654321",millis())==panel_pairing::Request::Started);
+ step(200);assert(panel_screen::awake()&&panel_screen::timeout()==30&&!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN));
+ step(120100);assert(lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN)&&!strlen(lv_label_get_text(pairDigits)));
+ panel_screen::setTimeout(0);
+ go(PAGE_SETTINGS);
  touch("Сервис");assert(view==ServiceView);save("service");touch("microSD");assert(view==StorageView);assert(lv_obj_has_flag(sdFormatAccept,LV_OBJ_FLAG_HIDDEN));save("storage");
  sd.formatPhase=panel_storage::FormatPhase::AwaitingPhysical;sd.formatRemainingSeconds=80;updateStorageLabel();check();save("storage-confirm-fixture");touch("Отмена");assert(panel_storage::cancelled==1&&panel_storage::accepted==0);
  sd.formatPhase=panel_storage::FormatPhase::AwaitingPhysical;updateStorageLabel();touch("Стереть microSD");assert(panel_storage::accepted==1);assert(lv_obj_has_flag(sdFormatAccept,LV_OBJ_FLAG_HIDDEN));
@@ -86,7 +104,7 @@ int main(){
  // Screen wake consumes the first touch rather than activating the underlying tile.
  panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());clickAt(100,260);assert(panel_screen::awake()&&!overlay);clickAt(100,260);assert(overlay);dismiss();panel_screen::setTimeout(0);
  for(int p=0;p<4;p++){go(p);for(int i=0;i<4;i++){swipe();assert(page==(p+i+1)%4);}}
- for(int v:{Root,WifiView,BleView,DisplayView,WebView,ConnectionsView,HaView,ServiceView,StorageView,DiagnosticsView,AboutView,WifiMoreView}){go(PAGE_SETTINGS,v);if(v==DisplayView)save("display");if(v==BleView)save("bluetooth");check();}
+ for(int v:{Root,WifiView,BleView,DisplayView,ConnectionsView,HaView,ServiceView,StorageView,DiagnosticsView,AboutView,WifiMoreView}){go(PAGE_SETTINGS,v);if(v==DisplayView)save("display");if(v==BleView)save("bluetooth");check();}
  go(1,1);save("boiler");go(1,3);save("diesel");go(1,4);save("fuel-heater");
  go(0);
  auto contacts=[&](bool upperClosed,bool lowerClosed){

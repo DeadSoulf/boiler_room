@@ -1,110 +1,45 @@
 #pragma once
-// Served directly from ESP32-P4. No CDN or external HTTP dependencies.
-static const char kBoilerWebPage[] PROGMEM = R"BPHTML(<!doctype html><html lang="ru">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#09121f"><title>Котельная — управление</title>
-<style>
-:root{color-scheme:dark;--bg:#08131f;--card:#15273b;--card2:#101f30;--border:#2b4055;--text:#f1f6fc;--muted:#93a8c0;--sky:#74cbf5;--green:#67ddb3;--amber:#f1bb78;--red:#f49294}
-*{box-sizing:border-box}html{font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
-body{margin:0;min-width:310px;background:radial-gradient(ellipse at 95% -8%,#12354b,transparent 48%),var(--bg);min-height:100vh}
-.container{max-width:1200px;margin:auto;padding:16px clamp(12px,3vw,34px) 70px}
-header{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 0 22px;border-bottom:1px solid var(--border)}
-.brand{display:flex;align-items:center;gap:12px}.mark{display:grid;place-items:center;width:46px;height:46px;background:#1e4354;color:var(--sky);font-size:27px;font-weight:bold;border-radius:14px}
-h1{font-size:clamp(21px,3.5vw,31px);line-height:1.2;margin:0}h2{font-size:20px;margin:0 0 14px}h3{font-size:16px;margin:0 0 10px}
-p{margin:6px 0;color:var(--muted)}.muted,.hint{color:var(--muted)}small{font-size:12px}
-.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.status{border:1px solid var(--border);padding:8px 12px;border-radius:50px;color:var(--amber);font-size:13px}
-.status.ok{color:var(--green)}.tag{font-size:11px;letter-spacing:.04em;color:var(--sky);padding:5px 8px;border:1px solid #31576c;border-radius:7px}
-nav{display:flex;overflow:auto;gap:9px;padding:16px 0;scrollbar-width:thin}
-button{font:inherit;border:1px solid #345369;border-radius:11px;background:#1b3449;color:var(--text);cursor:pointer;padding:10px 14px;min-height:42px}
-button:hover{background:#24455a}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
-button:disabled{opacity:.4;cursor:not-allowed}.active,button.primary{background:#126c82;border-color:#2b94a6;color:white}
-button.danger{background:#593741;border-color:#7a4553}button.ghost{background:#122536}nav button{white-space:nowrap;flex:1;min-width:96px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
-.two{display:grid;grid-template-columns:1.1fr 1fr;gap:13px}
-.card{background:linear-gradient(150deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:17px;padding:20px;min-width:0}
-.temp{min-height:175px;border-top:3px solid var(--accent)}.temp-name{font-weight:600}.temp-value{font-size:clamp(32px,4vw,46px);font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:10px 0}.unit{font-size:17px;color:var(--muted)}.temp-detail{font-size:12px;color:var(--muted)}
-.row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
-.row:last-child{border-bottom:0}.row span:last-child{text-align:right;overflow-wrap:anywhere}
-.stack{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.section{margin-top:24px}.hidden{display:none!important}
-input,select{background:#0b1a2b;color:var(--text);border:1px solid #3b556d;border-radius:9px;font:inherit;padding:11px 12px;width:100%;min-height:42px}
-input[type=checkbox]{width:19px;min-height:19px;accent-color:#3ca3b4}
-label{display:block;color:#b9d0e4;font-size:13px;font-weight:600;margin-bottom:7px}
-.field{margin:10px 0}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
-table{width:100%;border-collapse:collapse}th,td{padding:10px 7px;border-bottom:1px solid var(--border);text-align:left;font-size:13px;overflow-wrap:anywhere}
-tr:last-child td{border-bottom:0}th{color:var(--muted);font-weight:500}
-.footnote,.notice{border:1px solid #305165;background:#132d3e;color:#b8dff2;padding:13px 15px;border-radius:13px;margin:16px 0;font-size:13px}
-.warn{border-color:#68563e;background:#34291e;color:#f0c797}.error{color:#ffafb0}.good{color:var(--green)}
-.details{border:1px dashed #43617b;border-radius:14px;margin-top:14px;padding:16px}
-.badge{font-size:12px;border:1px solid #395772;border-radius:50px;padding:5px 10px;color:var(--muted)}.badge.on{color:var(--green)}
-.detail-chart{min-height:85px;width:100%;display:block;background:#0d1c2c;border-radius:9px;margin-top:9px}
-.feed{max-height:310px;overflow:auto}.event{border-bottom:1px solid var(--border);padding:10px 0}.event:last-child{border:0}
-.equip-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.equip .actions button{flex:1}.equip h3{font-size:16px}
-.tab-row{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.tab-row button{flex:1;min-width:105px}
-#toast{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#23475a;border:1px solid #4b798c;border-radius:12px;padding:12px 20px;z-index:20;box-shadow:0 8px 32px #0008;max-width:92vw;text-align:center;pointer-events:none}
-code{font-size:12px;color:#aadffd;overflow-wrap:anywhere}.tiny{font-size:12px}
-footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap}
-@media(max-width:820px){.two{grid-template-columns:1fr}.equip-list{grid-template-columns:1fr 1fr}}
-@media(max-width:620px){.container{padding:12px 10px 60px}.card{padding:15px;border-radius:13px}.equip-list{grid-template-columns:1fr}.grid{gap:9px}.temp{min-height:145px}.temp-value{font-size:34px}.toolbar{width:100%}.toolbar button{flex:1}nav{gap:5px}nav button{min-width:88px;padding:9px 8px;font-size:12px}}
-</style></head>
-<body><div class="container">
-<header>
- <div class="brand"><div class="mark">°</div><div><h1>КОТЕЛЬНАЯ</h1><p>Boiler Panel <span id="version">подключение...</span> · ESP32-P4</p></div></div>
- <div class="toolbar"><span id="net" class="status">Подключение…</span><span id="authstate" class="tag">Только просмотр</span><button id="pairbutton" data-action="show-pair">Сопряжение</button><button id="logout" data-action="logout" class="ghost hidden">Выход</button></div>
-</header>
-<nav>
-<button data-page="home" class="active">Главная</button>
-<button data-page="equipment">Управление</button>
-<button data-page="fuel">Топливо</button>
-<button data-page="settings">Настройки</button><button data-page="connections">Устройства</button>
-<button data-page="ha">Home Assistant</button>
-<button data-page="service">Сервис</button>
-</nav>
-<div id="pairbox" class="card hidden">
- <h2>Сопряжение с дисплеем</h2>
- <p>На физической панели откройте <b>Настройки → Веб-доступ → Создать новый код</b>. Введите код ниже. Он действует 2 минуты, а доступ — 1 час. Без сопряжения доступны показания.</p>
- <div class="stack"><input style="max-width:180px" id="paircode" inputmode="numeric" maxlength="6" placeholder="Код с дисплея" autocomplete="off"><button data-action="pair" class="primary">Подключить управление</button><button data-action="hide-pair" class="ghost">Закрыть</button></div>
- <p class="tiny">Веб-соединение по HTTP не зашифровано. Используйте только в доверенной локальной сети.</p>
+// Self-contained on-device UI. No CDN, tracking, remote assets or credentials in HTML.
+static const char kBoilerWebPage[] PROGMEM = R"BPHTML(<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101719"><title>Котельная</title><style>
+:root{color-scheme:dark;--bg:#101719;--card:#1b2528;--line:#304044;--ink:#eff5f3;--muted:#a1b3b5;--accent:#76d6c3;--warn:#e7bb78;--red:#ef9f9a;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;font-size:16px}
+*{box-sizing:border-box}html{background:var(--bg);color:var(--ink)}body{margin:0;min-width:320px}button,input,select{font:inherit}button{color:var(--ink);background:#26373b;border:1px solid transparent;border-radius:12px;padding:12px 18px;min-height:46px;cursor:pointer;transition:background .15s}button:hover{background:#33494e}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:#245d55;border-color:#3b8b7c}.primary:hover{background:#30786b}.danger{background:#593738;border-color:#825453}.ghost{background:transparent;border-color:var(--line)}.hidden{display:none!important}
+.container{max-width:1180px;margin:0 auto;padding:32px 28px 26px}header{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:32px}h1{margin:0;font-size:32px;font-weight:600;letter-spacing:-.025em}h2{margin:0 0 24px;font-size:24px;font-weight:550}h3{font-size:18px;font-weight:550;margin:0 0 18px}p{color:var(--muted);line-height:1.55;margin:12px 0}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.header-meta{display:flex;align-items:center;gap:14px}.header-time{font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}.status,.badge,.tag{font-size:12px;color:var(--muted);padding:6px 0}.status.ok,.good{color:var(--accent)}.tag{border-left:1px solid var(--line);padding-left:14px}.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.topnav{display:flex;gap:8px;padding-bottom:22px;margin-bottom:30px;border-bottom:1px solid var(--line)}.topnav button{background:transparent;color:var(--muted);padding:12px 20px}.topnav button.active{color:var(--ink);background:#26373b}.topnav button:hover{color:var(--ink)}.page{animation:appear .16s ease-out}@keyframes appear{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px;min-width:0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}.temp{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-height:290px;padding:24px;border:1px solid var(--line);background:var(--card)}.temp:hover{background:#233136;border-color:#52766d}.temp-name{color:var(--muted);font-size:15px;font-weight:400}.temp-value{font-size:clamp(30px,3.1vw,43px);font-weight:500;letter-spacing:-.04em;white-space:nowrap;line-height:1.2;margin:auto 0 12px;font-variant-numeric:tabular-nums}.temp-detail{color:var(--muted);font-size:12px;min-height:18px}.temp-fuel .temp-value{font-size:18px;letter-spacing:0;margin:13px 0 4px}.temp-fuel .temp-detail{margin-top:auto}.canister{height:152px;width:130px;align-self:center;color:var(--muted);margin:6px 0}.canister[data-state=full]{color:var(--accent)}.canister[data-state=half]{color:var(--warn)}.canister[data-state=empty],.canister[data-state=invalid]{color:var(--red)}.can-fill{fill:currentColor}.can-outline{stroke:currentColor;fill:none;stroke-width:3}.can-symbol{fill:currentColor;font-size:42px;font-weight:550}.can-cross{stroke:var(--bg);stroke-width:3;fill:none}.section{margin-top:24px}.row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid var(--line);font-size:14px}.row:last-child{border-bottom:0}.row>span:first-child{color:var(--muted)}.row>:last-child{text-align:right;overflow-wrap:anywhere}.stack,.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.actions{margin:20px 0 8px}.actions button{max-width:100%}.field{margin:20px 0}label{display:block;color:var(--muted);font-size:13px;margin-bottom:8px}input,select{display:block;background:#101b1e;border:1px solid #40575c;border-radius:10px;color:var(--ink);width:100%;max-width:100%;min-height:46px;padding:12px}input[type=checkbox]{width:20px;min-height:20px;accent-color:var(--accent);flex-shrink:0}.stack select{flex:1;min-width:160px}.tiny,small{font-size:12px;line-height:1.55}.muted,.hint{color:var(--muted)}.hint{font-size:13px}.hint:empty{display:none}.notice,.footnote{font-size:13px;line-height:1.6;color:var(--muted);padding:16px 18px;background:#182528;border:1px solid var(--line);border-radius:12px;margin:20px 0}.warn{color:#eacfa8;border-color:#66543d;background:#29251f}.error{color:var(--red)}.details{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:20px}summary{cursor:pointer;color:var(--ink);padding:6px 0;line-height:1.5}details>summary{min-height:40px}.danger-zone{border-color:#73484a}details[open]>summary{margin-bottom:14px}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.menu-item{display:grid;grid-template-columns:1fr auto;gap:9px;text-align:left;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:17px}.menu-item strong{font-size:18px;font-weight:500}.menu-item span{font-size:13px;color:var(--muted);grid-row:2}.menu-item b{grid-column:2;grid-row:1/3;align-self:center;color:var(--muted);font-weight:400}.subhead{display:flex;align-items:center;gap:18px;margin:0 0 24px}.subhead h2{margin:0}.subhead button{background:transparent;border:1px solid var(--line)}.tab-row{display:none}.feed{max-height:320px;overflow:auto}.feed>button{min-height:56px}.equip-list{display:grid;grid-template-columns:1fr 1fr;gap:16px}.equip{padding:24px}.equip h3{margin-bottom:10px}.equip p{font-size:13px;margin:0}.equip .error{color:var(--muted)}.equip .tiny{display:none}.detail-chart{display:block;width:100%;height:140px;background:#122025;border-radius:12px;margin:20px 0}.fuel-summary-value{font-size:30px;font-weight:500}.service-grid{margin-top:20px}code{overflow-wrap:anywhere;font-size:12px;color:#b9ded7}footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:38px;padding-top:20px;font-size:12px;color:var(--muted)}
+dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-radius:22px;padding:30px;width:min(460px,calc(100% - 32px));max-height:90vh;overflow:auto}dialog::backdrop{background:#050a0dd9;backdrop-filter:blur(4px)}dialog h2{margin-bottom:12px}.pair-dialog input{text-align:center;font-size:30px;letter-spacing:.28em;font-variant-numeric:tabular-nums}.pair-dialog .actions button{flex:1}.pair-dialog .close-modal{float:right;min-height:40px;padding:8px 12px;background:transparent}.pair-symbol{height:44px;width:44px;border:1px solid #3a7167;border-radius:12px;display:grid;place-items:center;margin-bottom:22px;color:var(--accent)}#pair-error{min-height:20px;font-size:13px}.pair-dialog .tiny{margin-bottom:0}#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);padding:14px 20px;border:1px solid #42625a;background:#203c35;color:var(--ink);border-radius:12px;max-width:calc(100% - 32px);z-index:100;box-shadow:0 5px 25px #0006;text-align:center;font-size:14px;pointer-events:none}
+@media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.temp{min-height:255px}.temp-value{font-size:42px}.header-meta{display:none}}
+@media(max-width:680px){.container{padding:22px 16px}header{align-items:flex-start;gap:16px;margin-bottom:24px}h1{font-size:27px}.toolbar{justify-content:flex-end;gap:8px}.toolbar .tag{display:none}.toolbar button{padding:10px 13px;min-height:44px}.topnav{gap:3px;justify-content:space-between;margin-bottom:24px;padding-bottom:16px}.topnav button{font-size:13px;padding:10px 9px;min-height:44px}.grid{gap:12px}.temp{padding:18px;min-height:245px}.temp-value{font-size:32px}.temp-name{font-size:13px}.canister{height:137px;width:112px}.temp-fuel .temp-value{font-size:17px}.two,.equip-list,.menu-grid{grid-template-columns:1fr}.card{padding:20px}.temp.card{padding:18px}.menu-item{padding:20px}.subhead{gap:10px}.subhead h2{font-size:22px}.row{gap:12px}.row>:last-child{max-width:60%}.actions button{flex:1 1 auto}footer{font-size:11px}.notice{padding:14px}dialog{padding:24px}.header-time{font-size:13px}}
+@media(max-width:380px){.topnav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.temp-value{font-size:28px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body><div class="container">
+<header><div><p class="eyebrow">Панель дома</p><h1>Котельная</h1></div><div class="header-meta"><span class="header-time" id="clock">--:--</span></div><div class="toolbar"><span id="authstate" class="tag">Просмотр</span><button id="pairbutton" class="primary" data-action="show-pair">Сопряжение</button><button id="logout" class="ghost hidden" data-action="logout">Завершить доступ</button></div></header>
+<nav class="topnav" aria-label="Разделы"><button data-page="home" class="active">Главная</button><button data-page="equipment">Оборудование</button><button data-page="fuel">Топливо</button><button data-page="settings">Настройки</button></nav>
+<dialog id="pairbox" class="pair-dialog" aria-labelledby="pair-title"><button class="close-modal" data-action="hide-pair" aria-label="Отменить сопряжение">×</button><div class="pair-symbol" aria-hidden="true">⌁</div><h2 id="pair-title">Сопряжение</h2><p id="pair-message">Запрашиваем код на дисплее…</p><form id="pair-form"><label for="paircode">Код с физической панели</label><input id="paircode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="······" required><p id="pair-error" class="error" role="alert"></p><p id="pair-expiry" class="tiny"></p><div class="actions"><button type="button" class="ghost" data-action="pair-retry">Новый код</button><button type="submit" class="primary" id="pair-submit" disabled>Подключить</button></div></form><p class="tiny">Доступ на 1 час. HTTP не шифруется — только доверенная локальная сеть.</p></dialog>
+<section id="home" class="page"><div class="grid">
+<button class="card temp" data-temp="0"><span class="temp-name">В котельной</span><span class="temp-value" id="t0">--.- °C</span><span class="temp-detail" id="tstate0">Нет данных</span></button>
+<button class="card temp" data-temp="1"><span class="temp-name">На улице</span><span class="temp-value" id="t1">--.- °C</span><span class="temp-detail" id="tstate1">Нет данных</span></button>
+<button class="card temp" data-temp="2"><span class="temp-name">Теплоноситель</span><span class="temp-value" id="t2">--.- °C</span><span class="temp-detail" id="tstate2">Нет данных</span></button>
+<button class="card temp temp-fuel" data-page="fuel"><span class="temp-name">Топливо</span><span class="temp-value" id="t3">--.- °C</span><svg id="fuel-canister" class="canister" data-state="unknown" viewBox="0 0 120 148" role="img" aria-label="Уровень топлива: нет данных"><title id="canister-title">Нет данных</title><rect id="canister-fill" class="can-fill" x="18" y="136" width="84" height="0" rx="5"/><g class="can-outline"><rect x="12" y="24" width="96" height="118" rx="10"/><path d="M62 24V4H99V24M21 18V10H41V18Z"/></g><path id="canister-cross" class="can-cross" d="M43 62L78 104M78 62L43 104" visibility="hidden"/><text id="canister-symbol" class="can-symbol" x="60" y="101" text-anchor="middle">?</text></svg><span class="temp-detail" id="tstate3">Нет данных</span></button>
 </div>
-<section id="home" class="page">
- <div class="stack" style="justify-content:space-between"><h2>Температуры</h2><span id="clock" class="muted">Время не установлено</span></div>
- <div class="grid">
- <button class="card temp" style="--accent:#65ddb1;text-align:left" data-temp="0"><div class="temp-name">В котельной</div><div class="temp-value" id="t0">--.- °C</div><div class="temp-detail" id="tstate0">Нет данных</div></button>
- <button class="card temp" style="--accent:#71bff8;text-align:left" data-temp="1"><div class="temp-name">На улице</div><div class="temp-value" id="t1">--.- °C</div><div class="temp-detail" id="tstate1">Нет данных</div></button>
- <button class="card temp" style="--accent:#f3bf81;text-align:left" data-temp="2"><div class="temp-name">Теплоноситель</div><div class="temp-value" id="t2">--.- °C</div><div class="temp-detail" id="tstate2">Нет данных</div></button>
- <button class="card temp" style="--accent:#b7a4ed;text-align:left" data-temp="3"><div class="temp-name">Топливо</div><div class="temp-value" id="t3">--.- °C</div><div class="temp-detail" id="tstate3">Нет данных</div><div class="temp-detail" id="fuel-summary">Уровень: нет данных</div></button>
- </div>
- <div id="temperature-detail" class="card section hidden"><div class="stack" style="justify-content:space-between"><h2 id="detail-title">Температура</h2><button data-action="close-detail">Закрыть</button></div>
- <div id="detail-meta" class="muted">История измерений недоступна.</div><svg id="detail-chart" class="detail-chart" viewBox="0 0 400 100" preserveAspectRatio="none" aria-label="График измерений"></svg><div id="detail-stats" class="muted tiny"></div></div>
- <div class="card section"><h3>Общая информация</h3><div class="row"><span>Уровень топлива</span><b id="home-fuel">Нет данных</b></div><div class="row"><span>Wi-Fi</span><span id="home-wifi">Неизвестно</span></div><div class="row"><span>Источники измерений</span><span>Не назначены (показываются только реальные данные)</span></div></div>
-</section>
-<section id="equipment" class="page hidden">
- <h2>Оборудование котельной</h2><div class="notice warn">Контроллеры оборудования ещё не подключены. Доступно отображение состава и статуса подключения. Команды включения и выключения отсутствуют.</div>
- <div class="equip-list section" id="equipment-list"></div>
-</section>
-<section id="fuel" class="page hidden">
- <h2>Топливо</h2>
- <div class="two"><div class="card"><h3>Уровень по двум герконам</h3>
- <div class="row"><span>Общий уровень</span><strong id="fuel-status">Нет данных</strong></div>
- <div class="row"><span>Нижний датчик</span><span id="lower-status">Нет данных</span></div>
- <div class="row"><span>Верхний датчик</span><span id="upper-status">Нет данных</span></div>
- <p class="tiny">Проценты и литры не рассчитываются: герконы дают только два порога.</p></div>
- <div class="card"><h3>Подогрев топлива — до 80 °C</h3><div class="row"><span>Температура</span><b id="fuel-temp">--.- °C</b></div><div class="row"><span>Контроллер подогрева</span><strong id="fuel-controller">Не подключён</strong></div>
- <p class="tiny">80 °C — проектное требование, не подтверждённая уставка исполнительного регулятора.</p>
- <button class="ghost" data-temp="3">История температуры</button></div></div>
-</section>
+<div id="temperature-detail" class="card section hidden"><div class="stack" style="justify-content:space-between"><h2 id="detail-title">Температура</h2><button data-action="close-detail" class="ghost">Закрыть</button></div><p id="detail-meta"></p><svg id="detail-chart" class="detail-chart" viewBox="0 0 400 100" preserveAspectRatio="none" aria-label="История измерений"></svg><p id="detail-stats" class="tiny"></p></div></section>
+<section id="equipment" class="page hidden"><h2>Оборудование</h2><div class="equip-list" id="equipment-list"></div><p class="tiny">Управление появится после подключения и проверки исполнительных контроллеров.</p></section>
+<section id="fuel" class="page hidden"><h2>Топливо</h2><div class="two"><div class="card"><h3>Уровень</h3><p id="fuel-status" class="fuel-summary-value">Нет данных</p><div class="row"><span>Нижний датчик</span><span id="lower-status">Нет данных</span></div><div class="row"><span>Верхний датчик</span><span id="upper-status">Нет данных</span></div><details><summary>Как определяется уровень</summary><p class="tiny">Два геркона дают три состояния, без расчёта литров. Для принятой схемы контактов используйте режим NC: оба разомкнуты — полная канистра; замкнут верхний — половина; замкнуты оба — пустая. Обрыв провода неотличим от размыкания контакта.</p></details></div><div class="card"><h3>Температура и подогрев</h3><div class="row"><span>Температура топлива</span><b id="fuel-temp">--.- °C</b></div><div class="row"><span>Контроллер подогрева</span><span id="fuel-controller">Не подключён</span></div><button class="ghost section" data-temp="3">История температуры</button><p class="tiny">До 80 °C — требование проекта, не действующая уставка. Команд нагрева нет.</p></div></div></section>
 <section id="settings" class="page hidden">
- <h2>Настройки</h2>
- <div class="tab-row" id="tabs">
- <button data-tab="wifi" class="active">Wi-Fi</button><button data-tab="ble">Bluetooth</button><button data-tab="clock">Часы</button><button data-tab="screen">Экран</button><button data-tab="web">Веб-доступ</button>
- </div>
+ <h2>Настройки</h2><div id="settings-menu" class="menu-grid">
+<button class="menu-item" data-tab="wifi"><strong>Wi-Fi</strong><span>Сеть и подключение</span><b>›</b></button>
+<button class="menu-item" data-tab="screen"><strong>Экран</strong><span>Сон и пробуждение</span><b>›</b></button>
+<button class="menu-item" data-tab="ble"><strong>Bluetooth</strong><span>Устройства поблизости</span><b>›</b></button>
+<button class="menu-item" data-tab="clock"><strong>Часы</strong><span>Время и часовой пояс</span><b>›</b></button>
+<button class="menu-item" data-page="ha"><strong>Home Assistant</strong><span>Подключение через MQTT</span><b>›</b></button>
+<button class="menu-item" data-page="connections"><strong>Датчики</strong><span>Назначения и контакты JP1</span><b>›</b></button>
+<button class="menu-item" data-page="service"><strong>Сервис</strong><span>microSD, диагностика, версия</span><b>›</b></button>
+</div><div id="settings-back" class="subhead hidden"><button data-action="settings-root" aria-label="Назад к настройкам">‹ Настройки</button></div>
  <div id="tab-wifi" class="tab card"><h3>Wi-Fi · 2.4 ГГц</h3>
  <div class="row"><span>Соединение</span><strong id="wifi-connected">Не подключено</strong></div>
  <div class="row"><span>SSID</span><span id="wifi-ssid">Доступно после сопряжения</span></div>
  <div class="row"><span>IP</span><span id="wifi-ip">—</span></div>
  <div class="row"><span>RSSI</span><span id="wifi-rssi">—</span></div>
  <p class="hint" id="wifi-message"></p>
- <div class="actions"><button data-action="wifi_scan" data-write="1">Найти сети</button><button data-action="wifi_disconnect" data-write="1">Отключить</button><button class="danger" data-action="wifi_forget" data-write="1">Забыть сеть</button></div>
+ <div class="actions"><button class="primary" data-action="wifi_scan" data-write="1">Найти сети</button></div><details class="details"><summary>Отключение и удаление сети</summary><div class="actions"><button data-action="wifi_disconnect" data-write="1">Отключить</button><button class="danger" data-action="wifi_forget" data-write="1">Забыть сеть</button></div></details>
  <div class="field"><label>Найденные сети</label><div id="ap-list" class="feed"><p class="muted">Нажмите «Найти сети»</p></div></div>
  <form id="wifi-form" autocomplete="off"><div class="field"><label for="ssid">SSID (до 32 байт)</label><input id="ssid" name="ssid" maxlength="32" required placeholder="Имя сети"></div>
  <div class="field"><label for="wifi-pass">Пароль сети</label><input id="wifi-pass" name="password" type="password" autocomplete="new-password" maxlength="64" placeholder="WPA2/WPA3 пароль"></div>
@@ -117,14 +52,10 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
  <div id="tab-screen" class="tab card hidden"><h3>Подсветка и пробуждение касанием</h3><div class="row"><span>Текущий таймер</span><b id="screen-current">Не выключать</b></div>
  <div class="row"><span>Сенсор касаний</span><span id="touch-ready">—</span></div><div class="field"><label for="screen-select">Выключение после бездействия</label><select id="screen-select"><option value="0">Не выключать</option><option value="30">30 секунд</option><option value="60">1 минута</option><option value="120">2 минуты</option><option value="300">5 минут</option><option value="600">10 минут</option><option value="1800">30 минут</option></select></div>
  <button data-action="screen" data-write="1">Сохранить таймер</button><p id="screen-message" class="hint"></p><p class="muted tiny">Первое касание только пробуждает экран. Wi-Fi и сам контроллер продолжают работать.</p></div>
- <div id="tab-web" class="tab card hidden"><h3>Веб-доступ</h3><div class="row"><span>Режим</span><span id="web-auth">Только просмотр</span></div>
- <p>Для управления создайте одноразовый код на физическом дисплее: <b>Настройки → Веб-доступ</b>, затем нажмите «Сопряжение» вверху браузера. Сессия — 1 час.</p>
- <button data-action="show-pair">Ввести код с дисплея</button>
- <div class="notice warn">Обычный HTTP в локальной сети не шифруется. Не включайте перенаправление порта 80 на маршрутизаторе.</div></div>
 </section>
 <section id="connections" class="page hidden">
-<h2>Подключение устройств / GPIO</h2>
-<div class="notice warn">Конфигурация сохраняется в NVS с резервной записью и проверкой целостности. Драйверы физических GPIO пока не включены: доступность контактов на разъёме JC4880P443 должна быть подтверждена. Управляющие выходы не подключены.</div>
+<div class="subhead"><button data-action="settings-root">‹ Настройки</button><h2>Датчики</h2></div>
+<div class="notice warn">Настройка входных датчиков на JP1. Подключайте только согласованные цепи 3,3 В. Управляющие выходы не подключены.</div>
 <div class="card">
   <div class="row"><span>Ревизия конфигурации</span><strong id="cfg-revision">0</strong></div>
   <div class="row"><span>Применение GPIO</span><strong id="cfg-state">Не активировано</strong></div>
@@ -141,8 +72,8 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
   <select id="cfg-type">
     <option value="0">Не назначено</option>
     <option value="1">DS18B20 / OneWire (только температура)</option>
-    <option value="2">Геркон NO (только уровень)</option>
-    <option value="3">Геркон NC (только уровень)</option>
+    <option value="2">Геркон NO: замкнут = достигнут</option>
+    <option value="3">Геркон NC: разомкнут = достигнут</option>
     <option value="4">Modbus RTU / RS-485 (требует контроллер)</option>
     <option value="5">MQTT (требует настроенный брокер)</option>
   </select></div>
@@ -174,7 +105,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 </div>
 </section>
 <section id="ha" class="page hidden">
- <h2>Home Assistant</h2>
+ <div class="subhead"><button data-action="settings-root">‹ Настройки</button><h2>Home Assistant</h2></div>
  <div class="notice">Панель передаёт показания через MQTT Discovery. Нужен MQTT-брокер, подключённый к Home Assistant. Это не адрес веб-интерфейса HA (порт 8123). Управление нагревом и реле не передаётся.</div>
  <div class="two"><div class="card">
   <h3>Состояние интеграции</h3>
@@ -200,7 +131,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
  </form></div>
 </section>
 <section id="service" class="page hidden">
-<h2>Сервис</h2><div class="two">
+<div class="subhead"><button data-action="settings-root">‹ Настройки</button><h2>Сервис</h2></div><details class="details"><summary>Диагностика ESP32-P4 / ESP32-C6</summary><div class="two service-grid">
 <div class="card"><h3>ESP32-P4</h3>
 <div class="row"><span>Версия панели</span><b id="service-version">—</b></div>
 <div class="row"><span>Время работы</span><b id="uptime">—</b></div>
@@ -214,7 +145,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 <div class="row"><span>Wi-Fi</span><span id="service-wifi">—</span></div>
 <div class="row"><span>IP панели</span><span id="service-ip">—</span></div>
 <div class="row"><span>Действие веб-сервера</span><span>Наблюдение + сопряжение</span></div>
-</div></div>
+</div></div></details>
 <div class="card section">
  <h3>Накопитель microSD</h3>
  <div class="row"><span>Состояние</span><b id="sd-state">Проверка…</b></div>
@@ -226,33 +157,30 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
  <div class="row"><span>Записано событий / измерений</span><b id="sd-events">—</b></div>
  <p id="sd-message" class="hint"></p>
  <p class="tiny muted">Каталог: <code>/boiler-panel/logs/</code>. Только данные этой панели. Форматирование при загрузке отключено; произвольные файлы карты недоступны через HTTP.</p>
- <div class="notice warn">
+ <details class="details danger-zone"><summary>Форматирование microSD</summary><div class="notice warn">
   <strong>Форматирование microSD — полное удаление данных!</strong>
   <p>Существующие файлы и разделы карты будут уничтожены. Будет создана совместимая FAT-файловая система.
   Настройки ESP32-P4, прошивка ESP32-C6 и накопители компьютера не затрагиваются.</p>
-  <p>Нужно сопряжение браузера с дисплеем. После запроса в браузере подтвердите стирание <strong>физически на дисплее</strong> в разделе «Сервис → microSD» в течение 90 секунд.</p>
+  <p>Нужно сопряжение браузера с дисплеем. После запроса в браузере подтвердите стирание <strong>физически на дисплее</strong> в разделе «Настройки → Сервис → microSD» в течение 90 секунд.</p>
  </div>
  <div class="field">
   <label for="sd-format-phrase">Чтобы разрешить операцию, введите точно: СТЕРЕТЬ MICROSD</label>
   <input id="sd-format-phrase" autocomplete="off" spellcheck="false" maxlength="24" placeholder="СТЕРЕТЬ MICROSD">
  </div>
  <div class="actions"><button class="danger" id="sd-format-button" data-action="sd_format_prepare" data-write="1">Запросить форматирование microSD</button></div>
- <div id="sd-format-progress" class="notice hidden" role="status"></div>
+ </details><div id="sd-format-progress" class="notice hidden" role="status"></div>
 </div>
 <div class="actions"><button data-action="refresh" class="primary">Обновить сведения</button></div>
-<div class="notice">Эта страница не записывает новую прошивку. OTA, управление реальными выходами и аппаратные датчики пока не реализованы.</div>
-</section>
-<div id="toast" class="hidden" role="status"></div>
-<footer><span>Локальная панель мониторинга · без подключённых контроллеров</span><span id="last-update">Ожидание ответа</span><span>Автообновление каждые 3 секунды</span></footer>
-</div>
-<script>
+<div class="notice">Эта страница не обновляет прошивку. Управляющие выходы отключены.</div>
+</section><footer><span>Boiler Panel <span id="version">подключение...</span></span><span id="net" class="status">Подключение…</span><span id="last-update">Ожидание панели</span></footer></div><div id="toast" class="hidden" role="status" aria-live="polite"></div><script>
 (()=>{
 "use strict";
 const $=id=>document.getElementById(id);
 const names=["Бойлер косвенного нагрева","Электрокотёл","Контур 1","Контур 2","Контур 3","Дизельный отопитель","Подогрев топлива"];
 const tnames=["В котельной","На улице","Теплоноситель","Топливо"];
-let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="home",tab="wifi",detail=-1;
-let lastServerError="",lastToast=null,refreshInFlight=false;
+let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="home",tab="",detail=-1;
+let lastServerError="",lastToast=null,refreshInFlight=false,serverOnline=false;
+let pairTicket="",pairDeadline=0,pairGeneration=0,pairBusy=false;
 let haFormRevision=null,haDirty=false;
 const timeout=s=>s===0?"Не выключать":s<60?s+" секунд":s/60+" минут";
 const storageBytes=n=>Number.isFinite(n)&&n>0
@@ -260,7 +188,7 @@ const storageBytes=n=>Number.isFinite(n)&&n>0
       n>=1048576?(n/1048576).toFixed(1)+" МБ":
       (n/1024).toFixed(0)+" КБ"):"—";
 function text(id,v){const n=$(id);if(n)n.textContent=v==null?"—":String(v)}
-function show(id,on){const n=$(id);if(n)n.classList.toggle("hidden",!on)}
+function show(id,on){const n=$(id);if(!n)return;if(id==="pairbox"){if(on&&!n.open)n.showModal();if(!on&&n.open)n.close();return;}n.classList.toggle("hidden",!on)}
 function notice(message,problem=false){
  const n=$("toast");n.textContent=message;n.style.color=problem?"#ffacaf":"#d6f9ff";show("toast",true);
  if(lastToast)clearTimeout(lastToast);lastToast=setTimeout(()=>show("toast",false),4700);
@@ -269,7 +197,8 @@ function numeric(n){return Number.isFinite(Number(n))?Number(n):0}
 function apiHeaders(){const h={};if(token)h.Authorization="Bearer "+token;return h}
 function drawPage(){
  for(const n of document.querySelectorAll(".page"))n.classList.toggle("hidden",n.id!==page);
- for(const n of document.querySelectorAll("[data-page]"))n.classList.toggle("active",n.dataset.page===page);
+ for(const n of document.querySelectorAll(".topnav [data-page]"))n.classList.toggle("active",n.dataset.page===(["connections","ha","service"].includes(page)?"settings":page));
+ show("settings-menu",!tab);show("settings-back",!!tab);
  for(const n of document.querySelectorAll(".tab"))n.classList.toggle("hidden",n.id!=="tab-"+tab);
  for(const n of document.querySelectorAll("[data-tab]"))n.classList.toggle("active",n.dataset.tab===tab);
  updateView();
@@ -293,18 +222,15 @@ function updateDetail(){
  line.setAttribute("points",points);line.setAttribute("fill","none");line.setAttribute("stroke","#71ccfa");line.setAttribute("stroke-width","2.5");svg.append(line);
 }
 function renderEquipment(){
- const d=current||{},items=d.equipment||[],holder=$("equipment-list");
- holder.replaceChildren();
- for(let i=0;i<names.length;i++){
-   const item=items[i]||{};
-   const card=document.createElement("div");card.className="card equip";
-   const heading=document.createElement("h3");heading.textContent=item.name||names[i];
-   const status=document.createElement("p");status.className="error";
-   status.textContent=item.connected?"Подключено":"Контроллер не подключён";
-   const explanation=document.createElement("p");explanation.className="tiny muted";
-   explanation.textContent="Фактическое состояние неизвестно. Команды недоступны до назначения и проверки контроллера.";
-   card.append(heading,status,explanation);
-   holder.append(card);
+ const items=current?.equipment||[],holder=$("equipment-list");holder.replaceChildren();
+ for(const [index,title] of [[0,"Бойлер"],[1,"Электрокотёл"],[5,"Дизельный отопитель"],[6,"Подогрев топлива"]]){
+  const card=document.createElement("details");card.className="card equip";
+  const summary=document.createElement("summary"),heading=document.createElement("h3"),status=document.createElement("p");
+  heading.textContent=title;status.textContent=items[index]?.connected?"Подключён":"Не подключён";
+  summary.append(heading,status);card.append(summary);
+  const explanation=document.createElement("p");explanation.textContent="Управление недоступно до подключения и проверки контроллера.";card.append(explanation);
+  if(index===1)for(const n of [2,3,4]){const row=document.createElement("div");row.className="row";const name=document.createElement("span"),value=document.createElement("span");name.textContent=items[n]?.name||names[n];value.textContent=items[n]?.connected?"Подключён":"Нет данных";row.append(name,value);card.append(row);}
+  holder.append(card);
  }
 }
 function renderAP(){
@@ -355,7 +281,7 @@ function renderHA(){
  }
 }
 async function saveHA(e){
- e.preventDefault();if(!current||!current.authorized||haFormRevision===null){show("pairbox",true);return;}
+ e.preventDefault();if(!current||!current.authorized||haFormRevision===null){startPairing();return;}
  const enabled=$("ha-enabled").checked;
  if(enabled&&!$("ha-lan").checked){notice("Подтвердите доверенную локальную сеть",true);return;}
  if($("ha-password").value&&$("ha-clear-password").checked){notice("Выберите новый пароль ИЛИ удаление сохранённого",true);return;}
@@ -370,13 +296,34 @@ async function saveHA(e){
  }catch(e){notice("Не сохранено: "+e.message,true);}
  finally{values.password="";}
 }
+async function request(path,options){const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);try{return await fetch(path,{...options,signal:c.signal});}finally{clearTimeout(timer);}}
+function errorText(code){return ({same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера"})[code]||code;}
+function updateCanister(f){
+ let state="unknown",title="Нет данных",height=0,symbol="?";
+ if(f?.lower?.valid&&f?.upper?.valid){
+  if(f.lower.age_s>=30||f.upper.age_s>=30){state="stale";title="Данные устарели";}
+  else if(f.upper.reached&&f.lower.reached){state="full";title="Полная";height=106;symbol="";}
+  else if(f.lower.reached&&!f.upper.reached){state="half";title="Половина";height=53;symbol="";}
+  else if(!f.lower.reached&&!f.upper.reached){state="empty";title="Пустая";symbol="!";}
+  else{state="invalid";title="Проверьте герконы";}
+ }
+ const icon=$("fuel-canister");icon.dataset.state=state;icon.setAttribute("aria-label","Уровень топлива: "+title);
+ text("canister-title",title);text("canister-symbol",symbol);
+ $("canister-fill").setAttribute("height",height);$("canister-fill").setAttribute("y",136-height);
+ $("canister-cross").setAttribute("visibility",height?"visible":"hidden");
+ text("fuel-status",title);
+}
+function markOffline(){
+ for(let i=0;i<4;i++){text("t"+i,"--.- °C");text("tstate"+i,"Нет связи");}
+ text("fuel-temp","--.- °C");text("lower-status","Нет связи");text("upper-status","Нет связи");updateCanister(null);
+}
 function updateView(){
  const d=current;if(!d)return;
  text("version",d.version);text("service-version",d.version);
  text("clock",d.clock||"Нет времени");text("clock-current",d.clock||"Нет времени");
- text("net",d.wifi&&d.wifi.connected?"● Wi-Fi подключён":"● Wi-Fi не подключён");
+ text("net",d.wifi&&d.wifi.connected?"Wi-Fi подключён":"Нет Wi-Fi");
  $("net").className="status"+(d.wifi&&d.wifi.connected?" ok":"");
- text("authstate",d.authorized?"Управление разрешено":"Только просмотр");
+ text("authstate",d.authorized?"Доступ открыт":"Просмотр");
  text("web-auth",d.authorized?"Сопряжено (1 час)":"Только просмотр");
  show("pairbutton",!d.authorized);show("logout",d.authorized);
  text("last-update","Обновлено: "+new Date().toLocaleTimeString("ru-RU"));
@@ -386,7 +333,7 @@ function updateView(){
  for(let i=0;i<4;i++){
    const t=d.temperatures&&d.temperatures[i]||{};
    const value=t.valid&&typeof t.value==="number"?t.value.toFixed(1)+" °C":"--.- °C";
-   text("t"+i,value);text("tstate"+i,t.valid?"Измерено "+t.age_s+" с назад":"Нет данных");
+   text("t"+i,value);text("tstate"+i,t.valid?"":t.ever?"Устарело":"Нет данных");
    if(i===3)text("fuel-temp",value);
  }
  updateDetail();
@@ -459,21 +406,22 @@ function updateView(){
      || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction)
      || (b.dataset.action==="sd_format_prepare" && (!!sd.format_attempted || formatActive));
  }
- renderAP();renderBLE();renderEquipment();renderHA();
+ renderAP();renderBLE();renderEquipment();renderHA();updateCanister(d.fuel);
+ if(!serverOnline)markOffline();
  for(const b of document.querySelectorAll('[data-action="ha_discover"]'))b.disabled=!d.authorized||!d.home_assistant?.enabled;
 }
 async function sendPost(path,data,secret){
- const headers={"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"};
+ const headers={"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","X-Boiler-Pairing":"1"};
  if(secret&&token)headers.Authorization="Bearer "+token;
- const r=await fetch(path,{method:"POST",headers,body:new URLSearchParams(data),cache:"no-store"});
+ const r=await request(path,{method:"POST",headers,body:new URLSearchParams(data),cache:"no-store"});
  let obj;
  try{obj=await r.json()}catch(_){obj={error:"invalid_response"}}
  if(r.status===401){token="";sessionStorage.removeItem("boiler_panel_token");}
- if(!r.ok)throw Error(obj.error||("HTTP "+r.status));
+ if(!r.ok)throw Error(errorText(obj.error||("HTTP "+r.status)));
  return obj;
 }
 async function command(action,options={}){
- if(!token){show("pairbox",true);notice("Сначала введите код с физической панели",true);return}
+ if(!token){startPairing();return}
  try{
    await sendPost("/api/command",Object.assign({action},options),true);
    notice("Запрос принят. Результат появится в состоянии панели.");
@@ -482,16 +430,41 @@ async function command(action,options={}){
    notice("Ошибка действия: "+e.message,true);
  }
 }
-async function login(){
- const code=$("paircode").value.trim();
- if(!/^[0-9]{6}$/.test(code)){notice("Введите шестизначный код",true);return}
+async function startPairing(){
+ show("pairbox",true);text("pair-error","");
+ if(pairTicket&&pairDeadline>Date.now()){$("paircode").focus();return;}
+ const generation=++pairGeneration;
+ if(!globalThis.crypto?.getRandomValues){text("pair-error","Браузер не поддерживает безопасное сопряжение");return;}
+ const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+ const ticket=Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join("");pairTicket=ticket;pairDeadline=0;pairBusy=true;
+ $("paircode").value="";$("pair-submit").disabled=true;text("pair-message","Запрашиваем код на дисплее…");
  try{
-   const r=await sendPost("/api/pair",{code},false);
-   token=r.token;sessionStorage.setItem("boiler_panel_token",token);
-   $("paircode").value="";show("pairbox",false);
-   notice("Управление веб-панелью разрешено на 1 час");
-   await poll();
- }catch(e){notice("Сопряжение не выполнено: "+e.message,true)}
+  const result=await sendPost("/api/pair/start",{request_id:ticket},false);
+  if(generation!==pairGeneration){await sendPost("/api/pair/cancel",{request_id:ticket},false);return;}
+  pairDeadline=Date.now()+result.expires_in_s*1000;
+  text("pair-message","Код показан на панели слева от часов. Введите его здесь.");
+  $("pair-submit").disabled=false;$("paircode").focus();
+ }catch(e){if(generation===pairGeneration){pairTicket="";text("pair-error",e.message);text("pair-message","Код не запрошен. Повторите попытку.");}}
+ finally{if(generation===pairGeneration)pairBusy=false;}
+}
+async function cancelPairing(){
+ const ticket=pairTicket;++pairGeneration;pairTicket="";pairDeadline=0;pairBusy=false;
+ $("paircode").value="";show("pairbox",false);
+ if(ticket){try{await sendPost("/api/pair/cancel",{request_id:ticket},false);}catch(_){/* Code still expires on panel. */}}
+}
+async function login(){
+ if(pairBusy)return;
+ const code=$("paircode").value.trim();
+ if(!/^[0-9]{6}$/.test(code)){text("pair-error","Введите шестизначный код с панели");return;}
+ if(!pairTicket||Date.now()>=pairDeadline){text("pair-error","Запросите новый код");return;}
+ pairBusy=true;$("pair-submit").disabled=true;
+ try{
+  const result=await sendPost("/api/pair",{code,request_id:pairTicket},false);
+  token=result.token;sessionStorage.setItem("boiler_panel_token",token);
+  pairTicket="";pairDeadline=0;++pairGeneration;$("paircode").value="";show("pairbox",false);
+  notice("Сопряжение выполнено. Код на дисплее погашен.");await poll();
+ }catch(e){text("pair-error",e.message);$("paircode").value="";$("paircode").focus();}
+ finally{pairBusy=false;$("pair-submit").disabled=Date.now()>=pairDeadline;}
 }
 async function logout(){
  try{await sendPost("/api/logout",{},true)}catch(_){}
@@ -500,7 +473,7 @@ async function logout(){
  await poll();
 }
 async function requestStorageFormat(){
- if(!token){show("pairbox",true);notice("Сначала сопрягите браузер с физическим дисплеем",true);return}
+ if(!token){startPairing();return}
  const phrase=$("sd-format-phrase").value.trim();
  if(phrase!=="СТЕРЕТЬ MICROSD"){
    notice("Введите точную фразу: СТЕРЕТЬ MICROSD",true);return;
@@ -515,9 +488,10 @@ async function requestStorageFormat(){
 }
 function handleAction(b){
  const action=b.dataset.action;
+ if(action==="settings-root"){tab="";page="settings";drawPage();return;}
  if(action==="ha_reload"){haDirty=false;haFormRevision=null;renderHA();return;}
- if(action==="show-pair"){show("pairbox",true);$("paircode").focus();return}
- if(action==="hide-pair"){show("pairbox",false);return}
+ if(action==="show-pair"||action==="pair-retry"){startPairing();return;}
+ if(action==="hide-pair"){cancelPairing();return;}
  if(action==="pair"){login();return}
  if(action==="logout"){logout();return}
  if(action==="close-detail"){detail=-1;updateDetail();return}
@@ -552,7 +526,7 @@ document.addEventListener("click",e=>{
  const target=e.target;
  if(!(target instanceof Element))return;
  const p=target.closest("[data-page]");
- if(p){page=p.dataset.page;detail=-1;drawPage();return}
+ if(p){page=p.dataset.page;if(page==="settings")tab="";detail=-1;drawPage();return;}
  const t=target.closest("[data-tab]");
  if(t){setTab(t.dataset.tab);return}
  const temperature=target.closest("[data-temp]");
@@ -577,7 +551,7 @@ $("wifi-open").addEventListener("change",e=>{
 });
 $("wifi-form").addEventListener("submit",e=>{
  e.preventDefault();
- if(!token){show("pairbox",true);notice("Сначала сопряжение",true);return}
+ if(!token){startPairing();return}
  const ssid=$("ssid").value,pass=$("wifi-pass").value,open=$("wifi-open").checked;
  if(!ssid||new TextEncoder().encode(ssid).length>32){notice("SSID до 32 байт",true);return}
  if(!open&&!((pass.length>=8&&pass.length<=63)||/^[0-9a-fA-F]{64}$/.test(pass))){
@@ -591,19 +565,22 @@ async function poll(){
  if(refreshInFlight)return;
  refreshInFlight=true;
  try{
-   const r=await fetch("/api/status",{cache:"no-store",headers:apiHeaders()});
+   const r=await request("/api/status",{cache:"no-store",headers:apiHeaders()});
    if(!r.ok)throw Error("HTTP "+r.status);
    const d=await r.json();
    if(!d.authorized&&token){token="";sessionStorage.removeItem("boiler_panel_token");notice("Сессия истекла. Повторите сопряжение.");}
-   current=d;lastServerError="";updateView();
+   current=d;serverOnline=true;lastServerError="";updateView();
  }catch(e){
    if(lastServerError!==e.message)notice("Нет связи с панелью: "+e.message,true);
-   lastServerError=e.message;
+   lastServerError=e.message;serverOnline=false;markOffline();
    text("net","● Нет ответа панели");
    $("net").className="status";
    text("last-update","Сервер не отвечает, повторяем");
  }finally{refreshInFlight=false}
 }
+$("pair-form").addEventListener("submit",e=>{e.preventDefault();login();});
+$("pairbox").addEventListener("cancel",e=>{e.preventDefault();cancelPairing();});
+setInterval(()=>{if(!$("pairbox").open)return;const left=Math.max(0,Math.ceil((pairDeadline-Date.now())/1000));text("pair-expiry",pairDeadline?(left?"Осталось "+left+" с":"Срок кода истёк. Запросите новый."):"");if(!left)$("pair-submit").disabled=true;},500);
 drawPage();poll();setInterval(poll,3000);
 })();
 </script></body></html>)BPHTML";

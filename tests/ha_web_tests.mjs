@@ -13,7 +13,7 @@ const sent=[],messages=[];
 const context={
  current:{authorized:true,home_assistant:{ready:true,enabled:true,connected:true,revision:3,host:'192.0.2.1',port:1883,username:'fixture',password_set:true,discovery_prefix:'homeassistant'}},
  haFormRevision:null,haDirty:false,
- $:id=>nodes[id],text:()=>{},show:()=>{},notice:(...args)=>messages.push(args),
+ $:id=>nodes[id],text:()=>{},show:()=>{},startPairing:()=>messages.push(['pairing requested']),notice:(...args)=>messages.push(args),
  sendPost:async(path,data,auth)=>{sent.push({path,data:{...data},auth});return {ok:true};},poll:async()=>{}
 };
 vm.createContext(context);vm.runInContext(page.slice(start,stop),context);

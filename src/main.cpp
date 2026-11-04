@@ -34,14 +34,14 @@ constexpr uint32_t BG=0x101719, CARD=0x1B2528, LINE=0x304044, TXT=0xEFF5F3;
 constexpr uint32_t MUTED=0xA1B3B5, SKY=0x76D6C3, GREEN=0x76D6C3, AMBER=0xE7BB78, RED=0xEF9F9A;
 const char* const PAGES[]={"Главная","Оборудование","Топливо","Настройки"};
 constexpr int PAGE_SETTINGS=3;
-enum MenuView { Root=0,WifiView=1,BleView=2,DisplayView=4,WebView=5,ConnectionsView=6,HaView=7,ServiceView=8,StorageView=9,DiagnosticsView=10,AboutView=11,WifiMoreView=12 };
+enum MenuView { Root=0,WifiView=1,BleView=2,DisplayView=4,ConnectionsView=6,HaView=7,ServiceView=8,StorageView=9,DiagnosticsView=10,AboutView=11,WifiMoreView=12 };
 int parentMenuView(int v){if(v==WifiMoreView)return WifiView;if(v==WifiView||v==BleView||v==HaView)return ConnectionsView;if(v==StorageView||v==DiagnosticsView||v==AboutView)return ServiceView;return Root;}
 const char* const SENSOR_NAMES[]={"В котельной","На улице","Теплоноситель","Топливо"};
 const uint32_t ACCENT[]={SKY,SKY,SKY,SKY};
 Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sensor events.
 FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
 lv_obj_t *equipmentFuelTemp=nullptr,*equipmentFuelLevel=nullptr;
-lv_obj_t *haStatusLabel=nullptr,*webPairExpiry=nullptr,*detailValue=nullptr;
+lv_obj_t *haStatusLabel=nullptr,*detailValue=nullptr;
 struct FuelCanister {
   lv_obj_t *root=nullptr,*body=nullptr,*fill=nullptr,*handle=nullptr,*cap=nullptr;
   lv_obj_t *crossA=nullptr,*crossB=nullptr,*glyph=nullptr,*temperature=nullptr,*status=nullptr;
@@ -62,7 +62,7 @@ uint32_t lastSensorConfigRevision=0xffffffffU;
 lv_obj_t *tempValue[CHANNELS]={},*tempState[CHANNELS]={},*tempTrend[CHANNELS]={},*freshBar[CHANNELS]={};
 lv_obj_t *sensorSummary=nullptr,*sensorHint=nullptr,*liveTime=nullptr,*activity=nullptr,*activityDot=nullptr;
 lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText=nullptr,*detailGraph=nullptr;
-lv_obj_t *webPairLabel=nullptr,*sdStatusLabel=nullptr,*sdFormatNotice=nullptr,*sdFormatAccept=nullptr,*sdFormatReject=nullptr;
+lv_obj_t *sdStatusLabel=nullptr,*sdFormatNotice=nullptr,*sdFormatAccept=nullptr,*sdFormatReject=nullptr;
 int renderedPage=-1,renderedView=-1,detailChannel=-1;
 uint32_t activityStart=0,detailRevision=0;
 bool wifiLogSeen=false,wifiLogWasOnline=false;
@@ -71,6 +71,8 @@ bool displaySettingsLoaded=false;
 uint16_t appliedDisplayTimeout=0;
 void info(const char* title,const char* description);
 lv_obj_t *header=nullptr,*body=nullptr,*clockLabel=nullptr,*dateLabel=nullptr,*footer=nullptr;
+lv_obj_t *headerTitle=nullptr,*pairBadge=nullptr,*pairDigits=nullptr;
+uint32_t shownPairingGeneration=0;
 lv_obj_t *overlay=nullptr,*dialogError=nullptr,*ssidField=nullptr,*passwordField=nullptr,*timeField=nullptr,*activeField=nullptr,*keyboard=nullptr;
 int dialogKind=0; // 0 none, 1 Wi-Fi credentials, 2 manual clock, 3 information, 4 fuel.
 bool openNetwork=false, upper=false, symbols=false;
@@ -110,7 +112,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,WebAccess=80,WebNewCode,WebRevoke,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
 void updateStorageLabel();
@@ -340,9 +342,6 @@ void action(lv_event_t* e){
     case ConfirmDisconnect:cmd.job=Job::Disconnect;if(send(cmd))closeDialog=true;break;
     case ConfirmForget:cmd.job=Job::Forget;if(send(cmd))closeDialog=true;break;
     case Display:view=4;rebuild=true;break;
-    case WebAccess:view=5;rebuild=true;break;
-    case WebNewCode:panel_web::armPairing();rebuild=true;break;
-    case WebRevoke:panel_web::revokePairing();rebuild=true;break;
     case SdFormatApprove:panel_storage::confirmFormatPhysically();updateStorageLabel();break;
     case SdFormatCancel:panel_storage::cancelFormatPhysically();updateStorageLabel();break;
     case Wifi:view=1;rebuild=true;break;
@@ -391,19 +390,26 @@ const char* currentTitle(){
   if(page==1&&view>0)return view==1?"Бойлер":view==2?"Электрокотёл":view==3?"Отопитель":"Подогрев топлива";
   if(page==PAGE_SETTINGS)switch(view){
     case ConnectionsView:return "Подключения";case WifiView:return "Wi-Fi";case BleView:return "Bluetooth";
-    case DisplayView:return "Экран";case WebView:return "Веб-доступ";case HaView:return "Home Assistant";
+    case DisplayView:return "Экран";case HaView:return "Home Assistant";
     case ServiceView:return "Сервис";case StorageView:return "microSD";case DiagnosticsView:return "Диагностика";
     case AboutView:return "О панели";case WifiMoreView:return "Действия Wi-Fi";default:break;
   }
   return page==0?"Котельная":PAGES[page];
 }
 void makeHeader(){
-  if(header)lv_obj_del(header);clockLabel=dateLabel=nullptr;
+  if(header)lv_obj_del(header);
+  clockLabel=dateLabel=headerTitle=pairBadge=pairDigits=nullptr;
   header=box(lv_scr_act(),0,0,480,100,BG,0);lv_obj_set_style_border_width(header,0,0);
   const bool nested=view!=Root&&(page==1||page==PAGE_SETTINGS);
   if(nested)button(header,"<",16,18,56,56,Back);
-  label(header,currentTitle(),nested?88:24,32,nested?250:315,&boiler_font_25);
-  if(page==0){clockLabel=label(header,"--:--",334,30,122,&boiler_font_25,SKY);lv_obj_set_style_text_align(clockLabel,LV_TEXT_ALIGN_RIGHT,0);updateClock();}
+  headerTitle=label(header,currentTitle(),nested?88:24,32,nested?250:315,&boiler_font_25);
+  if(page==0){
+    clockLabel=label(header,"--:--",334,30,122,&boiler_font_25,SKY);lv_obj_set_style_text_align(clockLabel,LV_TEXT_ALIGN_RIGHT,0);updateClock();
+    pairBadge=box(header,196,16,132,66,0x245D55,12);lv_obj_clear_flag(pairBadge,LV_OBJ_FLAG_CLICKABLE);
+    auto* caption=label(pairBadge,"Код",12,4,108,&boiler_font_14,TXT);lv_obj_set_style_text_align(caption,LV_TEXT_ALIGN_CENTER,0);
+    pairDigits=label(pairBadge,"",8,28,116,&boiler_font_25,TXT);lv_obj_set_style_text_align(pairDigits,LV_TEXT_ALIGN_CENTER,0);
+    lv_obj_add_flag(pairBadge,LV_OBJ_FLAG_HIDDEN);
+  }
   else button(header,"Домой",350,18,106,56,Home);
 }
 void makeFooter(){
@@ -558,8 +564,7 @@ void fuelPage(){
 void settings(){
   menuRow(body,"Подключения","Wi-Fi, Bluetooth, Home Assistant",16,Connections,122);
   menuRow(body,"Экран","Сон и пробуждение",159,Display,122);
-  menuRow(body,"Веб-доступ","Адрес и код сопряжения",302,WebAccess,122);
-  menuRow(body,"Сервис","Карта памяти и диагностика",445,ServiceMenu,122);
+  menuRow(body,"Сервис","Карта памяти и диагностика",302,ServiceMenu,122);
 }
 void connectionsPage(){
   menuRow(body,"Wi-Fi",radio.connected?"Подключён":"Не подключён",16,Wifi,122);
@@ -617,19 +622,7 @@ void displayPage(){
   label(body,panel_screen::touchReady()?"Первое касание будит экран.\nСледующее — нажимает кнопку.":"Тач недоступен. Сон экрана отключён.",24,442,432,&boiler_font_19,MUTED);
   if(radio.displayMessage[0])label(body,radio.displayMessage,24,552,432,&boiler_font_14,SKY);
 }
-void webAccessPage(){
-  label(body,"Адрес в вашей сети",24,20,432,&boiler_font_19,MUTED);
-  char url[64];snprintf(url,sizeof(url),"%s%s%s",radio.ip[0]?"http://":"",radio.ip[0]?radio.ip:"Подключите Wi-Fi",radio.ip[0]?"/":"");
-  label(body,url,24,66,432,&boiler_font_25);
-  auto* code=box(body,24,150,432,176);
-  label(code,"Код сопряжения",20,18,390,&boiler_font_19,MUTED);
-  webPairLabel=label(code,"------",20,60,390,&boiler_font_55,SKY);
-  webPairExpiry=label(code,"Код не создан",20,135,390,&boiler_font_14,MUTED);
-  button(body,"Создать код",24,358,432,60,WebNewCode,0x245D55);
-  button(body,"Отозвать доступ",24,438,432,60,WebRevoke);
-  label(body,"Откройте адрес в браузере и выберите\n«Сопряжение». Код действует 2 минуты.",24,542,432,&boiler_font_19,MUTED);
-  label(body,"HTTP: только доверенная локальная сеть",24,628,432,&boiler_font_14,MUTED);
-}
+
 void haPage(){
   panel_ha::Snapshot ha;panel_ha::snapshot(ha);
   auto* state=box(body,24,16,432,160);
@@ -729,7 +722,7 @@ uint32_t signature(){
 void render(){
   const lv_coord_t scrollY=resultList && renderedPage==page && renderedView==view?lv_obj_get_scroll_y(resultList):0;
   if(body)lv_obj_del(body);
-  webPairLabel=webPairExpiry=haStatusLabel=sdStatusLabel=sdFormatNotice=sdFormatAccept=sdFormatReject=nullptr;
+  haStatusLabel=sdStatusLabel=sdFormatNotice=sdFormatAccept=sdFormatReject=nullptr;
   equipmentFuelTemp=equipmentFuelLevel=nullptr;
   fuelCardLabels={};fuelCanister={};
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;
@@ -743,7 +736,7 @@ void render(){
     default:
       switch(view){
         case WifiView:wifiPage();break;case BleView:blePage();break;case DisplayView:displayPage();break;
-        case WebView:webAccessPage();break;case ConnectionsView:connectionsPage();break;case HaView:haPage();break;
+        case ConnectionsView:connectionsPage();break;case HaView:haPage();break;
         case ServiceView:service();break;case StorageView:storagePage();break;case DiagnosticsView:diagnosticsPage();break;
         case AboutView:aboutPage();break;case WifiMoreView:wifiMorePage();break;default:settings();break;
       }break;
@@ -800,22 +793,34 @@ void refresh(lv_timer_t*){
   bool touching=false;
   for(auto* input=lv_indev_get_next(nullptr);input;input=lv_indev_get_next(input))
     if(lv_indev_get_type(input)==LV_INDEV_TYPE_POINTER && input->proc.state==LV_INDEV_STATE_PRESSED)touching=true;
+  char displayCode[7];uint32_t remaining=0,generation=0;
+  const bool pairingVisible=panel_web::pairingCode(displayCode,remaining,&generation);
+  if(pairingVisible){
+    // Only refreshes backlight idle time; never writes settings/NVS or sends a command.
+    panel_screen::setTimeout(panel_screen::timeout());
+    if(generation!=shownPairingGeneration&&!touching){
+      dismiss();page=0;view=Root;pendingPage=-1;slideDirection=0;shownPairingGeneration=generation;rebuild=true;
+    }
+  }
   if(rebuild && !overlay && !touching){rebuild=false;render();}
+  if(pairBadge&&pairDigits&&headerTitle){
+    if(pairingVisible){
+      lv_label_set_text(pairDigits,displayCode);lv_obj_clear_flag(pairBadge,LV_OBJ_FLAG_HIDDEN);
+      lv_obj_set_width(headerTitle,164);
+    }else{
+      lv_label_set_text(pairDigits,"");lv_obj_add_flag(pairBadge,LV_OBJ_FLAG_HIDDEN);
+      lv_obj_set_width(headerTitle,315);
+    }
+  }
+  memset(displayCode,0,sizeof(displayCode));
   if(activityDot)lv_obj_set_x(activityDot,6+int((millis()/20U)%400U));
   if(uint32_t(millis()-lastTick)>=1000U){
     lastTick=millis();updateClock();updateLive();updateStorageLabel();
     panel_storage::measurements(measurements,millis());
     panel_web::publish(measurements,fuelLevel,millis());
     panel_ha::publish(measurements,fuelLevel,millis());
-    if(webPairLabel){
-      char code[7];uint32_t remaining=0;
-      char line[100];
-      if(panel_web::pairingCode(code,remaining))
-        snprintf(line,sizeof(line),"%s",code);
-      else snprintf(line,sizeof(line),"------");
-      lv_label_set_text(webPairLabel,line);
-      if(webPairExpiry){snprintf(line,sizeof(line),remaining?"Действует ещё %lu с":"Код не создан",(unsigned long)remaining);lv_label_set_text(webPairExpiry,line);}
-    }
+
+
   }
 }
 } // namespace

@@ -5,6 +5,7 @@
 #include "Arduino.h"
 #include "panel_radio.h"
 #include "panel_web.h"
+#include "panel_pairing.h"
 #include "panel_storage.h"
 #include "panel_config.h"
 #include "panel_sensors.h"
@@ -28,10 +29,10 @@ namespace panel_storage {
  bool cancelFormatPhysically(){if(fixture.formatPhase!=FormatPhase::AwaitingPhysical)return false;++cancelled;fixture.formatPhase=FormatPhase::Cancelled;return true;}
 }
 namespace panel_web {
- bool armed=false;unsigned newCodes=0;
+ panel_pairing::State challenge;
  bool begin(){return true;}void publish(const panel::Measurement (&)[panel::CHANNELS],const panel::FuelLevel&,uint32_t){}
- bool armPairing(){armed=true;++newCodes;return true;}
- bool pairingCode(char out[7],uint32_t& seconds){if(!armed){out[0]=0;seconds=0;return false;}strcpy(out,"123456");seconds=112;return true;}
- void revokePairing(){armed=false;}
+ bool pairingCode(char out[7],uint32_t& seconds,uint32_t* generation){uint32_t g=0;bool active=challenge.display(out,seconds,g,millis());if(generation)*generation=g;return active;}
+ void revokePairing(){challenge.revoke();}
 }
+
 namespace panel_ha {Snapshot fixture;bool begin(){return true;}bool snapshot(Snapshot& s){s=fixture;return true;}void publish(const panel::Measurement (&)[panel::CHANNELS],const panel::FuelLevel&,uint32_t){}}
