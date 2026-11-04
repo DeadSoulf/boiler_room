@@ -117,7 +117,8 @@ inline bool statePayload(char* out,size_t cap,const Telemetry& t,const Diagnosti
   Json j(out,cap);j.add("{");
   for(unsigned i=0;i<6;i++){
     const bool valid=fresh(t,i,now);
-    if(i)j.add(",");j.add("\"%s\":",ENTITIES[i].key);
+    if(i){j.add(",");}
+    j.add("\"%s\":",ENTITIES[i].key);
     if(!valid)j.add("null");
     else if(i<4)j.add("%.2f",double(t.input[i].temperature));
     else j.quote(t.input[i].reached?"ON":"OFF");

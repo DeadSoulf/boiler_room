@@ -6,7 +6,7 @@ cfg=(root/"src/panel_config.cpp").read_text(encoding="utf-8")
 web=(root/"src/panel_web.cpp").read_text(encoding="utf-8")
 html=(root/"src/panel_web_page.h").read_text(encoding="utf-8")
 types=(root/"src/panel_types.h").read_text(encoding="utf-8")
-assert 'VERSION = "v0.6.2"' in types
+assert 'VERSION = "v0.7.0"' in types
 assert 'const char* titles[]={"Wi-Fi","Bluetooth устройства","Экран","Веб-доступ"};' in main
 assert 'Проверка символов' not in main
 assert 'case Time:view=3;' not in main

@@ -272,7 +272,8 @@ SaveResult configure(const Config& request,PasswordMode mode,uint32_t expectedRe
 bool requestDiscovery(){
   if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(10))!=pdTRUE)return false;
   const bool enabled=task&&saved.enabled;xSemaphoreGive(guard);
-  if(enabled)announce.store(true);return enabled;
+  if(enabled){announce.store(true);}
+  return enabled;
 }
 void publish(const panel::Measurement (&temps)[panel::CHANNELS],const panel::FuelLevel& fuel,uint32_t now){
   if(!readings)return;

@@ -10,6 +10,7 @@
 #include <time.h>
 #include <string.h>
 #include "panel_web.h"
+#include "panel_ha.h"
 #include "panel_radio.h"
 #include "panel_equipment.h"
 #include "panel_screen.h"
@@ -301,6 +302,25 @@ void statusRequest() {
     j+='}';
   }
   j+="]}";
+  panel_ha::Snapshot ha;
+  panel_ha::snapshot(ha);
+  j+=",\"home_assistant\":{\"ready\":";j+=ha.ready?"true":"false";
+  j+=",\"supported\":";j+=ha.supported?"true":"false";
+  j+=",\"enabled\":";j+=ha.enabled?"true":"false";
+  j+=",\"connected\":";j+=ha.connected?"true":"false";
+  j+=",\"revision\":";j+=String(ha.revision);
+  j+=",\"id\":";jsonQuote(j,ha.id);
+  j+=",\"message\":";jsonQuote(j,ha.message);
+  j+=",\"error_code\":";j+=String(ha.errorCode);
+  j+=",\"connections\":";j+=String(ha.connections);
+  j+=",\"discovery_messages\":";j+=String(ha.discoveryMessages);
+  j+=",\"last_publish_ms\":";j+=String(ha.lastPublishMs);
+  j+=",\"host\":";jsonQuote(j,admin?ha.host:"");
+  j+=",\"port\":";j+=String(admin?ha.port:0);
+  j+=",\"username\":";jsonQuote(j,admin?ha.username:"");
+  j+=",\"discovery_prefix\":";jsonQuote(j,admin?ha.prefix:"");
+  j+=",\"password_set\":";j+=(admin&&ha.passwordSet)?"true":"false";
+  j+=",\"transport\":\"mqtt_tcp_lan_only\",\"read_only\":true}";
   j+=",\"service\":{\"free_heap\":";j+=String(snap.freeHeap);
   j+=",\"display_ms\":";j+=String(snap.displayMs);
   j+=",\"lvgl_ms\":";j+=String(snap.lvglMs);
@@ -313,6 +333,41 @@ void statusRequest() {
 void commandRequest() {
   if(!authorized()){errorResponse(401,"pair_required");return;}
   const String kind=server.arg("action");
+  if(kind=="ha_discover"){
+    if(!panel_ha::requestDiscovery()){errorResponse(409,"ha_disabled_or_unavailable");return;}
+    jsonResponse(202,"{\"ok\":true,\"queued\":true}");return;
+  }
+  if(kind=="ha_save"){
+    const String host=server.arg("host"),user=server.arg("username"),prefix=server.arg("prefix"),
+      port=server.arg("port"),enabled=server.arg("enabled"),mode=server.arg("password_mode"),rev=server.arg("revision");
+    String secret=server.arg("password");
+    if(host.length()>128||user.length()>64||prefix.length()>64||secret.length()>128||
+       host.length()!=strlen(host.c_str())||user.length()!=strlen(user.c_str())||
+       prefix.length()!=strlen(prefix.c_str())||secret.length()!=strlen(secret.c_str())||
+       !allDigits(port,1,5)||asUint(port)==0||asUint(port)>65535||
+       !allDigits(rev,1,10)||strtoull(rev.c_str(),nullptr,10)>0xffffffffULL||
+       (enabled!="0"&&enabled!="1")||(mode!="keep"&&mode!="set"&&mode!="clear")||
+       (enabled=="1"&&server.arg("lan_confirm")!="1")){
+      errorResponse(400,"ha_invalid_fields_or_lan_confirmation");return;
+    }
+    panel_ha::Config request;
+    snprintf(request.host,sizeof(request.host),"%s",host.c_str());
+    snprintf(request.username,sizeof(request.username),"%s",user.c_str());
+    snprintf(request.prefix,sizeof(request.prefix),"%s",prefix.c_str());
+    snprintf(request.password,sizeof(request.password),"%s",secret.c_str());
+    request.enabled=enabled=="1";request.port=uint16_t(asUint(port));
+    const auto passwordMode=mode=="set"?panel_ha::PasswordMode::Set:
+        mode=="clear"?panel_ha::PasswordMode::Clear:panel_ha::PasswordMode::Keep;
+    const auto result=panel_ha::configure(request,passwordMode,uint32_t(strtoull(rev.c_str(),nullptr,10)));
+    panel_ha::wipe(&request,sizeof(request));
+    for(unsigned i=0;i<secret.length();i++)secret.setCharAt(i,0);
+    if(result==panel_ha::SaveResult::Invalid){errorResponse(400,"ha_invalid_or_password_required_for_new_broker");return;}
+    if(result==panel_ha::SaveResult::Conflict){errorResponse(409,"ha_configuration_changed_reload");return;}
+    if(result==panel_ha::SaveResult::StorageError){errorResponse(500,"ha_nvs_write_failed");return;}
+    if(result!=panel_ha::SaveResult::Saved){errorResponse(503,"ha_unavailable");return;}
+    jsonResponse(200,"{\"ok\":true,\"saved\":true}");return;
+  }
+
   if(kind=="sd_format_prepare"){
     // Strict exact phrase from browser + existing physical pairing.
     // This ONLY arms a temporary request; no SD API may be called here.

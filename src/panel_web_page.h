@@ -57,6 +57,7 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 <button data-page="equipment">Управление</button>
 <button data-page="fuel">Топливо</button>
 <button data-page="settings">Настройки</button><button data-page="connections">Устройства</button>
+<button data-page="ha">Home Assistant</button>
 <button data-page="service">Сервис</button>
 </nav>
 <div id="pairbox" class="card hidden">
@@ -172,6 +173,32 @@ footer{margin-top:29px;color:var(--muted);font-size:12px;display:flex;gap:10px;j
 <p class="tiny muted">Поддерживаются реальные входные датчики на JP1: DS18B20 (один на GPIO) и герконы NO/NC. До подключения датчика статус «Не найден». Modbus/MQTT пока только описываются, без работы драйвера. Реле, котлы и нагреватели не управляются.</p>
 </div>
 </section>
+<section id="ha" class="page hidden">
+ <h2>Home Assistant</h2>
+ <div class="notice">Панель передаёт показания через MQTT Discovery. Нужен MQTT-брокер, подключённый к Home Assistant. Это не адрес веб-интерфейса HA (порт 8123). Управление нагревом и реле не передаётся.</div>
+ <div class="two"><div class="card">
+  <h3>Состояние интеграции</h3>
+  <div class="row"><span>MQTT</span><strong id="ha-state">Выключен</strong></div>
+  <div class="row"><span>Идентификатор панели</span><code id="ha-id">—</code></div>
+  <div class="row"><span>Пакетов обнаружения</span><span id="ha-discovery-count">0</span></div>
+  <p id="ha-message" class="hint"></p>
+  <button data-action="ha_discover" data-write="1">Повторить обнаружение</button>
+  <p class="tiny">12 сущностей: четыре температуры, два геркона, уровень топлива, Wi-Fi, время работы, память и microSD. Без настоящего датчика или при устаревших данных сущность недоступна.</p>
+ </div><form id="ha-form" class="card" autocomplete="off">
+  <h3>Подключение к MQTT-брокеру</h3>
+  <label class="stack"><input type="checkbox" id="ha-enabled">Включить интеграцию</label>
+  <div class="field"><label for="ha-host">Адрес брокера (IP или имя, без http://)</label><input id="ha-host" maxlength="128" placeholder="192.168.1.10" spellcheck="false"></div>
+  <div class="field"><label for="ha-port">Порт MQTT</label><input id="ha-port" type="number" min="1" max="65535" value="1883" required></div>
+  <div class="field"><label for="ha-user">Логин MQTT</label><input id="ha-user" maxlength="64" autocomplete="off"></div>
+  <div class="field"><label for="ha-password">Пароль MQTT (пусто — оставить сохранённый)</label><input id="ha-password" type="password" maxlength="128" autocomplete="new-password"><small id="ha-password-info">Пароль не сохранён</small></div>
+  <label class="stack"><input id="ha-clear-password" type="checkbox">Удалить сохранённый пароль</label>
+  <div class="field"><label for="ha-prefix">Префикс Discovery</label><input id="ha-prefix" maxlength="64" value="homeassistant" pattern="[A-Za-z0-9_-]+" required></div>
+  <div class="notice warn">Эта версия использует MQTT/TCP без TLS; веб-настройки передаются по HTTP. Только доверенная локальная сеть, без проброса портов. Пароль хранится в NVS панели, не выводится через API. Используйте отдельную учётную запись брокера.</div>
+  <label class="stack"><input id="ha-lan" type="checkbox">Подтверждаю использование доверенной локальной сети</label>
+  <div class="actions"><button type="submit" class="primary" data-write="1">Сохранить</button><button type="button" data-action="ha_reload" class="ghost">Перечитать настройки</button></div>
+  <p class="tiny">Сохранение доступно после сопряжения с дисплеем. Для смены адреса брокера или логина введите пароль заново либо явно удалите его. Отключение попробует удалить Discovery на прежнем брокере; недоступный старый брокер может потребовать ручной очистки.</p>
+ </form></div>
+</section>
 <section id="service" class="page hidden">
 <h2>Сервис</h2><div class="two">
 <div class="card"><h3>ESP32-P4</h3>
@@ -226,6 +253,7 @@ const names=["Бойлер косвенного нагрева","Электро�
 const tnames=["В котельной","На улице","Теплоноситель","Топливо"];
 let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="home",tab="wifi",detail=-1;
 let lastServerError="",lastToast=null,refreshInFlight=false;
+let haFormRevision=null,haDirty=false;
 const timeout=s=>s===0?"Не выключать":s<60?s+" секунд":s/60+" минут";
 const storageBytes=n=>Number.isFinite(n)&&n>0
     ?(n>=1073741824?(n/1073741824).toFixed(2)+" ГБ":
@@ -307,6 +335,40 @@ function renderBLE(){
    const rssi=document.createElement("span");rssi.className="muted";rssi.textContent=(e.address||"")+" · "+e.rssi+" dBm";
    row.append(name,rssi);list.append(row);
  }
+}
+function renderHA(){
+ const d=current||{},h=d.home_assistant||{},admin=!!d.authorized;
+ text("ha-state",!h.ready?"Модуль недоступен":!h.enabled?"Выключен":h.connected?"Подключён к брокеру":"Нет соединения");
+ text("ha-id",h.id||"—");text("ha-message",(h.message||"")+(h.error_code?" · код "+h.error_code:""));
+ text("ha-discovery-count",h.discovery_messages||0);
+ text("ha-password-info",admin?(h.password_set?"Пароль сохранён, его содержимое скрыто":"Пароль не сохранён"):"Требуется сопряжение");
+ for(const el of $("ha-form").querySelectorAll("input"))el.disabled=!admin||!h.ready;
+ if(!admin){
+  for(const id of ["ha-host","ha-user","ha-password"])$(id).value="";
+  haFormRevision=null;haDirty=false;return;
+ }
+ if(!haDirty&&(haFormRevision===null||haFormRevision!==h.revision)){
+  $("ha-enabled").checked=!!h.enabled;$("ha-host").value=h.host||"";
+  $("ha-port").value=h.port||1883;$("ha-user").value=h.username||"";
+  $("ha-prefix").value=h.discovery_prefix||"homeassistant";
+  $("ha-password").value="";$("ha-clear-password").checked=false;haFormRevision=h.revision;
+ }
+}
+async function saveHA(e){
+ e.preventDefault();if(!current||!current.authorized||haFormRevision===null){show("pairbox",true);return;}
+ const enabled=$("ha-enabled").checked;
+ if(enabled&&!$("ha-lan").checked){notice("Подтвердите доверенную локальную сеть",true);return;}
+ if($("ha-password").value&&$("ha-clear-password").checked){notice("Выберите новый пароль ИЛИ удаление сохранённого",true);return;}
+ const mode=$("ha-clear-password").checked?"clear":$("ha-password").value?"set":"keep";
+ const values={action:"ha_save",enabled:enabled?"1":"0",host:$("ha-host").value.trim(),port:$("ha-port").value,
+   username:$("ha-user").value,password:$("ha-password").value,password_mode:mode,
+   prefix:$("ha-prefix").value.trim(),revision:String(haFormRevision),lan_confirm:$("ha-lan").checked?"1":"0"};
+ $("ha-password").value="";
+ try{
+  await sendPost("/api/command",values,true);haDirty=false;haFormRevision=null;
+  notice("Настройки сохранены. Соединение с брокером проверяется отдельно.");await poll();
+ }catch(e){notice("Не сохранено: "+e.message,true);}
+ finally{values.password="";}
 }
 function updateView(){
  const d=current;if(!d)return;
@@ -397,7 +459,8 @@ function updateView(){
      || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction)
      || (b.dataset.action==="sd_format_prepare" && (!!sd.format_attempted || formatActive));
  }
- renderAP();renderBLE();renderEquipment();
+ renderAP();renderBLE();renderEquipment();renderHA();
+ for(const b of document.querySelectorAll('[data-action="ha_discover"]'))b.disabled=!d.authorized||!d.home_assistant?.enabled;
 }
 async function sendPost(path,data,secret){
  const headers={"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"};
@@ -452,6 +515,7 @@ async function requestStorageFormat(){
 }
 function handleAction(b){
  const action=b.dataset.action;
+ if(action==="ha_reload"){haDirty=false;haFormRevision=null;renderHA();return;}
  if(action==="show-pair"){show("pairbox",true);$("paircode").focus();return}
  if(action==="hide-pair"){show("pairbox",false);return}
  if(action==="pair"){login();return}
@@ -496,6 +560,8 @@ document.addEventListener("click",e=>{
  const button=target.closest("[data-action]");
  if(button){if(button.disabled)return;handleAction(button)}
 });
+$("ha-form").addEventListener("input",()=>{haDirty=true;});
+$("ha-form").addEventListener("submit",saveHA);
 $("cfg-type").addEventListener("change",e=>{
  const t=Number(e.target.value);
  $("cfg-gpio").disabled=t===0||t===4||t===5;
