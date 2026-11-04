@@ -31,6 +31,7 @@ jobs:
           set -o pipefail
           (cd artifacts/calm-ui && ../../.build/calm-native/calm_test) | tee artifacts/calm-ui.log
           python3 tests/calm_ui/render_preview.py
+          python3 tests/calm_ui/render_canister.py artifacts/calm-ui
       - name: Existing safety and MQTT checks
         run: |
           python3 tests/storage_static_tests.py
@@ -46,5 +47,7 @@ jobs:
           path: |
             docs/calm-menu/*.png
             docs/calm-menu/preview.html
+            docs/fuel-canister/*.png
+            docs/fuel-canister/preview.html
             artifacts/calm-ui.log
           retention-days: 14

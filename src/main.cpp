@@ -42,6 +42,13 @@ Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sen
 FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
 lv_obj_t *equipmentFuelTemp=nullptr,*equipmentFuelLevel=nullptr;
 lv_obj_t *haStatusLabel=nullptr,*webPairExpiry=nullptr,*detailValue=nullptr;
+struct FuelCanister {
+  lv_obj_t *root=nullptr,*body=nullptr,*fill=nullptr,*handle=nullptr,*cap=nullptr;
+  lv_obj_t *crossA=nullptr,*crossB=nullptr,*glyph=nullptr,*temperature=nullptr,*status=nullptr;
+};
+FuelCanister fuelCanister;
+constexpr int CANISTER_FILL_HEIGHT=106;
+void updateCanister();
 struct FuelLevelLabels {
   lv_obj_t *summary=nullptr,*upper=nullptr,*lower=nullptr,*upperDot=nullptr,*lowerDot=nullptr;
 };
@@ -287,6 +294,7 @@ void updateFuelLabels(FuelLevelLabels& labels,uint32_t now){
   }
 }
 void updateFuel(){
+  updateCanister();
   const uint32_t now=millis();updateFuelLabels(fuelCardLabels,now);updateFuelLabels(fuelDetailLabels,now);
   if(fuelDetailHint){
     const char* hint="Для оценки нужны два свежих показания";
@@ -419,18 +427,79 @@ void confirmNetwork(bool forget){
   button(overlay,forget?"Забыть сеть":"Отключить",24,430,432,60,forget?ConfirmForget:ConfirmDisconnect,0x704443);
   dialogError=label(overlay,"",24,540,432,&boiler_font_19,AMBER);
 }
+void passive(lv_obj_t* object){
+  lv_obj_clear_flag(object,LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_flag(object,LV_OBJ_FLAG_GESTURE_BUBBLE);
+}
+void canister(lv_obj_t* tile){
+  fuelCanister.temperature=label(tile,"--.- °C",18,62,172,&boiler_font_19,MUTED);
+  fuelCanister.root=box(tile,48,92,112,156,CARD,0);
+  lv_obj_set_style_border_width(fuelCanister.root,0,0);passive(fuelCanister.root);
+  fuelCanister.handle=box(fuelCanister.root,54,6,42,26,CARD,5);
+  fuelCanister.cap=box(fuelCanister.root,18,13,24,11,CARD,3);
+  fuelCanister.body=box(fuelCanister.root,8,28,96,120,CARD,10);
+  for(auto* o:{fuelCanister.handle,fuelCanister.cap,fuelCanister.body}){
+    lv_obj_set_style_border_width(o,3,0);passive(o);
+  }
+  fuelCanister.fill=box(fuelCanister.body,4,4,82,CANISTER_FILL_HEIGHT,GREEN,5);
+  lv_obj_set_style_border_width(fuelCanister.fill,0,0);passive(fuelCanister.fill);
+  // LVGL stores the point array by reference, so both arrays have static lifetime.
+  static const lv_point_t crossA[]={{0,0},{36,40}},crossB[]={{36,0},{0,40}};
+  fuelCanister.crossA=lv_line_create(fuelCanister.body);
+  fuelCanister.crossB=lv_line_create(fuelCanister.body);
+  lv_line_set_points(fuelCanister.crossA,crossA,2);lv_line_set_points(fuelCanister.crossB,crossB,2);
+  for(auto* o:{fuelCanister.crossA,fuelCanister.crossB}){
+    lv_obj_set_pos(o,27,36);lv_obj_set_style_line_width(o,3,0);
+    lv_obj_set_style_line_color(o,c(CARD),0);lv_obj_set_style_line_rounded(o,true,0);passive(o);
+  }
+  fuelCanister.glyph=label(fuelCanister.body,"?",3,23,84,&boiler_font_55,MUTED);
+  lv_obj_set_style_text_align(fuelCanister.glyph,LV_TEXT_ALIGN_CENTER,0);passive(fuelCanister.glyph);
+  fuelCanister.status=label(tile,"Нет уровня",18,269,172,&boiler_font_14,MUTED);
+  lv_obj_set_style_text_align(fuelCanister.status,LV_TEXT_ALIGN_CENTER,0);
+  updateCanister();
+}
+void updateCanister(){
+  if(!fuelCanister.root)return;
+  char value[24],text[48];const uint32_t now=millis();
+  temperature(value,sizeof(value),measurements[3],now);
+  snprintf(text,sizeof(text),"%s °C",value);lv_label_set_text(fuelCanister.temperature,text);
+  lv_obj_set_style_text_color(fuelCanister.temperature,c(measurements[3].fresh(now)?TXT:MUTED),0);
+  int height=0;uint32_t ink=MUTED;const char* mark="?";const char* status="Нет уровня";
+  // These are normalized height states shared by the display, HTTP and HA.
+  // With both inputs set to ReedNC: open/open=full; upper closed=half;
+  // both closed=empty; lower closed alone=inconsistent. Missing data != full.
+  switch(fuelLevel.status(now)){
+    case FuelLevelStatus::UpperReached:height=CANISTER_FILL_HEIGHT;ink=GREEN;mark="";status="";break;
+    case FuelLevelStatus::Between:height=CANISTER_FILL_HEIGHT/2;ink=AMBER;mark="";status="";break;
+    case FuelLevelStatus::BelowLower:ink=RED;mark="!";status="";break;
+    case FuelLevelStatus::Inconsistent:ink=AMBER;status="Ошибка уровня";break;
+    case FuelLevelStatus::Stale:ink=AMBER;status="Устарело";break;
+    default:break;
+  }
+  for(auto* o:{fuelCanister.handle,fuelCanister.cap,fuelCanister.body})lv_obj_set_style_border_color(o,c(ink),0);
+  if(height){
+    lv_obj_set_height(fuelCanister.fill,height);lv_obj_set_y(fuelCanister.fill,4+CANISTER_FILL_HEIGHT-height);
+    lv_obj_set_style_bg_color(fuelCanister.fill,c(ink),0);lv_obj_clear_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN);
+  }else lv_obj_add_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN);
+  for(auto* o:{fuelCanister.crossA,fuelCanister.crossB}){
+    if(height){lv_obj_clear_flag(o,LV_OBJ_FLAG_HIDDEN);lv_obj_set_style_line_color(o,c(height==CANISTER_FILL_HEIGHT?CARD:ink),0);}
+    else lv_obj_add_flag(o,LV_OBJ_FLAG_HIDDEN);
+  }
+  lv_label_set_text(fuelCanister.glyph,mark);lv_obj_set_style_text_color(fuelCanister.glyph,c(ink),0);
+  lv_label_set_text(fuelCanister.status,status);lv_obj_set_style_text_color(fuelCanister.status,c(ink),0);
+}
 void home(){
+  // Four cards now use the space freed by removing the lower fuel-level button.
   for(unsigned i=0;i<CHANNELS;i++){
-    auto* tile=box(body,24+int(i%2)*224,12+int(i/2)*258,208,238);
-    lv_obj_add_event_cb(tile,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(Temp0+i)));
+    auto* tile=box(body,24+int(i%2)*224,12+int(i/2)*322,208,300);
+    lv_obj_add_event_cb(tile,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(i==3?FuelOverview:Temp0+i)));
     lv_obj_set_style_border_color(tile,c(SKY),LV_STATE_PRESSED);
     label(tile,SENSOR_NAMES[i],18,22,172,&boiler_font_19,MUTED);
-    tempValue[i]=label(tile,"--.-",16,83,178,&boiler_font_55);
-    label(tile,"°C",18,153,172,&boiler_font_19,MUTED);
-    tempState[i]=label(tile,"Нет данных",18,197,172,&boiler_font_14,MUTED);
+    if(i==3){canister(tile);continue;}
+    tempValue[i]=label(tile,"--.-",16,112,178,&boiler_font_55);
+    label(tile,"°C",18,182,172,&boiler_font_19,MUTED);
+    tempState[i]=label(tile,"Нет данных",18,258,172,&boiler_font_14,MUTED);
   }
-  auto* level=menuRow(body,"Уровень топлива","",550,FuelOverview,94);
-  fuelCardLabels.summary=label(level,"Нет данных",20,57,350,&boiler_font_14,MUTED);
 }
 
 void updateEquipmentReadings(){
@@ -662,7 +731,7 @@ void render(){
   if(body)lv_obj_del(body);
   webPairLabel=webPairExpiry=haStatusLabel=sdStatusLabel=sdFormatNotice=sdFormatAccept=sdFormatReject=nullptr;
   equipmentFuelTemp=equipmentFuelLevel=nullptr;
-  fuelCardLabels={};
+  fuelCardLabels={};fuelCanister={};
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;
   sensorSummary=sensorHint=liveTime=activity=activityDot=resultList=heapLabel=uptimeLabel=nullptr;
   body=box(lv_scr_act(),0,100,480,673,BG,0);lv_obj_set_style_border_width(body,0,0);

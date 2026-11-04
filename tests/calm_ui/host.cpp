@@ -49,8 +49,13 @@ int main(){
  puts("PASS: baseline screenshots from actual old LVGL source, isolated fixtures");return 0;
 #else
  assert(!strcmp(PAGES[2],"Топливо")&&!strcmp(PAGES[3],"Настройки"));
- for(unsigned i=0;i<4;i++){assert(tempValue[i]&&strstr(lv_label_get_text(tempValue[i]),"--"));assert(lv_obj_get_style_text_font(tempValue[i],0)==&boiler_font_55);assert(!freshBar[i]&&!tempTrend[i]);}
- touch("Топливо");assert(overlay&&detailChannel==3);save("temperature-no-data");touch("Назад");assert(!overlay&&page==0);
+ for(unsigned i=0;i<3;i++){assert(tempValue[i]&&strstr(lv_label_get_text(tempValue[i]),"--"));assert(lv_obj_get_style_text_font(tempValue[i],0)==&boiler_font_55);assert(!freshBar[i]&&!tempTrend[i]);}
+ assert(!tempValue[3]&&fuelCanister.temperature&&fuelCanister.root);
+ assert(lv_obj_get_style_text_font(fuelCanister.temperature,0)==&boiler_font_19);
+ assert(lv_obj_get_child_cnt(body)==4&&!find(body,"Уровень топлива"));
+ assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.- °C"));
+ assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
+ touch("Топливо");assert(page==2&&!overlay);touch("Температура топлива");assert(overlay&&detailChannel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);
  swipe();assert(page==1&&view==0);save("equipment");
  touch("Электрокотёл");assert(page==1&&view==2);save("electric");touch("<");assert(page==1&&view==0);
  touch("Дизельный отопитель");assert(view==3);touch("Домой");assert(page==0&&!overlay);
@@ -75,14 +80,48 @@ int main(){
  lv_obj_scroll_to_y(resultList,0,LV_ANIM_OFF);step();mx=150;my=375;down=true;step(80);
  strcpy(radioFixture.aps[0].ssid,"Replacement");++radioFixture.revision;step(140);assert(displayedAps[0].ssid[0]=='W');down=false;step(300);assert(overlay&&selectedSsid[0]=='W');check();save("credentials-fixture");dismiss();
  go(0);const float values[]={22.4f,-8.2f,61.7f,34.8f};for(unsigned i=0;i<4;i++)measurements[i].put(values[i],millis());fuelLevel.put(true,false,millis());step(1100);save("home-values-fixture");check();
- for(unsigned i=0;i<4;i++)assert(!strcmp(lv_label_get_text(tempState[i]),""));
+ for(unsigned i=0;i<3;i++)assert(!strcmp(lv_label_get_text(tempState[i]),""));
+ assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"34.8 °C"));
  go(2);save("fuel-values-fixture");go(0);step(31000);assert(!strcmp(lv_label_get_text(tempState[0]),"Устарело"));save("home-stale-fixture");
  // Screen wake consumes the first touch rather than activating the underlying tile.
  panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());clickAt(100,260);assert(panel_screen::awake()&&!overlay);clickAt(100,260);assert(overlay);dismiss();panel_screen::setTimeout(0);
  for(int p=0;p<4;p++){go(p);for(int i=0;i<4;i++){swipe();assert(page==(p+i+1)%4);}}
  for(int v:{Root,WifiView,BleView,DisplayView,WebView,ConnectionsView,HaView,ServiceView,StorageView,DiagnosticsView,AboutView,WifiMoreView}){go(PAGE_SETTINGS,v);if(v==DisplayView)save("display");if(v==BleView)save("bluetooth");check();}
  go(1,1);save("boiler");go(1,3);save("diesel");go(1,4);save("fuel-heater");
+ go(0);
+ auto contacts=[&](bool upperClosed,bool lowerClosed){
+   const bool lowerReached=panel_config::reedLevelReached(panel_config::Type::ReedNC,!lowerClosed);
+   const bool upperReached=panel_config::reedLevelReached(panel_config::Type::ReedNC,!upperClosed);
+   for(unsigned i=4;i<6;i++){
+     panel_sensors::Event event;event.revision=panel_config::fixture.revision;event.channel=uint8_t(i);
+     event.atMs=millis();event.reedReached=i==4?lowerReached:upperReached;panel_sensors::queue.push_back(event);
+   }
+   measurements[3].put(34.8f,millis());step(1100);check();
+ };
+ contacts(false,false);assert(fuelLevel.status(millis())==FuelLevelStatus::UpperReached);
+ assert(lv_obj_get_height(fuelCanister.fill)==CANISTER_FILL_HEIGHT&&!lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN));
+ assert(!strcmp(lv_label_get_text(fuelCanister.glyph),""));save("canister-full-fixture");
+ contacts(true,false);assert(fuelLevel.status(millis())==FuelLevelStatus::Between);
+ assert(lv_obj_get_height(fuelCanister.fill)==CANISTER_FILL_HEIGHT/2);save("canister-half-fixture");
+ contacts(true,true);assert(fuelLevel.status(millis())==FuelLevelStatus::BelowLower);
+ assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"!"));save("canister-empty-fixture");
+ contacts(false,true);assert(fuelLevel.status(millis())==FuelLevelStatus::Inconsistent);
+ assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));save("canister-invalid-fixture");
+ contacts(false,false);step(31000);updateLive();check();
+ assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.status),"Устарело"));save("canister-stale-fixture");
+ fuelLevel.clear();updateLive();check();assert(!strcmp(lv_label_get_text(fuelCanister.status),"Нет уровня"));save("canister-unknown-fixture");
+ fuelLevel.lower.put(true,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
+ contacts(false,false);measurements[3].put(0,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"0.0 °C"));
+ measurements[3].put(-55,millis());updateLive();check();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"-55.0 °C"));
+ measurements[3].put(NAN,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.- °C"));
+ // Icon children are passive: tapping its body still opens the fuel page.
+ lv_area_t icon;lv_obj_get_coords(fuelCanister.body,&icon);clickAt((icon.x1+icon.x2)/2,(icon.y1+icon.y2)/2);
+ assert(page==2&&!fuelCanister.root&&!overlay);touch("Домой");assert(fuelCanister.root);
+ // Existing NO mode remains available for opposite-polarity float contacts.
+ assert(panel_config::reedLevelReached(panel_config::Type::ReedNO,false));
+ assert(!panel_config::reedLevelReached(panel_config::Type::ReedNO,true));
  for(int n=0;n<240;n++){go(n%4);}
+
  printf("RESULT: %u layout checks, clipped=%u; actual LVGL pointer navigation, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
  return clipped?1:0;
 #endif

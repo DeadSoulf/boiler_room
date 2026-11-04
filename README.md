@@ -1,4 +1,8 @@
-# Boiler Room Touch Panel — v0.8.0 (calm physical menu candidate)
+# Boiler Room Touch Panel — v0.8.1 (fuel canister candidate)
+
+## Fuel canister card — v0.8.1 candidate
+
+The fuel card contains a jerrycan icon with the fuel temperature in small type above it; the lower fuel-level button is removed. [Screenshots and contact truth table](docs/fuel-canister/README.md). Not installed: the physical panel remains on v0.8.0. The requested physical open=full arrangement uses both existing ReedNC input bindings; no NVS changes are made. The following sections describe previous development stages.
 
 A standalone GUITION JC4880P443C_I_W boiler-room panel, ESP32-P4 rev v1.3 + ESP32-C6 (ESP-Hosted 2.9.6), 480×800 LVGL portrait display. Source of truth: [GitHub](https://github.com/DeadSoulf/boiler_room).
 

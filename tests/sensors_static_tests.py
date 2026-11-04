@@ -11,7 +11,7 @@ page=read("src/panel_web_page.h")
 main=read("src/main.cpp")
 ci=read("ci/prepare.py")
 version=read("src/panel_types.h")
-assert 'VERSION = "v0.8.0"' in version
+assert 'VERSION = "v0.8.1"' in version
 expected={52:7,33:8,51:9,31:10,50:11,30:12,49:13,29:14,34:17,32:19,28:21}
 pairs={int(g):int(p) for g,p in re.findall(r"\{(\d+),(\d+)\}",pins)}
 assert pairs==expected,(pairs,expected)
@@ -27,7 +27,8 @@ assert "d.bus->getTemp(d.rom,c)" in sensors
 assert "CONVERSION_MS=850" in sensors
 assert "gpio_set_level" not in sensors and "digitalWrite(" not in sensors
 assert "pinMode(a.gpio,INPUT_PULLUP)" in sensors
-assert "d.setting.type==panel_config::Type::ReedNO" in sensors
+assert "panel_config::reedLevelReached(d.setting.type,inputHigh)" in sensors
+assert "type==Type::ReedNO ? !inputHigh : inputHigh" in read("src/panel_config.h")
 assert "d.due=now+PERIOD_MS" in sensors
 assert "xQueueSend(samples,&e,0)" in sensors
 assert "if(config.revision!=activeRevision)reconfigure(config)" in sensors
