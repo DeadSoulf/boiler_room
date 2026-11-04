@@ -12,7 +12,7 @@ The self-contained web UI has four primary sections and nested settings, grouped
 
 ## Installation and release discipline
 
-The current task is preparing and installing v0.9.0; the preceding verified installation is v0.8.0. The final hardware record is `docs/verification/installed.json`. Target compilation and native/browser tests are not a claim of physical touch/sensor/MQTT verification.
+**v0.9.0 is installed and verified by full Flash read-back and HTTP.** Wi-Fi, microSD and the new embedded web page respond; existing settings are preserved. [Hardware report](docs/verification/v0.9.0-hardware-2026-11-04.md) · [installed.json](docs/verification/installed.json) · [v0.9.0 release](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.9.0). Physical visual/touch checks, real PIN entry by a person and a real MQTT broker were not remotely verified.
 
 Every requested successful device update must also publish its source into **main**, a matching version tag, a GitHub Release with the checked installation ZIP and SHA-256, updated README/CHANGELOG and handoff. Documentation-only updates while main stays on older firmware do not satisfy this rule. [Release process](docs/RELEASE_PROCESS_RU.md).
 
