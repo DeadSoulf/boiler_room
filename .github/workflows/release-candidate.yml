@@ -1,0 +1,114 @@
+name: Publish explicitly requested GitHub OTA candidate
+
+# Creating this branch after merging its exact source into main is the release
+# command. Ordinary pushes, main merges, PRs and tag creation cannot publish.
+on: create
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ota-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  request:
+    if: github.repository == 'DeadSoulf/boiler_room' && github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/ota-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      source: ${{ steps.check.outputs.source }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate the explicit branch, exact source and fresh main ancestry
+        id: check
+        run: python3 scripts/prepare_ota_candidate.py request
+
+  ota:
+    needs: request
+    uses: ./.github/workflows/github-ota.yml
+
+  native:
+    needs: request
+    uses: ./.github/workflows/calm-menu.yml
+
+  publish:
+    needs: [request, ota, native]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.request.outputs.version }}
+      SOURCE_COMMIT: ${{ needs.request.outputs.source }}
+      RELEASE_CHECKS_ARTIFACT_ID: ${{ needs.ota.outputs.checks_artifact_id }}
+      RELEASE_FIRMWARE_ARTIFACT_ID: ${{ needs.ota.outputs.firmware_artifact_id }}
+      RELEASE_NATIVE_ARTIFACT_ID: ${{ needs.native.outputs.native_artifact_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reject missing artifact IDs instead of falling back to all artifacts
+        run: python3 scripts/prepare_ota_candidate.py artifact-ids
+      # No run-id or github-token override: downloads are restricted to this run.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.ota.outputs.firmware_artifact_id }}
+          path: artifacts
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.ota.outputs.checks_artifact_id }}
+          path: artifacts
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.native.outputs.native_artifact_id }}
+          path: artifacts/native-review
+          merge-multiple: true
+      - name: Validate all package bytes and real build/browser proof before mutations
+        run: python3 scripts/prepare_ota_candidate.py prepare
+      - name: Create only an absent exact-source tag; never replace one
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/prepare_ota_candidate.py tag
+      - name: Existing publisher dry-run with package, proof and tag guards
+        run: |
+          set -euo pipefail
+          python3 scripts/publish_github_release.py --source "$SOURCE_COMMIT" \
+            --package "artifacts/BoilerPanel-${RELEASE_VERSION}-COM3.zip" \
+            --ota-build-result artifacts/ota-build-result.json \
+            --notes artifacts/release-notes.md | tee artifacts/publisher-dry-run.log
+      - name: Publish pending hardware acceptance using the existing publisher
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/publish_github_release.py --source "$SOURCE_COMMIT" \
+            --package "artifacts/BoilerPanel-${RELEASE_VERSION}-COM3.zip" \
+            --ota-build-result artifacts/ota-build-result.json \
+            --notes artifacts/release-notes.md --publish | tee artifacts/publisher-result.log
+      - name: Independently download every public asset without authentication
+        env:
+          GITHUB_TOKEN: ''
+          GH_TOKEN: ''
+        run: python3 scripts/prepare_ota_candidate.py verify-public
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: ota-release-evidence-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: |
+            artifacts/ota-build-result.json
+            artifacts/release-notes.md
+            artifacts/candidate-preflight.json
+            artifacts/publisher-dry-run.log
+            artifacts/publisher-result.log
+            artifacts/public-download-verification.json
+          retention-days: 30

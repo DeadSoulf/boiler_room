@@ -1,0 +1,5 @@
+[BoilerPanel] v0.10.3 equipment=NOT_CONNECTED outputs=NONE display=0 ms LVGL=0 ms first-frame=1000 ms touch=0 ms
+OTA_REDRAW unchanged: frames=0 pixels=0
+OTA_REDRAW radio: changes=22 frames=0 root_deletions=0 stable_pixels=yes
+OTA_REDRAW progress: updates=20 frames=20 full_frames=0 pixels=432448 mode=partial
+RESULT: 392 layout checks, clipped=0; all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access

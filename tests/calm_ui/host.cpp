@@ -16,6 +16,11 @@ time_t preview_time(time_t* out){tm t={};t.tm_year=126;t.tm_mon=10;t.tm_mday=4;t
 #include UI_SOURCE
 #undef time
 std::vector<lv_color_t> pixels(480*800);
+struct FrameStats {unsigned frames=0,fullFrames=0;uint64_t pixels=0;};
+FrameStats frameStats;
+void monitor(lv_disp_drv_t*,uint32_t,uint32_t px){++frameStats.frames;frameStats.pixels+=px;if(px==480U*800U)++frameStats.fullFrames;}
+unsigned deletedScreenChildren=0;
+void screenChildDeleted(lv_event_t* e){if(lv_event_get_target(e)==lv_scr_act())++deletedScreenChildren;}
 void flush(lv_disp_drv_t* d,const lv_area_t* a,lv_color_t* src){for(int y=a->y1;y<=a->y2;y++)for(int x=a->x1;x<=a->x2;x++)pixels[y*480+x]=*src++;lv_disp_flush_ready(d);}
 int mx=10,my=10;bool down=false;
 void pointer(lv_indev_drv_t*,lv_indev_data_t* d){d->point.x=mx;d->point.y=my;d->state=panel_screen_touch_ready()&&panel_screen_filter_touch(down)?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;}
@@ -49,10 +54,73 @@ void homeTemperatureChecks(){
    assert(valueBox.x1>=cardBox.x1&&valueBox.x2<=cardBox.x2&&iconBox.x1>=cardBox.x1&&iconBox.x2<=cardBox.x2&&statusBox.y2<cardBox.y2);
  }
 }
-int main(){
+void unchangedPixels(const std::vector<lv_color_t>& before,const std::vector<lv_area_t>& allowed={}){
+ for(size_t i=0;i<pixels.size();++i)if(before[i].full!=pixels[i].full){
+   const int x=int(i%480),y=int(i/480);bool expected=false;
+   for(const auto& a:allowed)if(x>=a.x1&&x<=a.x2&&y>=a.y1&&y<=a.y2)expected=true;
+   if(!expected){fprintf(stderr,"Unexpected pixel change at (%d,%d): %04x -> %04x\n",x,y,unsigned(before[i].full),unsigned(pixels[i].full));assert(false);}
+ }
+}
+void updateRedrawChecks(bool fullRefresh){
+ auto& update=panel_update::fixture;auto& network=panel_radio::fixture;
+ const auto originalUpdate=update;const auto originalNetwork=network;
+ step(500); // Let the real LVGL disabled-state transition finish once.
+ auto* originalBody=body;auto* originalHeader=header;auto* originalFooter=footer;
+ auto* originalProgress=updateProgress;auto* originalCancel=updateCancelButton;
+ deletedScreenChildren=0;lv_obj_add_event_cb(lv_scr_act(),screenChildDeleted,LV_EVENT_CHILD_DELETED,nullptr);
+ auto stable=[&](){assert(!deletedScreenChildren&&body==originalBody&&header==originalHeader&&footer==originalFooter&&updateProgress==originalProgress&&updateCancelButton==originalCancel);};
+ const auto steadyPixels=pixels;frameStats={};step(1200);
+ printf("OTA_REDRAW unchanged: frames=%u pixels=%llu\n",frameStats.frames,(unsigned long long)frameStats.pixels);
+ assert(frameStats.frames==0);stable();unchangedPixels(steadyPixels);
+ frameStats={};
+ for(unsigned i=0;i<20;++i){
+   network.rssi=-50-int(i%5);++network.revision;step(100);
+   assert(radio.rssi==network.rssi&&radio.revision==network.revision);stable();unchangedPixels(steadyPixels);
+ }
+ // A connection change is still sampled, but this page has no radio-dependent content.
+ network.connected=false;network.rssi=0;network.ip[0]=0;strcpy(network.wifiMessage,"Связь потеряна");++network.revision;step(120);
+ assert(!radio.connected);stable();unchangedPixels(steadyPixels);
+ network=originalNetwork;network.revision=radio.revision+1;step(120);assert(radio.connected);stable();unchangedPixels(steadyPixels);
+ assert(frameStats.frames==0);
+ printf("OTA_REDRAW radio: changes=22 frames=%u root_deletions=%u stable_pixels=yes\n",frameStats.frames,deletedScreenChildren);
+ lv_area_t barBox,textBox;lv_obj_get_coords(lv_obj_get_parent(updateProgressFill),&barBox);lv_obj_get_coords(updateProgress,&textBox);
+ const auto beforeProgress=pixels;frameStats={};
+ for(unsigned percent=40;percent<=59;++percent){
+   update.done=percent*100;update.percent=uint8_t(percent);step(120);stable();
+   char expected[16];snprintf(expected,sizeof(expected),"%u%%",percent);assert(strstr(lv_label_get_text(updateProgress),expected));
+   assert(lv_obj_get_width(updateProgressFill)==int(428U*percent/100U));
+   assert(!lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));
+   unchangedPixels(beforeProgress,{barBox,textBox});
+ }
+ assert(frameStats.frames>0);assert(!strcmp(lv_label_get_text(updateProgress),"59%   5900 Б / 10000 Б"));
+ printf("OTA_REDRAW progress: updates=20 frames=%u full_frames=%u pixels=%llu mode=%s\n",frameStats.frames,frameStats.fullFrames,(unsigned long long)frameStats.pixels,fullRefresh?"full-refresh":"partial");
+ // Bytes can change before the first percent; phase and controls must stay live too.
+ update.total=100000;update.done=500;update.percent=0;step(120);assert(strstr(lv_label_get_text(updateProgress),"500 Б"));
+ update.done=501;step(120);assert(strstr(lv_label_get_text(updateProgress),"501 Б")&&lv_obj_has_flag(updateProgressFill,LV_OBJ_FLAG_HIDDEN));
+ update.phase=panel_update::Phase::Verifying;update.cancelAllowed=false;strcpy(update.message,"Проверяем файл обновления.");step(300);stable();
+ assert(!strcmp(lv_label_get_text(updateStatus),"Проверка файла")&&!strcmp(lv_label_get_text(updateMessage),update.message));
+ assert(lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED)&&lv_obj_has_state(updateInstallButton,LV_STATE_DISABLED));
+ // LONG_DOT stores an ellipsis in the label; it must not trigger repeat writes.
+ std::string longMessage;while(longMessage.size()+strlen("Ш")<sizeof(update.message))longMessage+="Ш";
+ strcpy(update.message,longMessage.c_str());step(300);assert(strcmp(lv_label_get_text(updateMessage),update.message));
+ frameStats={};step(1000);assert(frameStats.frames==0);stable();
+ update=originalUpdate;step(300);stable();assert(!strcmp(lv_label_get_text(updateStatus),"Загрузка")&&strstr(lv_label_get_text(updateProgress),"37%"));
+ assert(!lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));
+ lv_obj_remove_event_cb(lv_scr_act(),screenChildDeleted);
+ // Leaving/re-entering still creates the right page; Wi-Fi must keep its live updates.
+ network.connected=false;network.rssi=0;network.ip[0]=0;++network.revision;step(120);
+ touch("<");touch("<");touch("Подключения");touch("Wi-Fi");assert(find(body,"Нет подключения"));
+ const uint32_t nextRevision=network.revision+1;network=originalNetwork;network.revision=nextRevision;step(300);assert(find(body,"Подключён"));
+ touch("<");touch("<");touch("Сервис");touch("Обновление");
+ assert(strstr(lv_label_get_text(updateProgress),"37%")&&!strcmp(lv_label_get_text(updateMessage),originalUpdate.message));
+ assert(!lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));
+}
+int main(int argc,char** argv){
+ setvbuf(stdout,nullptr,_IOLBF,0);
+ assert(argc==1||(argc==2&&!strcmp(argv[1],"--full-refresh")));const bool fullRefresh=argc==2;
  setenv("TZ","UTC0",1);tzset();lv_init();
- static lv_color_t buf[480*40];static lv_disp_draw_buf_t draw;lv_disp_draw_buf_init(&draw,buf,nullptr,480*40);
- lv_disp_drv_t display;lv_disp_drv_init(&display);display.hor_res=480;display.ver_res=800;display.flush_cb=flush;display.draw_buf=&draw;lv_disp_drv_register(&display);
+ static lv_color_t buf[480*800],second[480*800];static lv_disp_draw_buf_t draw;lv_disp_draw_buf_init(&draw,buf,fullRefresh?second:nullptr,fullRefresh?480*800:480*40);
+ lv_disp_drv_t display;lv_disp_drv_init(&display);display.hor_res=480;display.ver_res=800;display.flush_cb=flush;display.draw_buf=&draw;display.full_refresh=fullRefresh;display.monitor_cb=monitor;lv_disp_drv_register(&display);
  lv_indev_drv_t input;lv_indev_drv_init(&input);input.type=LV_INDEV_TYPE_POINTER;input.read_cb=pointer;lv_indev_drv_register(&input);
  auto& radioFixture=panel_radio::fixture;radioFixture.ready=true;radioFixture.wifiSupported=true;radioFixture.bleSupported=true;radioFixture.connected=true;radioFixture.hasSaved=true;
  strcpy(radioFixture.ssid,"Example-WiFi");strcpy(radioFixture.ip,"192.0.2.10");radioFixture.rssi=-53;strcpy(radioFixture.hostVersion,"2.9.6");strcpy(radioFixture.c6Version,"2.9.6");
@@ -150,7 +218,7 @@ int main(){
  assert(!overlay&&update.busy&&panel_update::installed==1&&!strcmp(panel_update::requestedVersion,"v9.8.2"));
  update.total=10000;update.done=3700;update.percent=37;strcpy(update.message,"Загружаем новую версию панели.");step(120);check();save("update-progress-fixture");
  assert(strstr(lv_label_get_text(updateProgress),"37%")&&lv_obj_has_state(updateInstallButton,LV_STATE_DISABLED));
- assert(!lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));touch("Отменить обновление");
+ assert(!lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));updateRedrawChecks(fullRefresh);touch("Отменить обновление");
  assert(panel_update::cancelled==1&&!update.busy);assert(!strcmp(lv_label_get_text(updateStatus),"Обновление отменено"));
  update.busy=true;update.cancelAllowed=false;update.phase=panel_update::Phase::Installing;step(120);
  assert(lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));lv_area_t disabled;lv_obj_get_coords(updateCancelButton,&disabled);
@@ -220,7 +288,7 @@ int main(){
  assert(!panel_config::reedLevelReached(panel_config::Type::ReedNO,true));
  for(int n=0;n<240;n++){go(n%4);}
 
- printf("RESULT: %u layout checks, clipped=%u; all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
+ printf("RESULT: %u layout checks, clipped=%u; all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
  return clipped?1:0;
 #endif
 }
