@@ -4,7 +4,7 @@
 
 Equipment cards retain their expanded or collapsed state and keyboard focus while live status is refreshed. The existing cards are updated in place, so new values still arrive without closing the section being read. No equipment API, GPIO or control behaviour changes.
 
-This release is being prepared for the first GitHub OTA installation from v0.10.0. **The last confirmed installed version remains v0.10.0** until the device completes the update and its result is checked. [OTA instructions](docs/github-ota.md) · [installed.json](docs/verification/installed.json).
+**v0.10.1 is installed through GitHub OTA and its healthy boot is confirmed.** Three HTTP observations on 5 November 2026, 10:21 Moscow time, show stable operation, no update error and v0.10.0 available for rollback. The live HTML exactly matches the released source. [Network acceptance report](docs/verification/v0.10.1-ota-network-2026-11-05.md) · [Release](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.1) · [OTA instructions](docs/github-ota.md) · [installed.json](docs/verification/installed.json).
 
 ## v0.10.0: GitHub updates on the panel
 
@@ -30,7 +30,7 @@ The self-contained web UI has four primary sections and nested settings, grouped
 
 ## Installation and release discipline
 
-**v0.10.0 is installed and verified by full Flash read-back and HTTP.** A fresh full v0.9.1 backup was made first. Wi-Fi, touch readiness, microSD, the OTA worker and the exact embedded web page are confirmed; existing settings are preserved. [Hardware report](docs/verification/v0.10.0-hardware-2026-11-05.md) · [installed.json](docs/verification/installed.json) · [v0.10.0 release](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.0). A complete subsequent firmware installation over the network, power interruption during OTA, physical visual/touch checks, real PIN entry and a real MQTT broker were not remotely verified.
+**Current installation: v0.10.1, delivered through GitHub OTA.** Wi-Fi, touch readiness, microSD logging, settings and the exact embedded web page are confirmed over HTTP. The device validates the written image and boot metadata internally; this acceptance did not use an independent external Flash read. [Network report](docs/verification/v0.10.1-ota-network-2026-11-05.md) · [installed.json](docs/verification/installed.json). The earlier USB installation and full read-back of v0.10.0 remain a [historical report](docs/verification/v0.10.0-hardware-2026-11-05.md). Physical power-loss, visual/touch checks, the exact user confirmation action and a real MQTT broker were not remotely verified. Future updates use GitHub OTA; USB initial provisioning or recovery requires a separate explicit request.
 
 Every requested successful device update must also publish its source into **main**, a matching version tag, a GitHub Release with the checked installation ZIP and SHA-256, updated README/CHANGELOG and handoff. Documentation-only updates while main stays on older firmware do not satisfy this rule. [Release process](docs/RELEASE_PROCESS_RU.md).
 
