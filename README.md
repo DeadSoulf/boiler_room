@@ -4,7 +4,7 @@
 
 All four Home readings use the same large number size on the 480×800 panel and in the embedded web UI. The fuel temperature now matches the other three; its canister remains below the value and unit. Web values retain the existing responsive size at each viewport, with the unit wrapping when needed. Equipment disclosure state from v0.10.1 is preserved.
 
-v0.10.2 is being prepared for GitHub OTA. The last verified installed version is v0.10.1; publishing a candidate is separate from confirming its installation.
+**[v0.10.2 is published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.2).** The final build, native LVGL, browser checks and both dedicated OTA/target CI runs passed. All four public files were downloaded and hash-checked. The last verified installed version remains **v0.10.1**; select **Settings → Service → Update → Check**, then confirm v0.10.2 on the panel or in the paired browser. [Release and verification report](docs/verification/v0.10.2-ota-candidate-2026-11-05.md).
 
 ## v0.10.1: keep equipment details open
 

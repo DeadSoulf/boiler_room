@@ -1,0 +1,96 @@
+{
+  "version": "v0.10.2",
+  "source_commit": "4dc813907b89b76f8af59d90e62ec246764b5901",
+  "release_published": true,
+  "hardware_acceptance": "pending",
+  "network_ota_install_verified": false,
+  "release_id": 434912228,
+  "release_url": "https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.2",
+  "published_at": "2026-11-05T07:53:18Z",
+  "merge_commit": "4816987a03c2e06b9ae1730440780f4bef2da23b",
+  "public_asset_downloads_verified": true,
+  "public_asset_check_utc": "2026-11-05T07:54:06.636981+00:00",
+  "assets": [
+    {
+      "id": 712554607,
+      "name": "boiler-panel-ota.json",
+      "bytes": 627,
+      "sha256": "0dd0eeb7c569daa6e4c6b52abf4ef2af74e5fdc50dd6a91173bab626693e2de8"
+    },
+    {
+      "id": 712554177,
+      "name": "BoilerPanel-v0.10.2-COM3.zip",
+      "bytes": 1099591,
+      "sha256": "c0a781962e2090ccfb283fd3058f9fa7803c9fa2083716e9fa80018b8842e9bf"
+    },
+    {
+      "id": 712554387,
+      "name": "BoilerPanel-v0.10.2-firmware.bin",
+      "bytes": 1943344,
+      "sha256": "03e824bd2a99db27894ae6150b50fcf8f828758eb37685d8285451cfc1b98d5b"
+    },
+    {
+      "id": 712554646,
+      "name": "SHA256SUMS.txt",
+      "bytes": 282,
+      "sha256": "6a1d08f542189c89f9a158537e16e0e4f7f9e09ba66c12cc3ed2043c7a74d573"
+    }
+  ],
+  "last_confirmed_installed_version": "v0.10.1",
+  "latest_device_observation": {
+    "checked_utc": "2026-11-05T07:54:42.229158+00:00",
+    "version": "v0.10.1",
+    "uptime_s": 2493,
+    "update": {
+      "started": true,
+      "supported": true,
+      "busy": false,
+      "available": false,
+      "cancel_allowed": false,
+      "rollback_available": true,
+      "boot_pending": false,
+      "automatic_rollback": true,
+      "phase": "current",
+      "done": 0,
+      "total": 0,
+      "percent": 0,
+      "last_check": 1793862828,
+      "latest_version": "v0.10.1",
+      "previous_version": "v0.10.0",
+      "message": "Установлена актуальная версия. Манифест GitHub проверен.",
+      "error_code": 0
+    }
+  },
+  "device_offer_observed": false,
+  "target_build": "PASS",
+  "native_lvgl": {
+    "version": "8.3.11",
+    "layout_checks": 384,
+    "clipped": 0
+  },
+  "browser": {
+    "result": "PASS",
+    "widths": [
+      320,
+      390,
+      768,
+      1280
+    ],
+    "home_temperature_cases": 16,
+    "status_polls": 28,
+    "page_errors": [],
+    "mutation_requests": [],
+    "physical_panel_contacted": false
+  },
+  "ci": {
+    "push_run": 41989377899,
+    "pr_run": 41989552858,
+    "ota_and_firmware": "success",
+    "legacy_general_ci_issue": 15
+  },
+  "physical_visual_verification": false,
+  "physical_ota_power_loss_verified": false,
+  "usb_write_performed": false,
+  "sd_format_performed": false,
+  "report": "v0.10.2-ota-candidate-2026-11-05.md"
+}
