@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Publish a hardware-accepted release or an explicitly pending OTA candidate.
 
-Uses the existing Git credential helper only for github.com/DeadSoulf/boiler_room.
+Uses the job's GITHUB_TOKEN in this repository's Actions, or the existing Git
+credential helper only for github.com/DeadSoulf/boiler_room outside Actions.
 Credentials stay in memory and are never printed or written. Default: dry-run.
 Never uploads backups or files outside the build's allowlisted firmware package.
 """
@@ -167,14 +168,9 @@ def request_body(data,upload=False):
   return data
  return json.dumps(data).encode('utf-8')
 def git(*args):return subprocess.check_output(['git',*args],cwd=ROOT,text=True).strip()
-def main():
- parser=argument_parser();args=parser.parse_args()
- if args.notes_only and args.hardware_result is None:parser.error('--notes-only requires --hardware-result')
- tag=(ROOT/'VERSION').read_text(encoding='ascii').strip()
- require(re.fullmatch(r'v\d+\.\d+\.\d+',tag),'Invalid release version')
- require(re.fullmatch(r'[0-9a-f]{40}',args.source),'A full immutable source commit is required')
- subprocess.run([sys.executable,str(ROOT/'scripts/check_release_version.py')],check=True,cwd=ROOT)
- package=args.package.resolve();require(package.parent==(ROOT/'artifacts').resolve(),'Package must be under artifacts/')
+def load_payloads(root,package,tag,source):
+ """The same package guards serve pre-tag CI validation and actual publication."""
+ package=package.resolve();require(package.parent==(root/'artifacts').resolve(),'Package must be under artifacts/')
  require(package.name==f'BoilerPanel-{tag}-COM3.zip','Package name does not match the version')
  package_bytes=package.read_bytes()
  with zipfile.ZipFile(io.BytesIO(package_bytes)) as z:
@@ -191,16 +187,45 @@ def main():
   require(set(manifest)==set(files)-{'SHA256SUMS.json'},'Every package payload must be hashed')
   require(all(hashlib.sha256(files[n]).hexdigest()==h for n,h in manifest.items()),'Package payload hash mismatch')
   source_lines=re.findall(r'^GitHub commit: ([0-9a-f]{40})$',files['SOURCE.txt'].decode('utf-8'),re.M)
-  require(source_lines==[args.source],'Package identifies a different or ambiguous source commit')
- ota_bytes=(ROOT/'artifacts'/MANIFEST_NAME).read_bytes()
- ota=validate_assets(ROOT,tag,args.source,files['firmware.bin'],files['bootloader.bin'],files['partitions.bin'])
- require((ROOT/'artifacts'/MANIFEST_NAME).read_bytes()==ota_bytes,'OTA manifest changed during validation')
+  require(source_lines==[source],'Package identifies a different or ambiguous source commit')
+ ota_bytes=(root/'artifacts'/MANIFEST_NAME).read_bytes()
+ ota=validate_assets(root,tag,source,files['firmware.bin'],files['bootloader.bin'],files['partitions.bin'])
+ require((root/'artifacts'/MANIFEST_NAME).read_bytes()==ota_bytes,'OTA manifest changed during validation')
  firmware_name=ota['firmware']['name']
  payloads=[(package.name,package_bytes,'application/zip'),
            (firmware_name,files['firmware.bin'],'application/octet-stream'),
            (MANIFEST_NAME,ota_bytes,'application/json')]
  sums=''.join(f'{hashlib.sha256(data).hexdigest()}  {name}\n' for name,data,_ in payloads).encode('ascii')
  payloads.append(('SHA256SUMS.txt',sums,'text/plain'))
+ return payloads
+def candidate_inputs_match(root,source):
+ inputs=('src','ci','VERSION',BROWSER_TEST)
+ subprocess.run(['git','diff','--exit-code',source,'--',*inputs],cwd=root,check=True,stdout=subprocess.DEVNULL)
+ untracked=subprocess.check_output(['git','ls-files','--others','--exclude-standard','--',*inputs],cwd=root,text=True).strip()
+ require(not untracked,'Untracked files would change the candidate build/test inputs')
+def github_token(environ=None):
+ env=dict(os.environ if environ is None else environ)
+ if env.get('GITHUB_ACTIONS')=='true':
+  require(env.get('GITHUB_REPOSITORY')==REPO,'Actions token is only accepted for the fixed repository')
+  token=env.get('GITHUB_TOKEN')
+  require(type(token) is str and token.strip(),'The release job needs its scoped GITHUB_TOKEN')
+  return token
+ env.update(GIT_TERMINAL_PROMPT='0',GCM_INTERACTIVE='never',GIT_TRACE='0',GIT_TRACE_CURL='0',GIT_CURL_VERBOSE='0')
+ credential=subprocess.run(['git','credential','fill'],cwd=ROOT,input=f'protocol=https\nhost=github.com\npath={REPO}.git\n\n',capture_output=True,text=True,env=env)
+ if credential.returncode:raise RuntimeError('Existing GitHub credentials unavailable; no release was published')
+ values=dict(line.split('=',1) for line in credential.stdout.splitlines() if '=' in line)
+ token=values.get('password')
+ if not token:raise RuntimeError('Existing GitHub token unavailable')
+ values.clear();return token
+def main():
+ parser=argument_parser();args=parser.parse_args()
+ if args.notes_only and args.hardware_result is None:parser.error('--notes-only requires --hardware-result')
+ tag=(ROOT/'VERSION').read_text(encoding='ascii').strip()
+ require(re.fullmatch(r'v\d+\.\d+\.\d+',tag),'Invalid release version')
+ require(re.fullmatch(r'[0-9a-f]{40}',args.source),'A full immutable source commit is required')
+ subprocess.run([sys.executable,str(ROOT/'scripts/check_release_version.py')],check=True,cwd=ROOT)
+ package=args.package.resolve();payloads=load_payloads(ROOT,package,tag,args.source)
+ package_bytes=payloads[0][1]
  mode='hardware' if args.hardware_result is not None else 'candidate'
  result_path=args.hardware_result if mode=='hardware' else args.ota_build_result
  proof=strict_json(result_path.read_bytes(),'Release result')
@@ -208,9 +233,7 @@ def main():
  else:
   validate_candidate(ROOT,proof,tag,args.source,payloads)
   # An attestation for the final source cannot cover modified/untracked build inputs.
-  inputs=('src','ci','VERSION',BROWSER_TEST)
-  subprocess.run(['git','diff','--exit-code',args.source,'--',*inputs],cwd=ROOT,check=True,stdout=subprocess.DEVNULL)
-  require(not git('ls-files','--others','--exclude-standard','--',*inputs),'Untracked files would change the candidate build/test inputs')
+  candidate_inputs_match(ROOT,args.source)
  require(git('rev-parse',f'refs/tags/{tag}')==args.source,'Tag must identify the exact build source')
  subprocess.run(['git','merge-base','--is-ancestor',args.source,'origin/main'],cwd=ROOT,check=True)
  remote=git('ls-remote','origin',f'refs/tags/{tag}').split()
@@ -219,12 +242,7 @@ def main():
  print(json.dumps({'tag':tag,'source':args.source,'package':package.name,'sha256':hashlib.sha256(package_bytes).hexdigest(),
                    'acceptance':'pending' if mode=='candidate' else 'hardware_accepted','notes_only':args.notes_only,'publish':args.publish}))
  if not args.publish:return
- env=os.environ.copy();env.update(GIT_TERMINAL_PROMPT='0',GCM_INTERACTIVE='never',GIT_TRACE='0',GIT_TRACE_CURL='0',GIT_CURL_VERBOSE='0')
- credential=subprocess.run(['git','credential','fill'],cwd=ROOT,input=f'protocol=https\nhost=github.com\npath={REPO}.git\n\n',capture_output=True,text=True,env=env)
- if credential.returncode:raise RuntimeError('Existing GitHub credentials unavailable; no release was published')
- values=dict(line.split('=',1) for line in credential.stdout.splitlines() if '=' in line)
- token=values.get('password')
- if not token:raise RuntimeError('Existing GitHub token unavailable')
+ token=github_token()
  def api(method,path,data=None,mime='application/json',upload=False,allow404=False):
   base='https://uploads.github.com/repos/' if upload else 'https://api.github.com/repos/'
   # application/json is also an asset MIME: its exact bytes must not be re-encoded.
@@ -237,5 +255,5 @@ def main():
    raise RuntimeError(f'GitHub {method} failed with HTTP {e.code}; credentials are not logged') from None
  final=publish_release(api,tag,args.source,notes,payloads,mode,notes_only=args.notes_only)
  print(json.dumps({'release':final['html_url'],'tag':final['tag_name'],'assets':[{'name':a['name'],'size':a['size'],'digest':a.get('digest')} for a in final['assets']]}))
- values.clear();token=None
+ token=None
 if __name__=='__main__':main()

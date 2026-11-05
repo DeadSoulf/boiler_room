@@ -788,14 +788,27 @@ const char* updatePhaseText(){
     default:return "Проверить новую версию";
   }
 }
+void updateLabelText(lv_obj_t* object,const char* text){
+  if(strcmp(lv_label_get_text(object),text))lv_label_set_text(object,text);
+}
+void updateVisibility(lv_obj_t* object,bool visible){
+  if(visible==lv_obj_has_flag(object,LV_OBJ_FLAG_HIDDEN)){
+    if(visible)lv_obj_clear_flag(object,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(object,LV_OBJ_FLAG_HIDDEN);
+  }
+}
 void updateButtonState(lv_obj_t* object,bool enabled,bool visible=true){
   if(!object)return;
-  if(visible)lv_obj_clear_flag(object,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(object,LV_OBJ_FLAG_HIDDEN);
+  updateVisibility(object,visible);
   if(enabled)lv_obj_clear_state(object,LV_STATE_DISABLED);else lv_obj_add_state(object,LV_STATE_DISABLED);
-  lv_obj_set_style_opa(object,enabled?LV_OPA_COVER:LV_OPA_40,0);
+  const lv_opa_t opacity=enabled?LV_OPA_COVER:LV_OPA_40;
+  if(lv_obj_get_style_opa(object,0)!=opacity)lv_obj_set_style_opa(object,opacity,0);
 }
 void updateUpdateLabels(){
-  panel_update::Snapshot next;if(panel_update::snapshot(next))updateState=next;
+  bool messageChanged=false;
+  panel_update::Snapshot next;if(panel_update::snapshot(next)){
+    messageChanged=next.supported!=updateState.supported||strcmp(next.message,updateState.message);
+    updateState=next;
+  }
   if(page==0&&bool(homeUpdateNotice)!=homeUpdateVisible())rebuild=true;
   char out[180];
   if(homeUpdateText){
@@ -807,24 +820,26 @@ void updateUpdateLabels(){
     else if(updateState.phase==panel_update::Phase::Success)snprintf(out,sizeof(out),"Установлена %s >",VERSION);
     else if(updateState.phase==panel_update::Phase::RolledBack)snprintf(out,sizeof(out),"Возврат к %s завершён >",VERSION);
     else snprintf(out,sizeof(out),"Доступно обновление %s >",updateState.latestVersion);
-    lv_label_set_text(homeUpdateText,out);
+    updateLabelText(homeUpdateText,out);
   }
   if(!updateStatus)return;
-  lv_label_set_text(updateLatest,updateState.latestVersion[0]?updateState.latestVersion:"Ещё не проверено");
-  lv_label_set_text(updateStatus,updatePhaseText());
-  lv_obj_set_style_text_color(updateStatus,c(updateState.phase==panel_update::Phase::Error?AMBER:TXT),0);
-  lv_label_set_text(updateMessage,updateState.message[0]?updateState.message:
+  updateLabelText(updateLatest,updateState.latestVersion[0]?updateState.latestVersion:"Ещё не проверено");
+  updateLabelText(updateStatus,updatePhaseText());
+  const lv_color_t ink=c(updateState.phase==panel_update::Phase::Error?AMBER:TXT);
+  if(lv_obj_get_style_text_color(updateStatus,0).full!=ink.full)lv_obj_set_style_text_color(updateStatus,ink,0);
+  // LONG_DOT changes the label's stored text; compare the original snapshot instead.
+  if(messageChanged||!lv_label_get_text(updateMessage)[0])lv_label_set_text(updateMessage,updateState.message[0]?updateState.message:
     updateState.supported?"Проверка новых версий выполняется\nпри подключении к интернету.":"Проверка станет доступна после\nзапуска служб панели.");
   const unsigned percent=updateState.percent>100?100:updateState.percent;
   if(updateState.total){
     char done[24],total[24];capacityString(updateState.done,done);capacityString(updateState.total,total);
     snprintf(out,sizeof(out),"%u%%   %s / %s",percent,done,total);
   }else out[0]=0;
-  lv_label_set_text(updateProgress,out);
+  updateLabelText(updateProgress,out);
   lv_obj_set_width(updateProgressFill,percent?int(428U*percent/100U):1);
-  if(percent)lv_obj_clear_flag(updateProgressFill,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(updateProgressFill,LV_OBJ_FLAG_HIDDEN);
+  updateVisibility(updateProgressFill,percent!=0);
   if(updateState.errorCode)snprintf(out,sizeof(out),"Код ошибки: %ld",(long)updateState.errorCode);else out[0]=0;
-  lv_label_set_text(updateError,out);
+  updateLabelText(updateError,out);
   const bool ready=updateState.started&&updateState.supported&&!updateState.busy&&!updateState.bootPending;
   updateButtonState(updateCheckButton,ready);
   updateButtonState(updateInstallButton,ready&&updateState.available&&updateState.latestVersion[0]);
@@ -977,7 +992,9 @@ void refresh(lv_timer_t*){
   }
   panel_screen::tick();
   if(pendingPage>=0){page=pendingPage;pendingPage=-1;rebuild=true;}
-  if(!overlay && page==PAGE_SETTINGS && (signature()!=renderedSignature || radio.revision!=renderedRevision))rebuild=true;
+  // RSSI revisions must not recreate the OTA page or restart its button transitions.
+  // Its labels and controls follow the update snapshot above, independently of radio.
+  if(!overlay && page==PAGE_SETTINGS && view!=UpdateView && (signature()!=renderedSignature || radio.revision!=renderedRevision))rebuild=true;
   bool touching=false;
   for(auto* input=lv_indev_get_next(nullptr);input;input=lv_indev_get_next(input))
     if(lv_indev_get_type(input)==LV_INDEV_TYPE_POINTER && input->proc.state==LV_INDEV_STATE_PRESSED)touching=true;

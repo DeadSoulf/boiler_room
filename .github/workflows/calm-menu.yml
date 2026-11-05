@@ -5,16 +5,23 @@ on:
   pull_request:
     paths: ['src/**', 'tests/calm_ui/**', 'tests/config_060_static.py', 'tests/web_firmware_tests.py', 'tests/sensors_static_tests.py', '.github/workflows/calm-menu.yml']
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      native_artifact_id:
+        value: ${{ jobs.native-menu.outputs.artifact_id }}
 permissions:
   contents: read
 jobs:
   native-menu:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    outputs:
+      artifact_id: ${{ steps.review.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          ref: ${{ github.sha }}
       - name: Fetch exact LVGL 8.3.11
         run: |
           mkdir -p .build/lvgl
@@ -30,6 +37,8 @@ jobs:
           mkdir -p artifacts/calm-ui
           set -o pipefail
           (cd artifacts/calm-ui && ../../.build/calm-native/calm_test) | tee artifacts/calm-ui.log
+          mkdir -p artifacts/calm-ui-full-refresh
+          (cd artifacts/calm-ui-full-refresh && ../../.build/calm-native/calm_test --full-refresh) | tee artifacts/calm-ui-full-refresh.log
           python3 tests/calm_ui/render_preview.py
           python3 tests/calm_ui/render_canister.py artifacts/calm-ui
           python3 tests/calm_ui/render_home_icons.py
@@ -42,9 +51,10 @@ jobs:
           python3 tests/home_assistant_tests.py
           python3 tests/flash_panel_tests.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        id: review
         if: always()
         with:
-          name: calm-menu-review
+          name: calm-menu-review-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: |
             docs/calm-menu/*.png
             docs/calm-menu/preview.html
@@ -52,4 +62,5 @@ jobs:
             docs/fuel-canister/preview.html
             docs/home-icons-v091/*.png
             artifacts/calm-ui.log
+            artifacts/calm-ui-full-refresh.log
           retention-days: 14

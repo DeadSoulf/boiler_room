@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.2
+# Boiler Room Touch Panel — v0.10.3
+
+## v0.10.3: stable update screen
+
+The physical Update page keeps its existing widgets when Wi-Fi signal information changes. Download text and button state are changed only when their displayed values change, so the unchanged page no longer redraws or restarts disabled-button animations every 100 ms. Progress, cancellation, connection availability and confirmation of a specific version remain live.
+
+The regression runs with real LVGL 8.3.11 in both partial rendering and the panel's full-refresh mode with two full-screen draw buffers. This release is being prepared for GitHub OTA; publication and installation are not yet confirmed. The last verified installed version remains v0.10.1. This is a native UI correction, not a physical verification of the LCD during Flash writes. When installing this correction, the previous firmware still handles that download; the new behaviour starts after reboot into v0.10.3.
 
 ## v0.10.2: equal Home temperature sizes
 
@@ -36,7 +42,7 @@ The self-contained web UI has four primary sections and nested settings, grouped
 
 ## Installation and release discipline
 
-**Current installation: v0.10.1, delivered through GitHub OTA.** Wi-Fi, touch readiness, microSD logging, settings and the exact embedded web page are confirmed over HTTP. The device validates the written image and boot metadata internally; this acceptance did not use an independent external Flash read. [Network report](docs/verification/v0.10.1-ota-network-2026-11-05.md) · [installed.json](docs/verification/installed.json). The earlier USB installation and full read-back of v0.10.0 remain a [historical report](docs/verification/v0.10.0-hardware-2026-11-05.md). Physical power-loss, visual/touch checks, the exact user confirmation action and a real MQTT broker were not remotely verified. Future updates use GitHub OTA; USB initial provisioning or recovery requires a separate explicit request.
+**Last verified installation: v0.10.1, delivered through GitHub OTA.** Wi-Fi, touch readiness, microSD logging, settings and the exact embedded web page are confirmed over HTTP. The device validates the written image and boot metadata internally; this acceptance did not use an independent external Flash read. [Network report](docs/verification/v0.10.1-ota-network-2026-11-05.md) · [installed.json](docs/verification/installed.json). The earlier USB installation and full read-back of v0.10.0 remain a [historical report](docs/verification/v0.10.0-hardware-2026-11-05.md). Physical power-loss, visual/touch checks, the exact user confirmation action and a real MQTT broker were not remotely verified. Future updates use GitHub OTA; USB initial provisioning or recovery requires a separate explicit request.
 
 Every requested successful device update must also publish its source into **main**, a matching version tag, a GitHub Release with the checked installation ZIP and SHA-256, updated README/CHANGELOG and handoff. Documentation-only updates while main stays on older firmware do not satisfy this rule. [Release process](docs/RELEASE_PROCESS_RU.md).
 

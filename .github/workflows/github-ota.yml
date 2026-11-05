@@ -1,23 +1,32 @@
 name: GitHub OTA checks and ESP32-P4 build
 on:
   push:
-    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/equipment_web_browser.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml']
+    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/ota_candidate_*', 'tests/equipment_web_browser.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml', '.github/workflows/release-candidate.yml']
   pull_request:
-    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/equipment_web_browser.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml']
+    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/ota_candidate_*', 'tests/equipment_web_browser.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml', '.github/workflows/release-candidate.yml']
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      checks_artifact_id:
+        value: ${{ jobs.ota-checks.outputs.artifact_id }}
+      firmware_artifact_id:
+        value: ${{ jobs.firmware.outputs.artifact_id }}
 permissions:
   contents: read
 concurrency:
-  group: github-ota-${{ github.ref }}
+  group: github-ota-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   ota-checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    outputs:
+      artifact_id: ${{ steps.review.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          ref: ${{ github.sha }}
       - name: Update policy, runtime faults and release integrity
         run: |
           python3 scripts/check_release_version.py
@@ -25,6 +34,7 @@ jobs:
           node tests/update_web_state_tests.mjs
           python3 tests/update_web_commands.py
           python3 tests/ota_release_tests.py
+          python3 tests/ota_candidate_tests.py
           python3 tests/artifact_manifest_tests.py
           python3 tests/flash_panel_tests.py
           python3 tests/flash_launcher_tests.py
@@ -37,9 +47,10 @@ jobs:
       - name: Keep equipment details and focus across live status polls
         run: python3 tests/equipment_web_browser.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        id: review
         if: always()
         with:
-          name: github-ota-checks-${{ github.sha }}
+          name: github-ota-checks-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: |
             artifacts/update-web-review/
             artifacts/equipment-web-review/
@@ -48,17 +59,21 @@ jobs:
     needs: ota-checks
     runs-on: ubuntu-24.04
     timeout-minutes: 35
+    outputs:
+      artifact_id: ${{ steps.package.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+          ref: ${{ github.sha }}
       - name: Pinned ESP32-P4 image and OTA/USB packages; no device access
         run: bash ci/bootstrap.sh firmware
       - if: always()
         run: mkdir -p artifacts && python3 ci/manifest.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        id: package
         if: always()
         with:
-          name: github-ota-esp32p4-${{ github.sha }}
+          name: github-ota-esp32p4-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: artifacts/
           retention-days: 14
