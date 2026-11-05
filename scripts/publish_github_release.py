@@ -11,6 +11,12 @@ ROOT=Path(__file__).resolve().parents[1]
 REPO='DeadSoulf/boiler_room'
 sys.path.insert(0,str(ROOT/'ci'))
 from ota_manifest import MANIFEST_NAME,validate_assets
+def request_body(data,upload=False):
+ if data is None:return None
+ if upload:
+  if not isinstance(data,bytes):raise TypeError('Release assets must be exact bytes')
+  return data
+ return json.dumps(data).encode('utf-8')
 def git(*args):return subprocess.check_output(['git',*args],cwd=ROOT,text=True).strip()
 def main():
  parser=argparse.ArgumentParser(description=__doc__)
@@ -54,7 +60,8 @@ def main():
  if not token:raise RuntimeError('Existing GitHub token unavailable')
  def api(method,path,data=None,mime='application/json',upload=False,allow404=False):
   base='https://uploads.github.com/repos/' if upload else 'https://api.github.com/repos/'
-  payload=(json.dumps(data).encode() if data is not None and mime=='application/json' else data)
+  # application/json is also an asset MIME: its exact bytes must not be re-encoded.
+  payload=request_body(data,upload=upload)
   request=urllib.request.Request(base+REPO+path,data=payload,method=method,headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'BoilerPanel-release','Content-Type':mime})
   try:
    with urllib.request.urlopen(request,timeout=90) as response:return json.loads(response.read() or b'{}')

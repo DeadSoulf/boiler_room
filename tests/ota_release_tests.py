@@ -5,6 +5,7 @@ Synthetic images/partition tables only; never accesses a device or the network.
 from pathlib import Path
 import copy
 import hashlib
+import importlib.util
 import json
 import shutil
 import struct
@@ -15,6 +16,21 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'ci'))
 import ota_manifest as ota
+
+
+class PublisherBodyTests(unittest.TestCase):
+    def test_json_manifest_is_uploaded_as_exact_bytes(self):
+        spec = importlib.util.spec_from_file_location('checked_publisher', ROOT / 'scripts/publish_github_release.py')
+        publisher = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(publisher)
+        manifest = b'{"schema": 1, "version": "v0.10.0"}\n'
+        self.assertIs(publisher.request_body(manifest, upload=True), manifest)
+        for content in (b'PK\x03\x04\x00\xff', b'0123456789  firmware.bin\n'):
+            self.assertIs(publisher.request_body(content, upload=True), content)
+        self.assertEqual(json.loads(publisher.request_body({'draft': True})), {'draft': True})
+        self.assertIsNone(publisher.request_body(None))
+        with self.assertRaises(TypeError):
+            publisher.request_body({'schema': 1}, upload=True)
 
 
 class ReleaseTests(unittest.TestCase):
