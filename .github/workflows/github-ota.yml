@@ -1,0 +1,60 @@
+name: GitHub OTA checks and ESP32-P4 build
+on:
+  push:
+    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml']
+  pull_request:
+    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-ota-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ota-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Update policy, runtime faults and release integrity
+        run: |
+          python3 scripts/check_release_version.py
+          bash tests/update_run.sh
+          node tests/update_web_state_tests.mjs
+          python3 tests/update_web_commands.py
+          python3 tests/ota_release_tests.py
+          python3 tests/artifact_manifest_tests.py
+          python3 tests/flash_panel_tests.py
+          python3 tests/flash_launcher_tests.py
+      - name: Browser dependencies for the isolated embedded-page fixture
+        run: |
+          python3 -m pip install playwright==1.64.1
+          python3 -m playwright install --with-deps chromium
+      - name: Update confirmation, progress, cancellation and reconnect
+        run: python3 tests/update_web_browser.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: github-ota-checks-${{ github.sha }}
+          path: artifacts/update-web-review/
+          retention-days: 14
+  firmware:
+    needs: ota-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Pinned ESP32-P4 image and OTA/USB packages; no device access
+        run: bash ci/bootstrap.sh firmware
+      - if: always()
+        run: mkdir -p artifacts && python3 ci/manifest.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: github-ota-esp32p4-${{ github.sha }}
+          path: artifacts/
+          retention-days: 14

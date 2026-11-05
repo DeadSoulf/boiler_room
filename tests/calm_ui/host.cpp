@@ -112,6 +112,46 @@ int main(){
  sd.formatPhase=panel_storage::FormatPhase::AwaitingPhysical;sd.formatRemainingSeconds=80;updateStorageLabel();check();save("storage-confirm-fixture");touch("Отмена");assert(panel_storage::cancelled==1&&panel_storage::accepted==0);
  sd.formatPhase=panel_storage::FormatPhase::AwaitingPhysical;updateStorageLabel();touch("Стереть microSD");assert(panel_storage::accepted==1);assert(lv_obj_has_flag(sdFormatAccept,LV_OBJ_FLAG_HIDDEN));
  touch("<");assert(view==ServiceView);touch("Диагностика");save("diagnostics");touch("<");touch("О панели");save("about");touch("Домой");assert(page==0);
+ // Firmware update uses real pointer events, a pinned confirmation and live snapshots.
+ assert(panel_update::heartbeats>0&&panel_update::healthy);
+ startupServicesReady=false;step(120);assert(!panel_update::healthy);
+ startupServicesReady=true;firstFrameShown=false;step(120);assert(!panel_update::healthy);
+ firstFrameShown=true;panel_screen::begin(false);step(120);assert(!panel_update::healthy);
+ panel_screen::begin(true);panel_screen::setTimeout(0);step(120);assert(panel_update::healthy);
+ auto& update=panel_update::fixture;update.available=true;update.phase=panel_update::Phase::Available;
+ strcpy(update.latestVersion,"v9.8.1");step(320);assert(homeUpdateNotice&&clockLabel&&!overlay);
+ lv_area_t offer,lastCard;lv_obj_get_coords(homeUpdateNotice,&offer);lv_obj_get_coords(lv_obj_get_child(body,3),&lastCard);
+ assert(offer.y1>lastCard.y2&&offer.y2<773);
+ for(unsigned i=0;i<lv_obj_get_child_cnt(footer);i++)assert(!lv_obj_has_flag(lv_obj_get_child(footer,i),LV_OBJ_FLAG_CLICKABLE));
+ save("update-offer-fixture");touch("Доступно обновление v9.8.1 >");assert(page==PAGE_SETTINGS&&view==UpdateView);
+ assert(!strcmp(lv_label_get_text(updateLatest),"v9.8.1"));save("update-available-fixture");
+ touch("Установить");assert(overlay&&dialogKind==5&&find(overlay,"v9.8.1")&&panel_update::installed==0);
+ save("update-confirm-fixture");touch("Отмена");assert(!overlay&&panel_update::installed==0);
+ touch("Установить");strcpy(update.latestVersion,"v9.8.2");step(120);touch("Установить");
+ assert(overlay&&panel_update::installed==0&&strstr(lv_label_get_text(dialogError),"изменились"));touch("Отмена");
+ touch("Установить");assert(find(overlay,"v9.8.2"));touch("Установить");
+ assert(!overlay&&update.busy&&panel_update::installed==1&&!strcmp(panel_update::requestedVersion,"v9.8.2"));
+ update.total=10000;update.done=3700;update.percent=37;strcpy(update.message,"Загружаем новую версию панели.");step(120);check();save("update-progress-fixture");
+ assert(strstr(lv_label_get_text(updateProgress),"37%")&&lv_obj_has_state(updateInstallButton,LV_STATE_DISABLED));
+ assert(!lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));touch("Отменить обновление");
+ assert(panel_update::cancelled==1&&!update.busy);assert(!strcmp(lv_label_get_text(updateStatus),"Обновление отменено"));
+ update.busy=true;update.cancelAllowed=false;update.phase=panel_update::Phase::Installing;step(120);
+ assert(lv_obj_has_state(updateCancelButton,LV_STATE_DISABLED));lv_area_t disabled;lv_obj_get_coords(updateCancelButton,&disabled);
+ clickAt((disabled.x1+disabled.x2)/2,(disabled.y1+disabled.y2)/2);assert(panel_update::cancelled==1);
+ touch("Домой");swipe();swipe();swipe();touch("Подключения");touch("Wi-Fi");
+ const unsigned beforeBusy=panel_radio::submitted;touch("Поиск сетей");
+ assert(overlay&&panel_radio::submitted==beforeBusy);touch("Закрыть");touch("<");touch("<");touch("Сервис");touch("Обновление");
+ update.busy=false;update.phase=panel_update::Phase::Error;update.errorCode=19;
+ strcpy(update.message,"Файл не прошёл проверку. Установленная версия сохранена. Проверьте соединение и повторите.");
+ update.rollbackAvailable=true;strcpy(update.previousVersion,"v9.7.0");step(400);check();save("update-error-fixture");
+ assert(strstr(lv_label_get_text(updateError),"19"));touch("Вернуть предыдущую версию");
+ assert(overlay&&find(overlay,"v9.7.0")&&panel_update::rolledBack==0);strcpy(update.previousVersion,"v9.7.1");touch("Вернуть версию");
+ assert(overlay&&panel_update::rolledBack==0);touch("Отмена");touch("Вернуть предыдущую версию");touch("Вернуть версию");
+ assert(!overlay&&panel_update::rolledBack==1&&!strcmp(panel_update::requestedVersion,"v9.7.1"));
+ update={};update.started=update.supported=true;step(120);touch("Проверить");
+ assert(panel_update::checked==1&&update.phase==panel_update::Phase::Checking&&update.busy);
+ update.busy=false;update.phase=panel_update::Phase::Current;step(120);assert(!strcmp(lv_label_get_text(updateStatus),"Версия актуальна"));
+ touch("<");assert(view==ServiceView);touch("<");assert(view==Root);touch("Домой");assert(!homeUpdateNotice);
  go(PAGE_SETTINGS,WifiView);radioFixture.apCount=16;
  for(unsigned i=0;i<16;i++){auto& ap=radioFixture.aps[i];memset(ap.ssid,'W',32);ap.ssid[32]=0;ap.supported=true;ap.auth=3;ap.rssi=-50-int(i);}
  ++radioFixture.revision;step(300);check();save("wifi-results-fixture");
@@ -126,7 +166,7 @@ int main(){
  // Screen wake consumes the first touch rather than activating the underlying tile.
  panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());clickAt(100,260);assert(panel_screen::awake()&&!overlay);clickAt(100,260);assert(overlay);dismiss();panel_screen::setTimeout(0);
  for(int p=0;p<4;p++){go(p);for(int i=0;i<4;i++){swipe();assert(page==(p+i+1)%4);}}
- for(int v:{Root,WifiView,BleView,DisplayView,ConnectionsView,HaView,ServiceView,StorageView,DiagnosticsView,AboutView,WifiMoreView}){go(PAGE_SETTINGS,v);if(v==DisplayView)save("display");if(v==BleView)save("bluetooth");check();}
+ for(int v:{Root,WifiView,BleView,DisplayView,ConnectionsView,HaView,ServiceView,StorageView,DiagnosticsView,AboutView,WifiMoreView,UpdateView}){go(PAGE_SETTINGS,v);if(v==DisplayView)save("display");if(v==BleView)save("bluetooth");check();}
  go(1,1);save("boiler");go(1,3);save("diesel");go(1,4);save("fuel-heater");
  go(0);
  auto contacts=[&](bool upperClosed,bool lowerClosed){
@@ -163,7 +203,7 @@ int main(){
  assert(!panel_config::reedLevelReached(panel_config::Type::ReedNO,true));
  for(int n=0;n<240;n++){go(n%4);}
 
- printf("RESULT: %u layout checks, clipped=%u; actual LVGL pointer navigation, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
+ printf("RESULT: %u layout checks, clipped=%u; actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
  return clipped?1:0;
 #endif
 }

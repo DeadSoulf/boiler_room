@@ -7,6 +7,7 @@
 #include "panel_web.h"
 #include "panel_pairing.h"
 #include "panel_storage.h"
+#include "panel_update.h"
 #include "panel_config.h"
 #include "panel_sensors.h"
 #include "panel_ha.h"
@@ -33,6 +34,25 @@ namespace panel_web {
  bool begin(){return true;}void publish(const panel::Measurement (&)[panel::CHANNELS],const panel::FuelLevel&,uint32_t){}
  bool pairingCode(char out[7],uint32_t& seconds,uint32_t* generation){uint32_t g=0;bool active=challenge.display(out,seconds,g,millis());if(generation)*generation=g;return active;}
  void revokePairing(){challenge.revoke();}
+}
+
+namespace panel_update {
+ Snapshot fixture;unsigned checked=0,installed=0,cancelled=0,rolledBack=0,heartbeats=0;bool healthy=false,accept=true;
+ char requestedVersion[24]={};
+ bool begin(){fixture.started=fixture.supported=true;return true;}
+ bool snapshot(Snapshot& s){s=fixture;return true;}
+ bool requestCheck(){if(!accept||fixture.busy||fixture.bootPending)return false;++checked;fixture.busy=true;fixture.phase=Phase::Checking;return true;}
+ bool requestInstall(const char* expected){
+   if(!accept||fixture.busy||fixture.bootPending||!fixture.available||strcmp(expected,fixture.latestVersion))return false;
+   ++installed;strcpy(requestedVersion,expected);fixture.busy=fixture.cancelAllowed=true;fixture.phase=Phase::Downloading;return true;
+ }
+ bool requestCancel(){if(!accept||!fixture.busy||!fixture.cancelAllowed)return false;++cancelled;fixture.busy=fixture.cancelAllowed=false;fixture.phase=Phase::Cancelled;return true;}
+ bool requestRollback(const char* expected){
+   if(!accept||fixture.busy||fixture.bootPending||!fixture.rollbackAvailable||strcmp(expected,fixture.previousVersion))return false;
+   ++rolledBack;strcpy(requestedVersion,expected);fixture.busy=true;fixture.cancelAllowed=false;fixture.phase=Phase::Rebooting;return true;
+ }
+ void uiHeartbeat(bool ready){++heartbeats;healthy=ready;}
+ const char* phaseName(Phase phase){const char* names[]={"idle","checking","current","available","downloading","verifying","installing","rebooting","success","error","cancelled","rolled_back"};return names[unsigned(phase)];}
 }
 
 namespace panel_ha {Snapshot fixture;bool begin(){return true;}bool snapshot(Snapshot& s){s=fixture;return true;}void publish(const panel::Measurement (&)[panel::CHANNELS],const panel::FuelLevel&,uint32_t){}}

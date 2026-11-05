@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.9.1
+# Boiler Room Touch Panel — v0.10.0
+
+## v0.10.0: GitHub updates on the panel
+
+The new update page discovers stable releases, offers a specific version for confirmation and shows download/verification/install progress. The same workflow is available in the paired embedded web UI. The image goes to the inactive Flash slot; SHA-256, size, board/revision, partition layout and the rollback-enabled bootloader are checked before boot selection. A healthy first start is required to retain the new application. The inserted microSD records update events through the existing log service; no image staging or formatting is required.
+
+[Using GitHub OTA and preparing releases](docs/github-ota.md). **Candidate under verification; the currently verified installed version is still v0.9.1 until the hardware report is updated.** Presence wake remains a separate pending task.
 
 ## v0.9.1: home temperature and matching icons
 
