@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.0
+# Boiler Room Touch Panel — v0.10.1
+
+## v0.10.1: keep equipment details open
+
+Equipment cards retain their expanded or collapsed state and keyboard focus while live status is refreshed. The existing cards are updated in place, so new values still arrive without closing the section being read. No equipment API, GPIO or control behaviour changes.
+
+This release is being prepared for the first GitHub OTA installation from v0.10.0. **The last confirmed installed version remains v0.10.0** until the device completes the update and its result is checked. [OTA instructions](docs/github-ota.md) · [installed.json](docs/verification/installed.json).
 
 ## v0.10.0: GitHub updates on the panel
 
