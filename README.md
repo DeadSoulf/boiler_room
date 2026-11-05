@@ -4,13 +4,15 @@
 
 The physical Update page keeps its existing widgets when Wi-Fi signal information changes. Download text and button state are changed only when their displayed values change, so the unchanged page no longer redraws or restarts disabled-button animations every 100 ms. Progress, cancellation, connection availability and confirmation of a specific version remain live.
 
-The regression runs with real LVGL 8.3.11 in both partial rendering and the panel's full-refresh mode with two full-screen draw buffers. This release is being prepared for GitHub OTA; publication and installation are not yet confirmed. The last verified installed version remains v0.10.1. This is a native UI correction, not a physical verification of the LCD during Flash writes. When installing this correction, the previous firmware still handles that download; the new behaviour starts after reboot into v0.10.3.
+**[v0.10.3 is published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.3).** Real LVGL 8.3.11 passed 392 checks with zero clipped elements in both partial rendering and full-refresh with two full-screen buffers. The final OTA/browser/native/ESP32-P4 release workflow passed; all four public assets were downloaded without authentication and hash-checked. [Release and verification report](docs/verification/v0.10.3-ota-display-2026-11-05.md).
+
+The last verified installed version remains v0.10.1; Asus was offline on the latest connection check, so the current panel version and physical LCD behaviour are unverified. Select **Settings → Service → Update → Check**, then confirm **v0.10.3** on the panel or in the paired browser. The previous firmware still renders the download of this correction; the new UI behaviour starts after booting v0.10.3.
 
 ## v0.10.2: equal Home temperature sizes
 
 All four Home readings use the same large number size on the 480×800 panel and in the embedded web UI. The fuel temperature now matches the other three; its canister remains below the value and unit. Web values retain the existing responsive size at each viewport, with the unit wrapping when needed. Equipment disclosure state from v0.10.1 is preserved.
 
-**[v0.10.2 is published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.2).** The final build, native LVGL, browser checks and both dedicated OTA/target CI runs passed. All four public files were downloaded and hash-checked. The last verified installed version remains **v0.10.1**; select **Settings → Service → Update → Check**, then confirm v0.10.2 on the panel or in the paired browser. [Release and verification report](docs/verification/v0.10.2-ota-candidate-2026-11-05.md).
+[v0.10.2 was published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.2) with successful final build, native LVGL, browser and dedicated OTA/target checks. Its installation was not independently confirmed before the v0.10.3 release. The same temperature-size correction is included in v0.10.3. [Historical release report](docs/verification/v0.10.2-ota-candidate-2026-11-05.md).
 
 ## v0.10.1: keep equipment details open
 
