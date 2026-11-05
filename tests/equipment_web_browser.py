@@ -157,16 +157,12 @@ try:
         context = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
         context.on("request", lambda request: result["external_requests"].append(request.url)
                    if not request.url.startswith(base + "/") else None)
-        # The main image is reused across widths; a closed original-image popup
-        # must not replace its response when the next width checks the same DOM.
-        pinout_responses = {}
-
-        def remember_pinout_response(response):
-            if response.url == base + "/assets/jp1-pinout.jpg":
-                pinout_responses[response.frame.page] = response
-
-        context.on("response", remember_pinout_response)
         page = context.new_page()
+        # Only this page owns the inline image reused across all four widths.
+        # Original-image popup navigation can arrive before its frame exists.
+        pinout_responses = []
+        page.on("response", lambda response: pinout_responses.append(response)
+                if response.url == base + "/assets/jp1-pinout.jpg" else None)
         page.on("pageerror", lambda error: result["page_errors"].append(str(error)))
         page.goto(base)
         page.click('.topnav [data-page="equipment"]')
@@ -360,7 +356,7 @@ try:
                 page.wait_for_function("() => {const image=document.getElementById('jp1-pinout');return image.complete&&image.naturalWidth===800&&image.naturalHeight===800;}")
                 original_picture = picture.element_handle()
                 original_link = link.element_handle()
-                response = pinout_responses[page]
+                response = pinout_responses[-1]
                 assert response.status == 200 and response.headers["content-type"] == "image/jpeg"
                 assert sha256(response.body()).hexdigest() == pinout_sha256
                 metrics = picture.evaluate("""image => {
@@ -392,21 +388,23 @@ try:
                 assert original_link.evaluate("node => node===document.getElementById('jp1-pinout-link')")
                 page.screenshot(path=str(out / f"sensor-pinout-photo-{width}.png"), full_page=True)
                 method = "keyboard" if width in (390, 1280) else "mouse"
-                with context.expect_page() as opened:
-                    if method == "keyboard":
-                        page.keyboard.press("Enter")
-                    else:
-                        link.click()
+                with context.expect_event("response", predicate=lambda response:
+                        response.url == base + "/assets/jp1-pinout.jpg"
+                        and response.request.is_navigation_request()) as original_response:
+                    with context.expect_page() as opened:
+                        if method == "keyboard":
+                            page.keyboard.press("Enter")
+                        else:
+                            link.click()
                 popup = opened.value
                 popup.wait_for_load_state()
                 assert popup.url == base + "/assets/jp1-pinout.jpg"
                 popup.wait_for_function("() => {const image=document.querySelector('img');return image&&image.complete&&image.naturalWidth===800&&image.naturalHeight===800;}")
-                popup_response = pinout_responses[popup]
+                popup_response = original_response.value
                 assert popup_response.status == 200 and popup_response.headers["content-type"] == "image/jpeg"
                 assert sha256(popup_response.body()).hexdigest() == pinout_sha256
                 popup.screenshot(path=str(out / f"sensor-pinout-original-{width}.png"))
                 popup.close()
-                del pinout_responses[popup]
                 expect(page.locator("#connections")).to_be_visible()
                 assert_pin_draft()
                 assert original_picture.evaluate("node => node===document.getElementById('jp1-pinout')")
