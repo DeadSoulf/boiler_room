@@ -1,4 +1,4 @@
-"""Equipment disclosure regression in the actual embedded HTML and Chromium.
+"""Equipment disclosure and Home typography in the actual embedded HTML/Chromium.
 
 The HTTP server supplies isolated fixtures only. No panel, serial port or GPIO
 is contacted. Real mouse/keyboard input and the unchanged three-second status
@@ -101,6 +101,7 @@ result = {
     "page_errors": [],
     "mutation_requests": [],
     "status_polls": 0,
+    "home_temperature_checks": [],
     "coverage": [],
     "physical_panel_contacted": False,
     "data": "isolated fixtures; status polling interval unchanged",
@@ -156,6 +157,55 @@ try:
                 for handle in original_cards + original_summaries:
                     assert handle.evaluate("node => node.isConnected"), "Polling replaced an equipment control"
 
+            def home_temperatures(width, case, values):
+                for index, value in enumerate(values):
+                    expected = "--.- °C" if value is None else f"{value:.1f} °C"
+                    expect(page.locator(f"#t{index}")).to_have_text(expected)
+                metrics = page.evaluate("""() => {
+                    const box = r => ({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height});
+                    return Array.from(document.querySelectorAll("#home .temp")).map(card => {
+                        const value=card.querySelector(".temp-value"),style=getComputedStyle(value);
+                        const text=document.createRange();text.selectNodeContents(value);
+                        const number=document.createRange();number.setStart(value.firstChild,0);
+                        number.setEnd(value.firstChild,value.textContent.length-3);
+                        return {
+                            font_px:parseFloat(style.fontSize),weight:style.fontWeight,spacing:style.letterSpacing,
+                            card:box(card.getBoundingClientRect()),
+                            name:box(card.querySelector(".temp-name").getBoundingClientRect()),
+                            value:box(value.getBoundingClientRect()),
+                            icon:box(card.querySelector("svg").getBoundingClientRect()),
+                            status:box(card.querySelector(".temp-detail").getBoundingClientRect()),
+                            text_rects:Array.from(text.getClientRects(),box),
+                            number_rects:Array.from(number.getClientRects(),box)
+                        };
+                    });
+                }""")
+                assert len(metrics) == 4
+                # Preserve the existing large sizes of the first three cards.
+                expected_font = {320: 28, 390: 28, 768: 42, 1280: 39.68}[width]
+                for item in metrics:
+                    assert abs(item["font_px"] - expected_font) < 0.02, (width, case, item["font_px"])
+                    assert item["weight"] == metrics[0]["weight"] and item["spacing"] == metrics[0]["spacing"]
+                    assert len(item["number_rects"]) == 1, (width, case, "number wrapped")
+                    assert item["text_rects"]
+                    for rect in item["text_rects"]:
+                        assert rect["left"] >= item["value"]["left"] - 1 and rect["right"] <= item["value"]["right"] + 1, (width, case, "text clipped")
+                        assert rect["top"] >= item["value"]["top"] - 1 and rect["bottom"] <= item["value"]["bottom"] + 1, (width, case, "text clipped vertically")
+                    assert item["name"]["bottom"] <= item["value"]["top"] + 1
+                    assert item["value"]["bottom"] <= item["icon"]["top"] + 1, (width, case, "value/icon overlap")
+                    assert item["icon"]["bottom"] <= item["status"]["top"] + 1, (width, case, "icon/status overlap")
+                    for part in ("value", "icon", "status"):
+                        assert item[part]["left"] >= item["card"]["left"] - 1 and item[part]["right"] <= item["card"]["right"] + 1, (width, case, part)
+                        assert item[part]["bottom"] <= item["card"]["bottom"] + 1, (width, case, part)
+                assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (width, case)
+                result["home_temperature_checks"].append({
+                    "width": width, "case": case, "values": values,
+                    "font_px": [item["font_px"] for item in metrics],
+                    "text_lines": [len(item["text_rects"]) for item in metrics],
+                    "number_single_line": True, "overlap_or_clipping": False,
+                })
+                page.screenshot(path=str(out / f"home-font-{case}-{width}.png"), full_page=True)
+
             for width in (320, 390, 768, 1280):
                 page.set_viewport_size({"width": width, "height": 900})
                 connected = width in (320, 768)
@@ -163,6 +213,7 @@ try:
                     fixture["equipment"] = deepcopy(inventory)
                     fixture["equipment"][1]["connected"] = connected
                     fixture["equipment"][2].update(name="Контур 1 · гостевая", connected=True)
+                    fixture["temperatures"] = [{"valid": False, "ever": False, "history": []} for _ in range(4)]
                 for index in range(4):
                     expect(cards.nth(index)).to_have_js_property("open", False)
                 # Mouse opens the first card. Native Tab/Enter/Space open the others.
@@ -204,6 +255,19 @@ try:
                     expect(summaries.nth(index).locator("p")).to_have_text("Нет данных")
                 expect(rows.nth(0).locator("span").nth(0)).to_have_text("Контур 1")
                 expect(rows.nth(0).locator("span").nth(1)).to_have_text("Нет данных")
+                page.click('.topnav [data-page="home"]')
+                home_temperatures(width, "no-data", [None] * 4)
+                for case, values in (("negative", [-55.0] * 4), ("three-digit", [125.0] * 4),
+                                     ("mixed", [-55.0, 0.0, 125.0, 34.8])):
+                    with guard:
+                        fixture["temperatures"] = [
+                            {"valid": True, "ever": True, "value": value, "minimum": value,
+                             "maximum": value, "age_s": 0, "history": []} for value in values
+                        ]
+                    wait_polls()
+                    home_temperatures(width, case, values)
+                page.click('.topnav [data-page="equipment"]')
+                same_cards()
                 result["widths"].append(width)
 
             # Restoring the complete inventory updates the same still-open DOM card.
@@ -238,6 +302,9 @@ try:
                 "null entries and missing tail preserve stable API types and unknown data",
                 "restored inventory refreshes values", "page navigation retains user disclosure",
                 "four responsive widths and minimum 44px summary targets",
+                "four equal Home temperature font sizes without reducing the original large sizes",
+                "no-data, negative, three-digit and mixed readings on all four widths",
+                "single-line numbers, wrapping units when necessary, no text clipping or icon overlap",
             ])
         assert not result["page_errors"], result["page_errors"]
         assert not state["mutation_requests"], state["mutation_requests"]

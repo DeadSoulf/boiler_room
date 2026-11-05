@@ -49,7 +49,7 @@ struct FuelCanister {
 };
 FuelCanister fuelCanister;
 lv_obj_t* tempIcon[3]={};
-constexpr int CANISTER_FILL_HEIGHT=106;
+constexpr int CANISTER_FILL_HEIGHT=74;
 void updateCanister();
 struct FuelLevelLabels {
   lv_obj_t *summary=nullptr,*upper=nullptr,*lower=nullptr,*upperDot=nullptr,*lowerDot=nullptr;
@@ -533,27 +533,27 @@ void temperatureIcon(lv_obj_t* tile,unsigned channel){
   }
 }
 void canister(lv_obj_t* tile){
-  fuelCanister.temperature=label(tile,"--.- °C",18,62,172,&boiler_font_19,MUTED);
-  fuelCanister.root=box(tile,48,92,112,156,CARD,0);
+  fuelCanister.temperature=tempValue[3]; // All four temperatures share the Home label/update path.
+  fuelCanister.root=box(tile,64,156,80,108,CARD,0);
   lv_obj_set_style_border_width(fuelCanister.root,0,0);passive(fuelCanister.root);
-  fuelCanister.handle=box(fuelCanister.root,54,6,42,26,CARD,5);
-  fuelCanister.cap=box(fuelCanister.root,18,13,24,11,CARD,3);
-  fuelCanister.body=box(fuelCanister.root,8,28,96,120,CARD,10);
+  fuelCanister.handle=box(fuelCanister.root,38,4,29,18,CARD,4);
+  fuelCanister.cap=box(fuelCanister.root,13,9,17,8,CARD,2);
+  fuelCanister.body=box(fuelCanister.root,6,20,68,84,CARD,7);
   for(auto* o:{fuelCanister.handle,fuelCanister.cap,fuelCanister.body}){
     lv_obj_set_style_border_width(o,3,0);passive(o);
   }
-  fuelCanister.fill=box(fuelCanister.body,4,4,82,CANISTER_FILL_HEIGHT,GREEN,5);
+  fuelCanister.fill=box(fuelCanister.body,4,4,58,CANISTER_FILL_HEIGHT,GREEN,4);
   lv_obj_set_style_border_width(fuelCanister.fill,0,0);passive(fuelCanister.fill);
   // LVGL stores the point array by reference, so both arrays have static lifetime.
-  static const lv_point_t crossA[]={{0,0},{36,40}},crossB[]={{36,0},{0,40}};
+  static const lv_point_t crossA[]={{0,0},{25,28}},crossB[]={{25,0},{0,28}};
   fuelCanister.crossA=lv_line_create(fuelCanister.body);
   fuelCanister.crossB=lv_line_create(fuelCanister.body);
   lv_line_set_points(fuelCanister.crossA,crossA,2);lv_line_set_points(fuelCanister.crossB,crossB,2);
   for(auto* o:{fuelCanister.crossA,fuelCanister.crossB}){
-    lv_obj_set_pos(o,27,36);lv_obj_set_style_line_width(o,3,0);
+    lv_obj_set_pos(o,19,25);lv_obj_set_style_line_width(o,3,0);
     lv_obj_set_style_line_color(o,c(CARD),0);lv_obj_set_style_line_rounded(o,true,0);passive(o);
   }
-  fuelCanister.glyph=label(fuelCanister.body,"?",3,23,84,&boiler_font_55,MUTED);
+  fuelCanister.glyph=label(fuelCanister.body,"?",2,25,60,&boiler_font_25,MUTED);
   lv_obj_set_style_text_align(fuelCanister.glyph,LV_TEXT_ALIGN_CENTER,0);passive(fuelCanister.glyph);
   fuelCanister.status=label(tile,"Нет уровня",18,269,172,&boiler_font_14,MUTED);
   lv_obj_set_style_text_align(fuelCanister.status,LV_TEXT_ALIGN_CENTER,0);
@@ -561,10 +561,7 @@ void canister(lv_obj_t* tile){
 }
 void updateCanister(){
   if(!fuelCanister.root)return;
-  char value[24],text[48];const uint32_t now=millis();
-  temperature(value,sizeof(value),measurements[3],now);
-  snprintf(text,sizeof(text),"%s °C",value);lv_label_set_text(fuelCanister.temperature,text);
-  lv_obj_set_style_text_color(fuelCanister.temperature,c(measurements[3].fresh(now)?TXT:MUTED),0);
+  const uint32_t now=millis();
   int height=0;uint32_t ink=MUTED;const char* mark="?";const char* status="Нет уровня";
   // These are normalized height states shared by the display, HTTP and HA.
   // With both inputs set to ReedNC: open/open=full; upper closed=half;
@@ -596,9 +593,9 @@ void home(){
     lv_obj_add_event_cb(tile,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(i==3?FuelOverview:Temp0+i)));
     lv_obj_set_style_border_color(tile,c(SKY),LV_STATE_PRESSED);
     label(tile,SENSOR_NAMES[i],18,22,172,&boiler_font_19,MUTED);
-    if(i==3){canister(tile);continue;}
     tempValue[i]=label(tile,"--.-",16,50,178,&boiler_font_55);
     label(tile,"°C",18,128,172,&boiler_font_19,MUTED);
+    if(i==3){canister(tile);continue;}
     temperatureIcon(tile,i);
     tempState[i]=label(tile,"Нет данных",18,269,172,&boiler_font_14,MUTED);
   }
