@@ -15,7 +15,7 @@
 
 Источник установленной сборки: `db7d221b7c89990e2ef12ffc27552c9c35422945`. Firmware 1 786 096 байт, SHA-256 `3bcc8663c088255763e75c3d42fdc00f8920332fa9785797904199653cdaf80b`; ZIP SHA-256 `15db67fa865a734b60130dc4076724d7212c50e55f09b678a6ef6bfd064bb6f2`.
 
-[Аппаратный отчёт v0.9.1](verification/v0.9.1-hardware-2026-11-05.md) · [installed.json](verification/installed.json) · [релиз v0.9.1](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.9.1). Тег указывает на исходник сборки; статус публикации подтверждается в installed.json.
+[Аппаратный отчёт v0.9.1](verification/v0.9.1-hardware-2026-11-05.md) · [installed.json](verification/installed.json) · [релиз v0.9.1](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.9.1). Тег указывает на исходник сборки; main, тег и опубликованный Release с ZIP/SHA-256 повторно проверены. PR #20 закрыт как merged. Идентификаторы выпуска и проверки — в installed.json.
 
 Пакет и SOURCE.txt на Asus сверены с GitHub до записи. В build commit и head PR `33f3d51…` все `src/` совпадают; второй commit меняет только документы. При объединении сохранены свежие AGENTS, подробная сводка и памятка из main.
 

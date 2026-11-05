@@ -41,8 +41,16 @@
   "real_mqtt_broker_verified": false,
   "real_pin_success_verified": false,
   "physical_presence_sensor_verified": false,
-  "release_published": false,
+  "release_published": true,
   "first_frame_ms": 499,
   "uptime_s_at_check": 9,
-  "main_contains_installed_source": true
+  "main_contains_installed_source": true,
+  "release_id": 434807682,
+  "release_published_at": "2026-11-05T05:13:40Z",
+  "package_asset_id": 712164136,
+  "package_bytes": 1001734,
+  "release_digest": "sha256:15db67fa865a734b60130dc4076724d7212c50e55f09b678a6ef6bfd064bb6f2",
+  "pr20_merged": true,
+  "final_http_checked_utc": "2026-11-05T05:14:50.150274+00:00",
+  "uptime_s_at_final_check": 451
 }
