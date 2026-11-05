@@ -1,10 +1,10 @@
 # Boiler Room Touch Panel — v0.9.1
 
-## v0.9.1 candidate: home temperature and matching icons
+## v0.9.1: home temperature and matching icons
 
 Channel 0 is now labelled **«В доме»** (home temperature). House, sun/cloud and radiator line icons match the existing fuel canister, without shrinking the large temperature readings. Native LVGL and embedded web UI are updated together; MQTT retains the `room` key and unique IDs. [Screenshots and checks](docs/home-icons-v091/README.md).
 
-**The device remains on v0.9.0; this candidate has NOT been flashed.** The following installation details describe the previous installed version.
+**v0.9.1 was installed on 5 November 2026.** A new full backup, independent stock-esptool read-back and live HTTP checks confirmed the update. GitHub update discovery and presence wake remain pending.
 
 Standalone GUITION JC4880P443C_I_W / ESP32-P4 + ESP32-C6, 480×800 LVGL panel. [Russian documentation](README_RU.md).
 
@@ -18,7 +18,7 @@ The self-contained web UI has four primary sections and nested settings, grouped
 
 ## Installation and release discipline
 
-**v0.9.0 is installed and verified by full Flash read-back and HTTP.** Wi-Fi, microSD and the new embedded web page respond; existing settings are preserved. [Hardware report](docs/verification/v0.9.0-hardware-2026-11-04.md) · [installed.json](docs/verification/installed.json) · [v0.9.0 release](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.9.0). Physical visual/touch checks, real PIN entry by a person and a real MQTT broker were not remotely verified.
+**v0.9.1 is installed and verified by full Flash read-back and HTTP.** Wi-Fi, microSD and the new embedded web page respond; existing settings are preserved. [Hardware report](docs/verification/v0.9.1-hardware-2026-11-05.md) · [installed.json](docs/verification/installed.json) · [v0.9.1 release](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.9.1). Physical visual/touch checks, real PIN entry by a person and a real MQTT broker were not remotely verified.
 
 Every requested successful device update must also publish its source into **main**, a matching version tag, a GitHub Release with the checked installation ZIP and SHA-256, updated README/CHANGELOG and handoff. Documentation-only updates while main stays on older firmware do not satisfy this rule. [Release process](docs/RELEASE_PROCESS_RU.md).
 
