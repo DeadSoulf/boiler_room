@@ -1,4 +1,12 @@
-# Boiler Room Touch Panel — v0.10.4
+# Boiler Room Touch Panel — v0.10.5
+
+## v0.10.5: live connector diagram in web sensor settings
+
+**Settings → Sensors** shows a schematic of all 26 JP1 contacts beside GPIO selection. Each usable GPIO shows whether it is free or assigned, with the assigned sensor channel named. Occupancy comes from saved panel settings and remains shown when a sensor is not responding. Unknown configuration or lost connection is labelled explicitly. Power, ground, BOOT, C6 and I2C contacts retain their fixed roles.
+
+The supplied connector photograph remains available below the diagram as a reference and opens in another tab. Its exact JPEG is embedded in the firmware and served by the panel without Internet or microSD. The diagram updates without changing the settings form or assigning any GPIO.
+
+This version is being prepared for GitHub OTA. Publication and installation of v0.10.5 are not yet confirmed; the last verified device acceptance remains v0.10.1.
 
 ## v0.10.4: date below the Home clock
 
@@ -6,7 +14,7 @@ The physical Home header shows the local date as **DD.MM.YYYY** below the time, 
 
 **[v0.10.4 is published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.4).** Native LVGL and independent checks passed 408 layout checks with zero clipping in both rendering modes. The final OTA/browser/ESP32-P4 release workflow passed; all four public assets were downloaded and hash-checked. [Verification report](docs/verification/v0.10.4-home-date-2026-11-05.md).
 
-Select **Settings → Service → Update → Check**, then confirm **v0.10.4** on the panel or in the paired browser. Installation and the physical display remain unverified: Asus is offline, and the last accepted installed version is v0.10.1.
+Installation of v0.10.4 and the physical display remain unverified. Its Home date display is also included in v0.10.5.
 
 ## v0.10.3: stable update screen
 
