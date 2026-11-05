@@ -168,8 +168,21 @@ try:
                         const text=document.createRange();text.selectNodeContents(value);
                         const number=document.createRange();number.setStart(value.firstChild,0);
                         number.setEnd(value.firstChild,value.textContent.length-3);
+                        const clipping=[];
+                        for(let node=value;node&&node!==document.body;node=node.parentElement){
+                            const css=getComputedStyle(node);
+                            const x=["hidden","clip","auto","scroll"].includes(css.overflowX);
+                            const y=["hidden","clip","auto","scroll"].includes(css.overflowY);
+                            if(x||y){
+                                const r=node.getBoundingClientRect(),left=r.left+node.clientLeft,top=r.top+node.clientTop;
+                                clipping.push({element:node.id||node.className,x,y,
+                                    bounds:{left,right:left+node.clientWidth,top,bottom:top+node.clientHeight}});
+                            }
+                        }
                         return {
+                            text:value.textContent,font_family:style.fontFamily,line_height:style.lineHeight,
                             font_px:parseFloat(style.fontSize),weight:style.fontWeight,spacing:style.letterSpacing,
+                            overflow_x:style.overflowX,overflow_y:style.overflowY,clipping,
                             card:box(card.getBoundingClientRect()),
                             name:box(card.querySelector(".temp-name").getBoundingClientRect()),
                             value:box(value.getBoundingClientRect()),
@@ -180,6 +193,10 @@ try:
                         };
                     });
                 }""")
+                # Preserve evidence even when an assertion below fails.
+                (out / f"home-font-{case}-{width}-metrics.json").write_text(
+                    json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                page.screenshot(path=str(out / f"home-font-{case}-{width}.png"), full_page=True)
                 assert len(metrics) == 4
                 # Preserve the existing large sizes of the first three cards.
                 expected_font = {320: 28, 390: 28, 768: 42, 1280: 39.68}[width]
@@ -190,7 +207,16 @@ try:
                     assert item["text_rects"]
                     for rect in item["text_rects"]:
                         assert rect["left"] >= item["value"]["left"] - 1 and rect["right"] <= item["value"]["right"] + 1, (width, case, "text clipped")
-                        assert rect["top"] >= item["value"]["top"] - 1 and rect["bottom"] <= item["value"]["bottom"] + 1, (width, case, "text clipped vertically")
+                        # A font's em-box can exceed line-height with overflow:visible.
+                        # Check real clipping boundaries and neighbouring elements.
+                        assert rect["top"] >= item["name"]["bottom"] - 1, (width, case, "text/name overlap")
+                        assert rect["bottom"] <= item["icon"]["top"] + 1, (width, case, "text/icon overlap")
+                        assert rect["top"] >= item["card"]["top"] - 1 and rect["bottom"] <= item["card"]["bottom"] + 1, (width, case, "text outside card")
+                        for clip in item["clipping"]:
+                            if clip["x"]:
+                                assert rect["left"] >= clip["bounds"]["left"] - 1 and rect["right"] <= clip["bounds"]["right"] + 1, (width, case, "text clipped horizontally", clip["element"])
+                            if clip["y"]:
+                                assert rect["top"] >= clip["bounds"]["top"] - 1 and rect["bottom"] <= clip["bounds"]["bottom"] + 1, (width, case, "text clipped vertically", clip["element"])
                     assert item["name"]["bottom"] <= item["value"]["top"] + 1
                     assert item["value"]["bottom"] <= item["icon"]["top"] + 1, (width, case, "value/icon overlap")
                     assert item["icon"]["bottom"] <= item["status"]["top"] + 1, (width, case, "icon/status overlap")
@@ -204,7 +230,6 @@ try:
                     "text_lines": [len(item["text_rects"]) for item in metrics],
                     "number_single_line": True, "overlap_or_clipping": False,
                 })
-                page.screenshot(path=str(out / f"home-font-{case}-{width}.png"), full_page=True)
 
             for width in (320, 390, 768, 1280):
                 page.set_viewport_size({"width": width, "height": 900})
