@@ -1,0 +1,960 @@
+{
+  "schema": 1,
+  "kind": "ota-release-verification-report",
+  "version": "v0.10.4",
+  "source_commit": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+  "merge_commit": "323c4c5557a6f3d6f9deeb5dbcd31d7024d756a6",
+  "pr": {
+    "number": 25,
+    "url": "https://github.com/DeadSoulf/boiler_room/pull/25"
+  },
+  "release": {
+    "id": 435037523,
+    "tag": "v0.10.4",
+    "url": "https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.4",
+    "published_at": "2026-11-05T10:09:53Z",
+    "draft": false,
+    "prerelease": false,
+    "assets": [
+      {
+        "id": 712949452,
+        "name": "boiler-panel-ota.json",
+        "size": 609,
+        "sha256": "c9daa4684eea084992f074e609a8a237914f4e27e02ca10a02ccda80a7b058d1",
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/boiler-panel-ota.json"
+      },
+      {
+        "id": 712949385,
+        "name": "BoilerPanel-v0.10.4-COM3.zip",
+        "size": 1099736,
+        "sha256": "1646449bab09e1cc8b1f5b08b075bf88daf55f9fcb1fa47dddeea6dd0b73d627",
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/BoilerPanel-v0.10.4-COM3.zip"
+      },
+      {
+        "id": 712949411,
+        "name": "BoilerPanel-v0.10.4-firmware.bin",
+        "size": 1943792,
+        "sha256": "dbbec15578d6ea2e0816f11969cc625cd9d5c03457ae1d36f80201832f16ee5f",
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/BoilerPanel-v0.10.4-firmware.bin"
+      },
+      {
+        "id": 712949478,
+        "name": "SHA256SUMS.txt",
+        "size": 282,
+        "sha256": "a107fd010ebcb85fd0efc96f03a0114479dbc70611cbae2d9e0920d5f19cd24a",
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/SHA256SUMS.txt"
+      }
+    ]
+  },
+  "ci": {
+    "release_run": {
+      "id": 42007522847,
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42007522847",
+      "source": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 127177932672,
+          "name": "request",
+          "conclusion": "success"
+        },
+        {
+          "id": 127177981363,
+          "name": "native / native-menu",
+          "conclusion": "success"
+        },
+        {
+          "id": 127177981755,
+          "name": "ota / ota-checks",
+          "conclusion": "success"
+        },
+        {
+          "id": 127179168059,
+          "name": "ota / firmware",
+          "conclusion": "success"
+        },
+        {
+          "id": 127180734395,
+          "name": "publish",
+          "conclusion": "success"
+        }
+      ]
+    },
+    "profile_runs": {
+      "push_ota": {
+        "id": 42006504175,
+        "conclusion": "success",
+        "head_sha": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42006504175"
+      },
+      "pr_ota": {
+        "id": 42006511150,
+        "conclusion": "success",
+        "head_sha": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42006511150"
+      },
+      "native_push": {
+        "id": 42006504176,
+        "conclusion": "success",
+        "head_sha": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42006504176"
+      },
+      "native_pr": {
+        "id": 42006511258,
+        "conclusion": "success",
+        "head_sha": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42006511258"
+      }
+    },
+    "artifacts": [
+      {
+        "id": 13406026161,
+        "name": "github-ota-checks-e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc-attempt-1",
+        "size": 1210008,
+        "sha256": "6de328aeb106a715b5c76b46f77ef109f73e289f8c3c47d7fb641606f7488775"
+      },
+      {
+        "id": 13405557703,
+        "name": "ota-release-evidence-e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc-attempt-1",
+        "size": 3790,
+        "sha256": "540581921247a9663b7cbf1a12119b569b9343336d6ba49f6fc44062a3cec6e6"
+      },
+      {
+        "id": 13405421719,
+        "name": "calm-menu-review-e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc-attempt-1",
+        "size": 1618364,
+        "sha256": "0795af48ee835ce099bbaced770584cad4a55f5cc4679ea9bae93e347337b845"
+      },
+      {
+        "id": 13405227597,
+        "name": "github-ota-esp32p4-e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc-attempt-1",
+        "size": 12888087,
+        "sha256": "cc83ab25df89f61c39b70990f3322078cf53191b2aca94a9c6c7e39a023438ea"
+      }
+    ],
+    "legacy_issue": {
+      "number": 15,
+      "run": 42006504164,
+      "job": 127174475588,
+      "failure": "esp_wifi.h: No such file or directory"
+    }
+  },
+  "native": {
+    "lvgl_commit": "74d0a816a440eea53e030c4f1af842a94f7ce3d3",
+    "source_sha256": {
+      "src/main.cpp": "abfd67004316a81f60e2e3e7d51a62928d79c751b57ff5b30fcc1864a411ca27",
+      "tests/calm_ui/host.cpp": "e0c06f01377c702880e64fce483cc9153aad00e4a7711ba0d2121d3ff8dd175f",
+      "tests/calm_ui/fakes.h": "31f9c02f3f8d888a3655689f6d37e1c07318821a38446294dd798a6df950803a",
+      "src/panel_types.h": "302a3f6ed6bf5026b49a7eb395aac7f53b647348c3143b63b9a4f8f5aa64a23f",
+      "VERSION": "e6833fe038a2e63215fcc9d22838bd88ae36cae986311f2b12f9b4a27077d0b2",
+      "src/boiler_fonts.c": "2bc21156983acec91e8bb89f992302057a25b09b38e600c6da258b3d2c82ea9f",
+      "tests/host/lv_conf.h": "6a7fe672685c077b79a32d05d5a6d8072ca6406d0ace2386858fac11afe9e244",
+      "src/panel_screen.cpp": "7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767"
+    },
+    "geometry": {
+      "clock_box": [
+        334,
+        18,
+        455,
+        52
+      ],
+      "clock_text_px": 58,
+      "max_valid_1440_clock_strings_px": 58,
+      "date_box": [
+        334,
+        55,
+        455,
+        81
+      ],
+      "date_text_px": 90,
+      "date_font_size": 19,
+      "pair_badge_box": [
+        196,
+        16,
+        327,
+        81
+      ],
+      "six_digit_pin_text_px": 78
+    },
+    "modes": {
+      "partial": {
+        "exit_code": 0,
+        "layout_checks": 408,
+        "clipped": 0,
+        "unchanged_clock_updater_frames": 0,
+        "ota_unchanged_frames": 0,
+        "ota_radio_changes": 22,
+        "ota_radio_frames": 0,
+        "ota_root_deletions": 0,
+        "ota_progress_updates": 20,
+        "ota_progress_frames": 20,
+        "ota_progress_pixels": 432448,
+        "log_sha256": "5bdf5b98e7109056f6a6f7d23eac81b047a7f7303ba1d17e805789e005036bfb",
+        "png_sha256": {
+          "home-date-pin-fixture": "ddf182ef578a0795e5eca20e7c2a5ef4fa64cb9d41a230811131110e9f24a99b",
+          "home-date-rollover-fixture": "ad65946d3c5277dc23a22a6d422ccd9f095283405447a19c6d3ddbcda5ae13af",
+          "home-date-timezone-fixture": "fcaf82203075da6b9150d45ca681ea2e700d89d3a4c1400653cb7f3ea90904a2",
+          "home-date-unknown-fixture": "3c75d116e3ae1524be0d5dd03dbf5a68fbf06d46be3d69b3e1a2883de043649e",
+          "home-date-no-pin-fixture": "7826c7bcbc1f8582d994f385327623ef1fd255619de14de9282f9924ea97058a",
+          "home-no-data": "7826c7bcbc1f8582d994f385327623ef1fd255619de14de9282f9924ea97058a"
+        }
+      },
+      "full-refresh": {
+        "exit_code": 0,
+        "layout_checks": 408,
+        "clipped": 0,
+        "unchanged_clock_updater_frames": 0,
+        "ota_unchanged_frames": 0,
+        "ota_radio_changes": 22,
+        "ota_radio_frames": 0,
+        "ota_root_deletions": 0,
+        "ota_progress_updates": 20,
+        "ota_progress_frames": 20,
+        "ota_progress_pixels": 7680000,
+        "log_sha256": "1e9a8ba7e82f4ccf67f8daba751c8bbbe162735f923af1b8508e944aeeac1bb3",
+        "png_sha256": {
+          "home-date-pin-fixture": "ddf182ef578a0795e5eca20e7c2a5ef4fa64cb9d41a230811131110e9f24a99b",
+          "home-date-rollover-fixture": "ad65946d3c5277dc23a22a6d422ccd9f095283405447a19c6d3ddbcda5ae13af",
+          "home-date-timezone-fixture": "fcaf82203075da6b9150d45ca681ea2e700d89d3a4c1400653cb7f3ea90904a2",
+          "home-date-unknown-fixture": "3c75d116e3ae1524be0d5dd03dbf5a68fbf06d46be3d69b3e1a2883de043649e",
+          "home-date-no-pin-fixture": "7826c7bcbc1f8582d994f385327623ef1fd255619de14de9282f9924ea97058a",
+          "home-no-data": "7826c7bcbc1f8582d994f385327623ef1fd255619de14de9282f9924ea97058a"
+        }
+      }
+    },
+    "independent_rebuild": true,
+    "physical_panel_contacted": false,
+    "preview": "v0.10.4-home-date-pin.png",
+    "preview_sha256": "ddf182ef578a0795e5eca20e7c2a5ef4fa64cb9d41a230811131110e9f24a99b"
+  },
+  "browser": {
+    "equipment": {
+      "result": "PASS",
+      "source_header": "/home/runner/work/boiler_room/boiler_room/src/panel_web_page.h",
+      "source_header_sha256": "272e3aa3815addd33783b432f6c7d074737f380b51f76589e359290679782408",
+      "test_script": "tests/equipment_web_browser.py",
+      "test_script_sha256": "efb0e6885bdbe9537c4b281803fdea57efa413da94be5334b238d6a963ed31d7",
+      "widths": [
+        320,
+        390,
+        768,
+        1280
+      ],
+      "page_errors": [],
+      "mutation_requests": [],
+      "status_polls": 28,
+      "home_temperature_checks": [
+        {
+          "width": 320,
+          "case": "no-data",
+          "values": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 320,
+          "case": "negative",
+          "values": [
+            -55.0,
+            -55.0,
+            -55.0,
+            -55.0
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            2,
+            2,
+            2,
+            2
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 320,
+          "case": "three-digit",
+          "values": [
+            125.0,
+            125.0,
+            125.0,
+            125.0
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            2,
+            2,
+            2,
+            2
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 320,
+          "case": "mixed",
+          "values": [
+            -55.0,
+            0.0,
+            125.0,
+            34.8
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            2,
+            1,
+            2,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 390,
+          "case": "no-data",
+          "values": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 390,
+          "case": "negative",
+          "values": [
+            -55.0,
+            -55.0,
+            -55.0,
+            -55.0
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 390,
+          "case": "three-digit",
+          "values": [
+            125.0,
+            125.0,
+            125.0,
+            125.0
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 390,
+          "case": "mixed",
+          "values": [
+            -55.0,
+            0.0,
+            125.0,
+            34.8
+          ],
+          "font_px": [
+            28,
+            28,
+            28,
+            28
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 768,
+          "case": "no-data",
+          "values": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "font_px": [
+            42,
+            42,
+            42,
+            42
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 768,
+          "case": "negative",
+          "values": [
+            -55.0,
+            -55.0,
+            -55.0,
+            -55.0
+          ],
+          "font_px": [
+            42,
+            42,
+            42,
+            42
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 768,
+          "case": "three-digit",
+          "values": [
+            125.0,
+            125.0,
+            125.0,
+            125.0
+          ],
+          "font_px": [
+            42,
+            42,
+            42,
+            42
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 768,
+          "case": "mixed",
+          "values": [
+            -55.0,
+            0.0,
+            125.0,
+            34.8
+          ],
+          "font_px": [
+            42,
+            42,
+            42,
+            42
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 1280,
+          "case": "no-data",
+          "values": [
+            null,
+            null,
+            null,
+            null
+          ],
+          "font_px": [
+            39.68,
+            39.68,
+            39.68,
+            39.68
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 1280,
+          "case": "negative",
+          "values": [
+            -55.0,
+            -55.0,
+            -55.0,
+            -55.0
+          ],
+          "font_px": [
+            39.68,
+            39.68,
+            39.68,
+            39.68
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 1280,
+          "case": "three-digit",
+          "values": [
+            125.0,
+            125.0,
+            125.0,
+            125.0
+          ],
+          "font_px": [
+            39.68,
+            39.68,
+            39.68,
+            39.68
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        },
+        {
+          "width": 1280,
+          "case": "mixed",
+          "values": [
+            -55.0,
+            0.0,
+            125.0,
+            34.8
+          ],
+          "font_px": [
+            39.68,
+            39.68,
+            39.68,
+            39.68
+          ],
+          "text_lines": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "number_single_line": true,
+          "overlap_or_clipping": false
+        }
+      ],
+      "coverage": [
+        "actual embedded HTML and three-second HTTP polls",
+        "mouse opens and closes details",
+        "native Tab/Shift+Tab/Enter/Space",
+        "four independently expanded cards over multiple polls at each width",
+        "user close survives polling",
+        "details and summary DOM identity retained",
+        "keyboard focus retained",
+        "live connected states and circuit names refreshed",
+        "null entries and missing tail preserve stable API types and unknown data",
+        "restored inventory refreshes values",
+        "page navigation retains user disclosure",
+        "four responsive widths and minimum 44px summary targets",
+        "four equal Home temperature font sizes without reducing the original large sizes",
+        "no-data, negative, three-digit and mixed readings on all four widths",
+        "single-line numbers, wrapping units when necessary, no text clipping or icon overlap"
+      ],
+      "physical_panel_contacted": false,
+      "data": "isolated fixtures; status polling interval unchanged"
+    },
+    "ota": {
+      "result": "PASS",
+      "page_errors": [],
+      "widths": [
+        320,
+        390,
+        768,
+        1280
+      ],
+      "pairings": 2,
+      "accepted_commands": [
+        {
+          "action": "update_check"
+        },
+        {
+          "action": "update_install",
+          "version": "v9.8.2",
+          "confirm": "v9.8.2"
+        },
+        {
+          "action": "update_cancel"
+        },
+        {
+          "action": "update_install",
+          "version": "v9.8.2",
+          "confirm": "v9.8.2"
+        },
+        {
+          "action": "update_rollback",
+          "version": "v0.10.4",
+          "confirm": "v0.10.4"
+        }
+      ],
+      "rejected_pinned_commands": [
+        {
+          "action": "update_install",
+          "version": "v9.8.1",
+          "confirm": "v9.8.1"
+        }
+      ],
+      "physical_panel_contacted": false,
+      "coverage": [
+        "real clicks and keyboard",
+        "explicit pinned confirmation",
+        "busy guards",
+        "cancel availability",
+        "bytes and progress",
+        "restart and expired session",
+        "reload persistence",
+        "successful reconnect",
+        "manual and automatic rollback"
+      ]
+    }
+  },
+  "binary_verification": {
+    "chip": "ESP32-P4",
+    "image_chip_id": 18,
+    "image_bytes": 1943792,
+    "min_chip_revision_legacy": 0,
+    "min_chip_revision_full": 0,
+    "max_chip_revision_full": 65535,
+    "partitions": [
+      {
+        "type": 1,
+        "subtype": 2,
+        "offset": 36864,
+        "size": 20480,
+        "label": "nvs",
+        "flags": 0
+      },
+      {
+        "type": 1,
+        "subtype": 0,
+        "offset": 57344,
+        "size": 8192,
+        "label": "otadata",
+        "flags": 0
+      },
+      {
+        "type": 0,
+        "subtype": 16,
+        "offset": 65536,
+        "size": 6553600,
+        "label": "app0",
+        "flags": 0
+      },
+      {
+        "type": 0,
+        "subtype": 17,
+        "offset": 6619136,
+        "size": 6553600,
+        "label": "app1",
+        "flags": 0
+      },
+      {
+        "type": 1,
+        "subtype": 130,
+        "offset": 13172736,
+        "size": 3538944,
+        "label": "spiffs",
+        "flags": 0
+      },
+      {
+        "type": 1,
+        "subtype": 3,
+        "offset": 16711680,
+        "size": 65536,
+        "label": "coredump",
+        "flags": 0
+      }
+    ],
+    "hardware_verified": false,
+    "note": "Image revision requirements must be checked against real board before manual installation. No C6 image or flash operation."
+  },
+  "candidate_proof": {
+    "schema": 1,
+    "kind": "ota-build-candidate",
+    "project": "DeadSoulf/boiler_room",
+    "version": "v0.10.4",
+    "source_commit": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+    "hardware_acceptance": "pending",
+    "assets": {
+      "BoilerPanel-v0.10.4-COM3.zip": {
+        "size": 1099736,
+        "sha256": "1646449bab09e1cc8b1f5b08b075bf88daf55f9fcb1fa47dddeea6dd0b73d627"
+      },
+      "BoilerPanel-v0.10.4-firmware.bin": {
+        "size": 1943792,
+        "sha256": "dbbec15578d6ea2e0816f11969cc625cd9d5c03457ae1d36f80201832f16ee5f"
+      },
+      "boiler-panel-ota.json": {
+        "size": 609,
+        "sha256": "c9daa4684eea084992f074e609a8a237914f4e27e02ca10a02ccda80a7b058d1"
+      }
+    },
+    "checks": {
+      "final_build": {
+        "source_commit": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+        "target": "jc4880p4",
+        "exit_code": 0,
+        "firmware_sha256": "dbbec15578d6ea2e0816f11969cc625cd9d5c03457ae1d36f80201832f16ee5f",
+        "log": {
+          "path": "artifacts/firmware-build.log",
+          "sha256": "9ed8b108bedb4c6972dff6de1ff5d256786c400749065d499abde68f89ed4915"
+        }
+      },
+      "browser_tests": {
+        "source_commit": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+        "test_script": "tests/equipment_web_browser.py",
+        "report": {
+          "path": "artifacts/equipment-web-review/browser-result.json",
+          "sha256": "0c7a77abcfd51aaf9b19815ec87511567627b28be89961f6857792194ce9976f"
+        }
+      }
+    }
+  },
+  "preflight": {
+    "source_commit": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+    "version": "v0.10.4",
+    "run_id": "42007522847",
+    "hardware_acceptance": "pending",
+    "artifact_ids": {
+      "checks": "13406026161",
+      "firmware": "13405227597",
+      "native": "13405421719"
+    },
+    "assets": {
+      "BoilerPanel-v0.10.4-COM3.zip": {
+        "size": 1099736,
+        "sha256": "1646449bab09e1cc8b1f5b08b075bf88daf55f9fcb1fa47dddeea6dd0b73d627"
+      },
+      "BoilerPanel-v0.10.4-firmware.bin": {
+        "size": 1943792,
+        "sha256": "dbbec15578d6ea2e0816f11969cc625cd9d5c03457ae1d36f80201832f16ee5f"
+      },
+      "boiler-panel-ota.json": {
+        "size": 609,
+        "sha256": "c9daa4684eea084992f074e609a8a237914f4e27e02ca10a02ccda80a7b058d1"
+      }
+    }
+  },
+  "public_download_report": {
+    "result": "PASS",
+    "version": "v0.10.4",
+    "source_commit": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+    "hardware_acceptance": "pending",
+    "verified_at_utc": "2026-11-05T10:09:55Z",
+    "authentication_sent": false,
+    "assets": {
+      "BoilerPanel-v0.10.4-COM3.zip": {
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/BoilerPanel-v0.10.4-COM3.zip",
+        "size": 1099736,
+        "sha256": "1646449bab09e1cc8b1f5b08b075bf88daf55f9fcb1fa47dddeea6dd0b73d627"
+      },
+      "BoilerPanel-v0.10.4-firmware.bin": {
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/BoilerPanel-v0.10.4-firmware.bin",
+        "size": 1943792,
+        "sha256": "dbbec15578d6ea2e0816f11969cc625cd9d5c03457ae1d36f80201832f16ee5f"
+      },
+      "boiler-panel-ota.json": {
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/boiler-panel-ota.json",
+        "size": 609,
+        "sha256": "c9daa4684eea084992f074e609a8a237914f4e27e02ca10a02ccda80a7b058d1"
+      },
+      "SHA256SUMS.txt": {
+        "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.4/SHA256SUMS.txt",
+        "size": 282,
+        "sha256": "a107fd010ebcb85fd0efc96f03a0114479dbc70611cbae2d9e0920d5f19cd24a"
+      }
+    }
+  },
+  "public_download_step": {
+    "started_at": "2026-11-05T10:09:54Z",
+    "completed_at": "2026-11-05T10:09:56Z",
+    "conclusion": "success",
+    "timestamp_note": "The raw report timestamp is recorded at verification start; step completion is the end of all four downloads."
+  },
+  "root_recheck": {
+    "result": "PASS",
+    "source_commit": "e14a3bb6a0d92d9592b3b11c501743c5c9ff2ebc",
+    "version": "v0.10.4",
+    "public_release_id": 435037523,
+    "release_run_id": 42007522847,
+    "artifact_zip_digests_verified": true,
+    "public_assets_and_ci_payloads_match": true,
+    "nested_package_hashes_and_source_verified": true,
+    "build_log_sha256": "9ed8b108bedb4c6972dff6de1ff5d256786c400749065d499abde68f89ed4915",
+    "equipment_report_sha256": "0c7a77abcfd51aaf9b19815ec87511567627b28be89961f6857792194ce9976f",
+    "firmware_sha256": "dbbec15578d6ea2e0816f11969cc625cd9d5c03457ae1d36f80201832f16ee5f",
+    "native": {
+      "partial": {
+        "checks": 408,
+        "clipped": 0,
+        "sha256": "5bdf5b98e7109056f6a6f7d23eac81b047a7f7303ba1d17e805789e005036bfb"
+      },
+      "full-refresh": {
+        "checks": 408,
+        "clipped": 0,
+        "sha256": "1e9a8ba7e82f4ccf67f8daba751c8bbbe162735f923af1b8508e944aeeac1bb3"
+      }
+    },
+    "artifact_downloads": {
+      "evidence": {
+        "kind": "evidence",
+        "artifact_zip_sha256": "540581921247a9663b7cbf1a12119b569b9343336d6ba49f6fc44062a3cec6e6",
+        "zip_bytes": 3790,
+        "files": {
+          "ota-build-result.json": "32f1eff10bfccc995cfc8574e797b59bf2b59a047f3775a296f46116431d9e1f",
+          "release-notes.md": "b824c074530568472208d54b6c7158ec6b57a6ff2bec524c58da97f11829418b",
+          "candidate-preflight.json": "402d69d90d69081b2979041f44fe8fcfeed54b1d984df9b0f9125befaed51f96",
+          "publisher-dry-run.log": "3b34d78b2c2611f490ebd8568c0c6f7d68947e269882176b4ed3b0105487d662",
+          "publisher-result.log": "28648220fe62f1011459cea5a63453640b7234d235f9221e3b823ed935b833f1",
+          "public-download-verification.json": "3dcd145f45e8255d3608f66e4c7ef3ff2216562e68724f770bef3ec62eb439e9"
+        }
+      },
+      "firmware": {
+        "kind": "firmware",
+        "artifact_zip_sha256": "cc83ab25df89f61c39b70990f3322078cf53191b2aca94a9c6c7e39a023438ea",
+        "zip_bytes": 12888087,
+        "files": {
+          "firmware-build.log": "9ed8b108bedb4c6972dff6de1ff5d256786c400749065d499abde68f89ed4915",
+          "binary-verification.json": "fb43c8fe6e2af52f02f00b29ca2de1d1a7eee23cd178ea376367b12cb8d826de",
+          "input-manifest.json": "75d692f4172deb7d71f68cda359311baa90eca1339f25d85e31f377a0a669503",
+          "BoilerPanel-v0.10.4-firmware.bin": "dbbec15578d6ea2e0816f11969cc625cd9d5c03457ae1d36f80201832f16ee5f",
+          "BoilerPanel-v0.10.4-COM3.zip": "1646449bab09e1cc8b1f5b08b075bf88daf55f9fcb1fa47dddeea6dd0b73d627",
+          "boiler-panel-ota.json": "c9daa4684eea084992f074e609a8a237914f4e27e02ca10a02ccda80a7b058d1"
+        }
+      },
+      "browser": {
+        "kind": "browser",
+        "artifact_zip_sha256": "6de328aeb106a715b5c76b46f77ef109f73e289f8c3c47d7fb641606f7488775",
+        "zip_bytes": 1210008,
+        "files": {
+          "equipment-web-review/browser-result.json": "0c7a77abcfd51aaf9b19815ec87511567627b28be89961f6857792194ce9976f",
+          "update-web-review/browser-result.json": "44b566ad178da893dde6e475360dbf64077543e2cab1b7cda7458eccc3e0e0a4"
+        }
+      },
+      "native": {
+        "kind": "native",
+        "artifact_zip_sha256": "0795af48ee835ce099bbaced770584cad4a55f5cc4679ea9bae93e347337b845",
+        "zip_bytes": 1618364,
+        "files": {
+          "artifacts/calm-ui.log": "5bdf5b98e7109056f6a6f7d23eac81b047a7f7303ba1d17e805789e005036bfb",
+          "artifacts/calm-ui-full-refresh.log": "1e9a8ba7e82f4ccf67f8daba751c8bbbe162735f923af1b8508e944aeeac1bb3"
+        }
+      }
+    },
+    "public_download_step": {
+      "started_at": "2026-11-05T10:09:54Z",
+      "completed_at": "2026-11-05T10:09:56Z",
+      "conclusion": "success"
+    },
+    "hardware_acceptance": "pending"
+  },
+  "hardware": {
+    "acceptance": "pending",
+    "installation_verified": false,
+    "physical_display_date_checked": false,
+    "physical_display_flicker_checked": false,
+    "last_network_accepted_version": "v0.10.1",
+    "latest_device_version": "unknown",
+    "last_device_observation_utc": "2026-11-05T07:59:47.665447Z",
+    "asus_connection_checked_at_utc": "2026-11-05T10:10:24Z",
+    "asus_connection": "Offline",
+    "http_attempted_this_turn": false,
+    "usb_or_reset_used": false,
+    "installed_json_changed": false
+  }
+}

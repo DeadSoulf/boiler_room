@@ -4,7 +4,9 @@
 
 The physical Home header shows the local date as **DD.MM.YYYY** below the time, inside the existing area at the right. The six-digit pairing code keeps its separate area to the left. Both lines use the same current time and configured timezone; an unset clock shows placeholders. Other pages retain their Home button.
 
-This version is being prepared and checked for GitHub OTA. Publication and installation of v0.10.4 are not yet confirmed; the last verified device acceptance remains v0.10.1.
+**[v0.10.4 is published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.4).** Native LVGL and independent checks passed 408 layout checks with zero clipping in both rendering modes. The final OTA/browser/ESP32-P4 release workflow passed; all four public assets were downloaded and hash-checked. [Verification report](docs/verification/v0.10.4-home-date-2026-11-05.md).
+
+Select **Settings → Service → Update → Check**, then confirm **v0.10.4** on the panel or in the paired browser. Installation and the physical display remain unverified: Asus is offline, and the last accepted installed version is v0.10.1.
 
 ## v0.10.3: stable update screen
 
