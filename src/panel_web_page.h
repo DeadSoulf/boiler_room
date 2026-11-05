@@ -248,15 +248,22 @@ function updateDetail(){
  line.setAttribute("points",points);line.setAttribute("fill","none");line.setAttribute("stroke","#71ccfa");line.setAttribute("stroke-width","2.5");svg.append(line);
 }
 function renderEquipment(){
- const items=current?.equipment||[],holder=$("equipment-list");holder.replaceChildren();
+ const items=current?.equipment||[],holder=$("equipment-list");
  for(const [index,title] of [[0,"Бойлер"],[1,"Электрокотёл"],[5,"Дизельный отопитель"],[6,"Подогрев топлива"]]){
-  const card=document.createElement("details");card.className="card equip";
-  const summary=document.createElement("summary"),heading=document.createElement("h3"),status=document.createElement("p");
-  heading.textContent=title;status.textContent=items[index]?.connected?"Подключён":"Не подключён";
-  summary.append(heading,status);card.append(summary);
-  const explanation=document.createElement("p");explanation.textContent="Управление недоступно до подключения и проверки контроллера.";card.append(explanation);
-  if(index===1)for(const n of [2,3,4]){const row=document.createElement("div");row.className="row";const name=document.createElement("span"),value=document.createElement("span");name.textContent=items[n]?.name||names[n];value.textContent=items[n]?.connected?"Подключён":"Нет данных";row.append(name,value);card.append(row);}
-  holder.append(card);
+  // API positions identify fixed equipment types. Retain details/summary so polls
+  // preserve the user's open/closed state and native keyboard focus.
+  let card=holder.querySelector('[data-equipment="'+index+'"]');
+  if(!card){
+   card=document.createElement("details");card.className="card equip";card.dataset.equipment=String(index);
+   const summary=document.createElement("summary"),heading=document.createElement("h3"),status=document.createElement("p");
+   heading.textContent=title;summary.append(heading,status);card.append(summary);
+   const explanation=document.createElement("p");explanation.textContent="Управление недоступно до подключения и проверки контроллера.";card.append(explanation);
+   if(index===1)for(const n of [2,3,4]){const row=document.createElement("div");row.className="row";row.dataset.circuit=String(n);row.append(document.createElement("span"),document.createElement("span"));card.append(row);}
+   holder.append(card);
+  }
+  const connected=items[index]?.connected;
+  card.querySelector("summary p").textContent=connected===true?"Подключён":connected===false?"Не подключён":"Нет данных";
+  if(index===1)for(const n of [2,3,4]){const row=card.querySelector('[data-circuit="'+n+'"]');row.children[0].textContent=items[n]?.name||names[n];row.children[1].textContent=items[n]?.connected?"Подключён":"Нет данных";}
  }
 }
 function renderAP(){
