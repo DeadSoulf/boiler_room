@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.3
+# Boiler Room Touch Panel — v0.10.4
+
+## v0.10.4: date below the Home clock
+
+The physical Home header shows the local date as **DD.MM.YYYY** below the time, inside the existing area at the right. The six-digit pairing code keeps its separate area to the left. Both lines use the same current time and configured timezone; an unset clock shows placeholders. Other pages retain their Home button.
+
+This version is being prepared and checked for GitHub OTA. Publication and installation of v0.10.4 are not yet confirmed; the last verified device acceptance remains v0.10.1.
 
 ## v0.10.3: stable update screen
 
@@ -6,7 +12,7 @@ The physical Update page keeps its existing widgets when Wi-Fi signal informatio
 
 **[v0.10.3 is published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.3).** Real LVGL 8.3.11 passed 392 checks with zero clipped elements in both partial rendering and full-refresh with two full-screen buffers. The final OTA/browser/native/ESP32-P4 release workflow passed; all four public assets were downloaded without authentication and hash-checked. [Release and verification report](docs/verification/v0.10.3-ota-display-2026-11-05.md).
 
-The last verified installed version remains v0.10.1; Asus was offline on the latest connection check, so the current panel version and physical LCD behaviour are unverified. Select **Settings → Service → Update → Check**, then confirm **v0.10.3** on the panel or in the paired browser. The previous firmware still renders the download of this correction; the new UI behaviour starts after booting v0.10.3.
+Installation of v0.10.3 and physical LCD behaviour have not been independently verified. Its redraw correction is also included in v0.10.4. The previous firmware still renders the download of the correction; the new UI behaviour starts after booting a version that contains it.
 
 ## v0.10.2: equal Home temperature sizes
 
