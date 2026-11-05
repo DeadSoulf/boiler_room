@@ -34,6 +34,21 @@ void clickAt(int x,int y){mx=x;my=y;down=true;step(80);down=false;step(240);}
 void touch(const char* name){auto* n=find(overlay?lv_layer_top():lv_scr_act(),name);if(!n){fprintf(stderr,"MISSING CLICK [%s] page=%d view=%d overlay=%d\n",name,page,view,int(overlay!=nullptr));abort();}auto* o=lv_obj_get_parent(n);assert(!lv_obj_has_state(o,LV_STATE_DISABLED));lv_obj_update_layout(o);lv_area_t a;lv_obj_get_coords(o,&a);assert(a.x1>=0&&a.y1>=0&&a.x2<480&&a.y2<800);int x=(a.x1+a.x2)/2,y=(a.y1+a.y2)/2;lv_point_t p={lv_coord_t(x),lv_coord_t(y)};auto* hit=lv_indev_search_obj(overlay?lv_layer_top():lv_scr_act(),&p);while(hit&&hit!=o)hit=lv_obj_get_parent(hit);assert(hit==o);clickAt(x,y);check();}
 void swipe(bool left=true){mx=left?420:60;my=85;down=true;step(60);for(int i=0;i<8;i++){mx+=left?-42:42;step(40);}down=false;step(320);check();}
 void go(int p,int v=0){dismiss();page=p;view=v;pendingPage=-1;rebuild=false;render();step();check();}
+void homeTemperatureChecks(){
+ lv_obj_update_layout(lv_scr_act());
+ for(unsigned i=0;i<CHANNELS;i++){
+   auto* value=tempValue[i];assert(value&&lv_obj_get_style_text_font(value,0)==&boiler_font_55);
+   auto* tile=lv_obj_get_parent(value);auto* unit=find(tile,"°C");assert(unit);
+   lv_point_t textSize;lv_txt_get_size(&textSize,lv_label_get_text(value),&boiler_font_55,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+   assert(textSize.x<=lv_obj_get_width(value)&&lv_obj_get_height(value)==boiler_font_55.line_height);
+   lv_area_t titleBox,valueBox,unitBox,iconBox,statusBox,cardBox;
+   lv_obj_get_coords(find(tile,SENSOR_NAMES[i]),&titleBox);lv_obj_get_coords(value,&valueBox);
+   lv_obj_get_coords(unit,&unitBox);lv_obj_get_coords(i==3?fuelCanister.root:tempIcon[i],&iconBox);
+   lv_obj_get_coords(i==3?fuelCanister.status:tempState[i],&statusBox);lv_obj_get_coords(tile,&cardBox);
+   assert(titleBox.y2<valueBox.y1&&valueBox.y2<unitBox.y1&&unitBox.y2<iconBox.y1&&iconBox.y2<statusBox.y1);
+   assert(valueBox.x1>=cardBox.x1&&valueBox.x2<=cardBox.x2&&iconBox.x1>=cardBox.x1&&iconBox.x2<=cardBox.x2&&statusBox.y2<cardBox.y2);
+ }
+}
 int main(){
  setenv("TZ","UTC0",1);tzset();lv_init();
  static lv_color_t buf[480*40];static lv_disp_draw_buf_t draw;lv_disp_draw_buf_init(&draw,buf,nullptr,480*40);
@@ -49,7 +64,8 @@ int main(){
  puts("PASS: baseline screenshots from actual old LVGL source, isolated fixtures");return 0;
 #else
  assert(!strcmp(PAGES[2],"Топливо")&&!strcmp(PAGES[3],"Настройки"));
- for(unsigned i=0;i<3;i++){assert(tempValue[i]&&strstr(lv_label_get_text(tempValue[i]),"--"));assert(lv_obj_get_style_text_font(tempValue[i],0)==&boiler_font_55);assert(!freshBar[i]&&!tempTrend[i]);}
+ for(unsigned i=0;i<CHANNELS;i++){assert(tempValue[i]&&strstr(lv_label_get_text(tempValue[i]),"--"));assert(lv_obj_get_style_text_font(tempValue[i],0)==&boiler_font_55);assert(!freshBar[i]&&!tempTrend[i]);}
+ homeTemperatureChecks();
  assert(!strcmp(SENSOR_NAMES[0],"В доме")&&find(body,"В доме")&&!find(body,"В котельной"));
  for(unsigned i=0;i<3;i++){
    assert(tempIcon[i]&&!lv_obj_has_flag(tempIcon[i],LV_OBJ_FLAG_CLICKABLE));
@@ -69,13 +85,14 @@ int main(){
    assert(find(overlay,SENSOR_NAMES[i]));touch("Назад");assert(!overlay&&page==0);
  }
  for(float value:{-55.0f,0.0f,125.0f}){
-   for(unsigned i=0;i<3;i++){measurements[i].put(value,millis());}updateLive();check();
+   for(unsigned i=0;i<CHANNELS;i++){measurements[i].put(value,millis());}step(1100);check();homeTemperatureChecks();
+   save(value<0?"home-font-negative-fixture":value>=100?"home-font-three-digit-fixture":"home-font-zero-fixture");
  }
- for(auto& reading:measurements){reading=Measurement{};}updateLive();check();save("home-icons-no-data");
- assert(!tempValue[3]&&fuelCanister.temperature&&fuelCanister.root);
- assert(lv_obj_get_style_text_font(fuelCanister.temperature,0)==&boiler_font_19);
+ for(auto& reading:measurements){reading=Measurement{};}step(1100);check();homeTemperatureChecks();save("home-font-no-data-fixture");save("home-icons-no-data");
+ assert(tempValue[3]&&fuelCanister.temperature==tempValue[3]&&fuelCanister.root);
+ assert(lv_obj_get_style_text_font(fuelCanister.temperature,0)==&boiler_font_55);
  assert(lv_obj_get_child_cnt(body)==4&&!find(body,"Уровень топлива"));
- assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.- °C"));
+ assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.-"));
  assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
  touch("Топливо");assert(page==2&&!overlay);touch("Температура топлива");assert(overlay&&detailChannel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);
  swipe();assert(page==1&&view==0);save("equipment");
@@ -161,7 +178,7 @@ int main(){
  strcpy(radioFixture.aps[0].ssid,"Replacement");++radioFixture.revision;step(140);assert(displayedAps[0].ssid[0]=='W');down=false;step(300);assert(overlay&&selectedSsid[0]=='W');check();save("credentials-fixture");dismiss();
  go(0);const float values[]={22.4f,-8.2f,61.7f,34.8f};for(unsigned i=0;i<4;i++)measurements[i].put(values[i],millis());fuelLevel.put(true,false,millis());step(1100);save("home-values-fixture");check();
  for(unsigned i=0;i<3;i++)assert(!strcmp(lv_label_get_text(tempState[i]),""));
- assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"34.8 °C"));
+ assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"34.8"));homeTemperatureChecks();
  go(2);save("fuel-values-fixture");go(0);step(31000);assert(!strcmp(lv_label_get_text(tempState[0]),"Устарело"));save("home-stale-fixture");
  // Screen wake consumes the first touch rather than activating the underlying tile.
  panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());clickAt(100,260);assert(panel_screen::awake()&&!overlay);clickAt(100,260);assert(overlay);dismiss();panel_screen::setTimeout(0);
@@ -192,9 +209,9 @@ int main(){
  assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.status),"Устарело"));save("canister-stale-fixture");
  fuelLevel.clear();updateLive();check();assert(!strcmp(lv_label_get_text(fuelCanister.status),"Нет уровня"));save("canister-unknown-fixture");
  fuelLevel.lower.put(true,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
- contacts(false,false);measurements[3].put(0,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"0.0 °C"));
- measurements[3].put(-55,millis());updateLive();check();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"-55.0 °C"));
- measurements[3].put(NAN,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.- °C"));
+ contacts(false,false);measurements[3].put(0,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"0.0"));
+ measurements[3].put(-55,millis());updateLive();check();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"-55.0"));
+ measurements[3].put(NAN,millis());updateLive();assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.-"));
  // Icon children are passive: tapping its body still opens the fuel page.
  lv_area_t icon;lv_obj_get_coords(fuelCanister.body,&icon);clickAt((icon.x1+icon.x2)/2,(icon.y1+icon.y2)/2);
  assert(page==2&&!fuelCanister.root&&!overlay);touch("Домой");assert(fuelCanister.root);
@@ -203,7 +220,7 @@ int main(){
  assert(!panel_config::reedLevelReached(panel_config::Type::ReedNO,true));
  for(int n=0;n<240;n++){go(n%4);}
 
- printf("RESULT: %u layout checks, clipped=%u; actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
+ printf("RESULT: %u layout checks, clipped=%u; all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
  return clipped?1:0;
 #endif
 }

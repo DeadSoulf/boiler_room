@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.1
+# Boiler Room Touch Panel — v0.10.2
+
+## v0.10.2: equal Home temperature sizes
+
+All four Home readings use the same large number size on the 480×800 panel and in the embedded web UI. The fuel temperature now matches the other three; its canister remains below the value and unit. Web values retain the existing responsive size at each viewport, with the unit wrapping when needed. Equipment disclosure state from v0.10.1 is preserved.
+
+v0.10.2 is being prepared for GitHub OTA. The last verified installed version is v0.10.1; publishing a candidate is separate from confirming its installation.
 
 ## v0.10.1: keep equipment details open
 
