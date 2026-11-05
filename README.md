@@ -4,13 +4,13 @@
 
 The new update page discovers stable releases, offers a specific version for confirmation and shows download/verification/install progress. The same workflow is available in the paired embedded web UI. The image goes to the inactive Flash slot; SHA-256, size, board/revision, partition layout and the rollback-enabled bootloader are checked before boot selection. A healthy first start is required to retain the new application. The inserted microSD records update events through the existing log service; no image staging or formatting is required.
 
-[Using GitHub OTA and preparing releases](docs/github-ota.md). **Candidate under verification; the currently verified installed version is still v0.9.1 until the hardware report is updated.** Presence wake remains a separate pending task.
+[Using GitHub OTA and preparing releases](docs/github-ota.md). **v0.10.0 was installed and verified on 5 November 2026.** The first OTA-capable version was installed through the checked USB package. Presence wake remains a separate pending task.
 
 ## v0.9.1: home temperature and matching icons
 
 Channel 0 is now labelled **«В доме»** (home temperature). House, sun/cloud and radiator line icons match the existing fuel canister, without shrinking the large temperature readings. Native LVGL and embedded web UI are updated together; MQTT retains the `room` key and unique IDs. [Screenshots and checks](docs/home-icons-v091/README.md).
 
-**v0.9.1 was installed on 5 November 2026.** A new full backup, independent stock-esptool read-back and live HTTP checks confirmed the update. GitHub update discovery and presence wake remain pending.
+The earlier **v0.9.1** installation on 5 November 2026 introduced these home-screen changes. Its historical hardware report is retained; GitHub updates are now implemented in v0.10.0.
 
 Standalone GUITION JC4880P443C_I_W / ESP32-P4 + ESP32-C6, 480×800 LVGL panel. [Russian documentation](README_RU.md).
 
@@ -24,7 +24,7 @@ The self-contained web UI has four primary sections and nested settings, grouped
 
 ## Installation and release discipline
 
-**v0.9.1 is installed and verified by full Flash read-back and HTTP.** Wi-Fi, microSD and the new embedded web page respond; existing settings are preserved. [Hardware report](docs/verification/v0.9.1-hardware-2026-11-05.md) · [installed.json](docs/verification/installed.json) · [v0.9.1 release](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.9.1). Physical visual/touch checks, real PIN entry by a person and a real MQTT broker were not remotely verified.
+**v0.10.0 is installed and verified by full Flash read-back and HTTP.** A fresh full v0.9.1 backup was made first. Wi-Fi, touch readiness, microSD, the OTA worker and the exact embedded web page are confirmed; existing settings are preserved. [Hardware report](docs/verification/v0.10.0-hardware-2026-11-05.md) · [installed.json](docs/verification/installed.json) · [v0.10.0 release](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.0). A complete subsequent firmware installation over the network, power interruption during OTA, physical visual/touch checks, real PIN entry and a real MQTT broker were not remotely verified.
 
 Every requested successful device update must also publish its source into **main**, a matching version tag, a GitHub Release with the checked installation ZIP and SHA-256, updated README/CHANGELOG and handoff. Documentation-only updates while main stays on older firmware do not satisfy this rule. [Release process](docs/RELEASE_PROCESS_RU.md).
 
