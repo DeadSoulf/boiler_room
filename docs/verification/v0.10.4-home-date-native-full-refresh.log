@@ -1,0 +1,7 @@
+[BoilerPanel] v0.10.4 equipment=NOT_CONNECTED outputs=NONE display=0 ms LVGL=0 ms first-frame=1000 ms touch=0 ms
+HOME_DATE geometry: time=(334,18,455,52) text=58 max1440=58 date=(334,55,455,81) text=90 PIN=(196,16,327,81) text=78 mode=full-refresh
+HOME_DATE live: invalid/recovery, year rollover, timezone, PIN retained, no rebuild; unchanged updater frames=0 mode=full-refresh
+OTA_REDRAW unchanged: frames=0 pixels=0
+OTA_REDRAW radio: changes=22 frames=0 root_deletions=0 stable_pixels=yes
+OTA_REDRAW progress: updates=20 frames=20 full_frames=20 pixels=7680000 mode=full-refresh
+RESULT: 408 layout checks, clipped=0; Home date/clock/PIN fit, unknown time/recovery/rollover/timezone, all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access

@@ -10,8 +10,13 @@
 #ifndef UI_SOURCE
 #define UI_SOURCE "../../src/main.cpp"
 #endif
-// Fixed clock for repeatable previews, not a value from a real device.
-time_t preview_time(time_t* out){tm t={};t.tm_year=126;t.tm_mon=10;t.tm_mday=4;t.tm_hour=12;t.tm_min=40;time_t v=mktime(&t);if(out)*out=v;return v;}
+// Controlled epoch for repeatable previews and live rollover tests; no device clock.
+time_t previewEpoch=0;
+void setPreviewClock(int year,int month,int day,int hour,int minute,int second=0){
+ tm t={};t.tm_year=year-1900;t.tm_mon=month-1;t.tm_mday=day;t.tm_hour=hour;t.tm_min=minute;t.tm_sec=second;t.tm_isdst=-1;
+ previewEpoch=mktime(&t);assert(previewEpoch!=time_t(-1));
+}
+time_t preview_time(time_t* out){if(out)*out=previewEpoch;return previewEpoch;}
 #define time preview_time
 #include UI_SOURCE
 #undef time
@@ -54,12 +59,70 @@ void homeTemperatureChecks(){
    assert(valueBox.x1>=cardBox.x1&&valueBox.x2<=cardBox.x2&&iconBox.x1>=cardBox.x1&&iconBox.x2<=cardBox.x2&&statusBox.y2<cardBox.y2);
  }
 }
+void homeHeaderChecks(){
+ assert(page==0&&headerTitle&&clockLabel&&dateLabel&&pairBadge&&pairDigits&&!find(header,"Домой"));
+ lv_obj_update_layout(header);
+ auto singleLine=[](lv_obj_t* object){
+   const auto* font=lv_obj_get_style_text_font(object,0);lv_point_t textSize;
+   lv_txt_get_size(&textSize,lv_label_get_text(object),font,lv_obj_get_style_text_letter_space(object,0),3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+   assert(textSize.x<=lv_obj_get_width(object)&&lv_obj_get_height(object)==font->line_height);
+ };
+ singleLine(clockLabel);singleLine(dateLabel);singleLine(headerTitle);
+ lv_area_t head,clock,date,pin,title,digits;
+ lv_obj_get_coords(header,&head);lv_obj_get_coords(clockLabel,&clock);lv_obj_get_coords(dateLabel,&date);
+ lv_obj_get_coords(pairBadge,&pin);lv_obj_get_coords(headerTitle,&title);lv_obj_get_coords(pairDigits,&digits);
+ assert(clock.x1==date.x1&&clock.x2==date.x2&&clock.y2<date.y1);
+ assert(clock.x1>pin.x2&&date.x1>pin.x2&&date.x2<head.x2&&clock.y1>head.y1&&date.y2<head.y2);
+ if(!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN)){
+   singleLine(pairDigits);assert(strlen(lv_label_get_text(pairDigits))==6&&lv_obj_get_style_text_font(pairDigits,0)==&boiler_font_25);
+   assert(title.x2<pin.x1&&digits.x1>pin.x1&&digits.x2<pin.x2&&digits.y1>pin.y1&&digits.y2<pin.y2);
+ }
+ check();
+}
 void unchangedPixels(const std::vector<lv_color_t>& before,const std::vector<lv_area_t>& allowed={}){
  for(size_t i=0;i<pixels.size();++i)if(before[i].full!=pixels[i].full){
    const int x=int(i%480),y=int(i/480);bool expected=false;
    for(const auto& a:allowed)if(x>=a.x1&&x<=a.x2&&y>=a.y1&&y<=a.y2)expected=true;
    if(!expected){fprintf(stderr,"Unexpected pixel change at (%d,%d): %04x -> %04x\n",x,y,unsigned(before[i].full),unsigned(pixels[i].full));assert(false);}
  }
+}
+void homeClockChecks(bool fullRefresh){
+ const time_t originalEpoch=previewEpoch;auto* originalHeader=header;auto* originalBody=body;
+ auto* originalClock=clockLabel;auto* originalDate=dateLabel;auto* originalPin=pairDigits;
+ auto expect=[&](const char* timeText,const char* dateText){
+   step(1100);assert(header==originalHeader&&body==originalBody&&clockLabel==originalClock&&dateLabel==originalDate&&pairDigits==originalPin);
+   assert(!strcmp(lv_label_get_text(clockLabel),timeText)&&!strcmp(lv_label_get_text(dateLabel),dateText));
+   assert(!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(pairDigits),"123456"));homeHeaderChecks();
+ };
+ setPreviewClock(2026,12,31,23,59,59);expect("23:59","31.12.2026");
+ lv_coord_t longestClock=0;lv_point_t measured;
+ for(int hour=0;hour<24;hour++)for(int minute=0;minute<60;minute++){
+   char value[6];snprintf(value,sizeof(value),"%02d:%02d",hour,minute);
+   lv_txt_get_size(&measured,value,&boiler_font_25,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+   if(measured.x>longestClock)longestClock=measured.x;
+ }
+ lv_txt_get_size(&measured,lv_label_get_text(clockLabel),&boiler_font_25,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+ assert(measured.x==longestClock&&longestClock<=lv_obj_get_width(clockLabel));
+ const int clockWidth=measured.x;
+ lv_txt_get_size(&measured,lv_label_get_text(dateLabel),&boiler_font_19,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+ const int dateWidth=measured.x;assert(lv_obj_get_style_text_font(dateLabel,0)==&boiler_font_19);
+ lv_txt_get_size(&measured,lv_label_get_text(pairDigits),&boiler_font_25,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+ lv_area_t clockBox,dateBox,pinBox;lv_obj_get_coords(clockLabel,&clockBox);lv_obj_get_coords(dateLabel,&dateBox);lv_obj_get_coords(pairBadge,&pinBox);
+ printf("HOME_DATE geometry: time=(%d,%d,%d,%d) text=%d max1440=%d date=(%d,%d,%d,%d) text=%d PIN=(%d,%d,%d,%d) text=%d mode=%s\n",clockBox.x1,clockBox.y1,clockBox.x2,clockBox.y2,clockWidth,int(longestClock),dateBox.x1,dateBox.y1,dateBox.x2,dateBox.y2,dateWidth,pinBox.x1,pinBox.y1,pinBox.x2,pinBox.y2,int(measured.x),fullRefresh?"full-refresh":"partial");
+ save("home-date-pin-fixture");
+ ++previewEpoch;expect("00:00","01.01.2027");save("home-date-rollover-fixture");
+ // Both strings follow the existing local timezone, including crossing midnight.
+ setPreviewClock(2026,11,5,22,30);setenv("TZ","MSK-3",1);tzset();expect("01:30","06.11.2026");save("home-date-timezone-fixture");
+ setenv("TZ","UTC0",1);tzset();expect("22:30","05.11.2026");
+ for(time_t invalid:{time_t(-1),time_t(0),time_t(1704067199)}){previewEpoch=invalid;expect("--:--","--.--.----");}
+ save("home-date-unknown-fixture");
+ ++previewEpoch;expect("00:00","01.01.2024");
+ previewEpoch=originalEpoch;expect("12:40","04.11.2026");
+ // Isolate the header updater from other Home telemetry: unchanged strings need no redraw.
+ lv_refr_now(nullptr);const auto unchanged=pixels;frameStats={};
+ for(unsigned i=0;i<20;i++){updateClock();lv_refr_now(nullptr);}
+ assert(!frameStats.frames);unchangedPixels(unchanged);
+ printf("HOME_DATE live: invalid/recovery, year rollover, timezone, PIN retained, no rebuild; unchanged updater frames=%u mode=%s\n",frameStats.frames,fullRefresh?"full-refresh":"partial");
 }
 void updateRedrawChecks(bool fullRefresh){
  auto& update=panel_update::fixture;auto& network=panel_radio::fixture;
@@ -118,7 +181,7 @@ void updateRedrawChecks(bool fullRefresh){
 int main(int argc,char** argv){
  setvbuf(stdout,nullptr,_IOLBF,0);
  assert(argc==1||(argc==2&&!strcmp(argv[1],"--full-refresh")));const bool fullRefresh=argc==2;
- setenv("TZ","UTC0",1);tzset();lv_init();
+ setenv("TZ","UTC0",1);tzset();setPreviewClock(2026,11,4,12,40);lv_init();
  static lv_color_t buf[480*800],second[480*800];static lv_disp_draw_buf_t draw;lv_disp_draw_buf_init(&draw,buf,fullRefresh?second:nullptr,fullRefresh?480*800:480*40);
  lv_disp_drv_t display;lv_disp_drv_init(&display);display.hor_res=480;display.ver_res=800;display.flush_cb=flush;display.draw_buf=&draw;display.full_refresh=fullRefresh;display.monitor_cb=monitor;lv_disp_drv_register(&display);
  lv_indev_drv_t input;lv_indev_drv_init(&input);input.type=LV_INDEV_TYPE_POINTER;input.read_cb=pointer;lv_indev_drv_register(&input);
@@ -132,6 +195,7 @@ int main(int argc,char** argv){
  puts("PASS: baseline screenshots from actual old LVGL source, isolated fixtures");return 0;
 #else
  assert(!strcmp(PAGES[2],"Топливо")&&!strcmp(PAGES[3],"Настройки"));
+ homeHeaderChecks();assert(!strcmp(lv_label_get_text(clockLabel),"12:40")&&!strcmp(lv_label_get_text(dateLabel),"04.11.2026"));
  for(unsigned i=0;i<CHANNELS;i++){assert(tempValue[i]&&strstr(lv_label_get_text(tempValue[i]),"--"));assert(lv_obj_get_style_text_font(tempValue[i],0)==&boiler_font_55);assert(!freshBar[i]&&!tempTrend[i]);}
  homeTemperatureChecks();
  assert(!strcmp(SENSOR_NAMES[0],"В доме")&&find(body,"В доме")&&!find(body,"В котельной"));
@@ -181,16 +245,18 @@ int main(int argc,char** argv){
  step(300);assert(page==0&&pairBadge&&!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN));
  assert(!strcmp(lv_label_get_text(pairDigits),"123456"));
  lv_area_t pinBox,clockBox;lv_obj_get_coords(pairBadge,&pinBox);lv_obj_get_coords(clockLabel,&clockBox);assert(pinBox.x2<clockBox.x1);
- check();save("pairing-header-fixture");
+ homeHeaderChecks();save("pairing-header-fixture");homeClockChecks(fullRefresh);
  assert(panel_web::challenge.verify(pairTicket,"000000",millis())==panel_pairing::Verify::Rejected);
  step(200);assert(!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN));
  assert(panel_web::challenge.verify(pairTicket,"123456",millis())==panel_pairing::Verify::Accepted);
  step(200);assert(lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN)&&!strlen(lv_label_get_text(pairDigits)));
+ homeHeaderChecks();save("home-date-no-pin-fixture");
  // A remote pairing request wakes the panel, but does not change the persisted timeout.
  step(31000);panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());
  assert(panel_web::challenge.request(pairTicket,"654321",millis())==panel_pairing::Request::Started);
  step(200);assert(panel_screen::awake()&&panel_screen::timeout()==30&&!lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN));
  step(120100);assert(lv_obj_has_flag(pairBadge,LV_OBJ_FLAG_HIDDEN)&&!strlen(lv_label_get_text(pairDigits)));
+ homeHeaderChecks();
  panel_screen::setTimeout(0);
  go(PAGE_SETTINGS);
  touch("Сервис");assert(view==ServiceView);save("service");touch("microSD");assert(view==StorageView);assert(lv_obj_has_flag(sdFormatAccept,LV_OBJ_FLAG_HIDDEN));save("storage");
@@ -250,7 +316,7 @@ int main(int argc,char** argv){
  go(2);save("fuel-values-fixture");go(0);step(31000);assert(!strcmp(lv_label_get_text(tempState[0]),"Устарело"));save("home-stale-fixture");
  // Screen wake consumes the first touch rather than activating the underlying tile.
  panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());clickAt(100,260);assert(panel_screen::awake()&&!overlay);clickAt(100,260);assert(overlay);dismiss();panel_screen::setTimeout(0);
- for(int p=0;p<4;p++){go(p);for(int i=0;i<4;i++){swipe();assert(page==(p+i+1)%4);}}
+ for(int p=0;p<4;p++){go(p);for(int i=0;i<4;i++){swipe();assert(page==(p+i+1)%4);if(page==0)homeHeaderChecks();else assert(!clockLabel&&!dateLabel&&find(header,"Домой"));}}
  for(int v:{Root,WifiView,BleView,DisplayView,ConnectionsView,HaView,ServiceView,StorageView,DiagnosticsView,AboutView,WifiMoreView,UpdateView}){go(PAGE_SETTINGS,v);if(v==DisplayView)save("display");if(v==BleView)save("bluetooth");check();}
  go(1,1);save("boiler");go(1,3);save("diesel");go(1,4);save("fuel-heater");
  go(0);
@@ -288,7 +354,7 @@ int main(int argc,char** argv){
  assert(!panel_config::reedLevelReached(panel_config::Type::ReedNO,true));
  for(int n=0;n<240;n++){go(n%4);}
 
- printf("RESULT: %u layout checks, clipped=%u; all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
+ printf("RESULT: %u layout checks, clipped=%u; Home date/clock/PIN fit, unknown time/recovery/rollover/timezone, all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
  return clipped?1:0;
 #endif
 }

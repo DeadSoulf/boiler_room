@@ -416,9 +416,12 @@ void action(lv_event_t* e){
 }
 void updateClock(){
   if(!clockLabel)return;
-  const time_t now=time(nullptr);char t[16]="--:--";
-  if(now>=time_t(1704067200)){tm local={};localtime_r(&now,&local);strftime(t,sizeof(t),"%H:%M",&local);}
-  lv_label_set_text(clockLabel,t);
+  const time_t now=time(nullptr);char t[16]="--:--",d[16]="--.--.----";tm local={};
+  if(now>=time_t(1704067200)&&localtime_r(&now,&local)){
+    strftime(t,sizeof(t),"%H:%M",&local);strftime(d,sizeof(d),"%d.%m.%Y",&local);
+  }
+  if(strcmp(lv_label_get_text(clockLabel),t))lv_label_set_text(clockLabel,t);
+  if(dateLabel&&strcmp(lv_label_get_text(dateLabel),d))lv_label_set_text(dateLabel,d);
 }
 const char* currentTitle(){
   if(page==1&&view>0)return view==1?"Бойлер":view==2?"Электрокотёл":view==3?"Отопитель":"Подогрев топлива";
@@ -438,7 +441,8 @@ void makeHeader(){
   if(nested)button(header,"<",16,18,56,56,Back);
   headerTitle=label(header,currentTitle(),nested?88:24,32,nested?250:315,&boiler_font_25);
   if(page==0){
-    clockLabel=label(header,"--:--",334,30,122,&boiler_font_25,SKY);lv_obj_set_style_text_align(clockLabel,LV_TEXT_ALIGN_RIGHT,0);updateClock();
+    clockLabel=label(header,"--:--",334,18,122,&boiler_font_25,SKY);lv_obj_set_style_text_align(clockLabel,LV_TEXT_ALIGN_RIGHT,0);
+    dateLabel=label(header,"--.--.----",334,55,122,&boiler_font_19,MUTED);lv_obj_set_style_text_align(dateLabel,LV_TEXT_ALIGN_RIGHT,0);updateClock();
     pairBadge=box(header,196,16,132,66,0x245D55,12);lv_obj_clear_flag(pairBadge,LV_OBJ_FLAG_CLICKABLE);
     auto* caption=label(pairBadge,"Код",12,4,108,&boiler_font_14,TXT);lv_obj_set_style_text_align(caption,LV_TEXT_ALIGN_CENTER,0);
     pairDigits=label(pairBadge,"",8,28,116,&boiler_font_25,TXT);lv_obj_set_style_text_align(pairDigits,LV_TEXT_ALIGN_CENTER,0);
