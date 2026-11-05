@@ -1,4 +1,4 @@
-"""Equipment disclosure and Home typography in the actual embedded HTML/Chromium.
+"""Equipment, Home typography and sensor pinout in embedded HTML/Chromium.
 
 The HTTP server supplies isolated fixtures only. No panel, serial port or GPIO
 is contacted. Real mouse/keyboard input and the unchanged three-second status
@@ -12,6 +12,7 @@ from pathlib import Path
 from threading import Lock, Thread
 import json
 import os
+import re
 from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,12 +25,41 @@ header_path = args.source_header.resolve()
 header_bytes = header_path.read_bytes()
 source = header_bytes.decode("utf-8")
 html = source[source.index("<!doctype html>"):source.index("</html>") + 7].encode("utf-8")
+pinout_source = ROOT / "src/web_assets/jp1-pinout.jpg"
+pinout_header = ROOT / "src/panel_web_pinout.h"
+pinout_header_bytes = pinout_header.read_bytes()
+pinout_array = re.search(r"kJp1PinoutJpeg\[\]\s+PROGMEM\s*=\s*\{(.*?)\};",
+                         pinout_header_bytes.decode("ascii"), re.S)
+assert pinout_array, "Embedded JP1 byte array missing"
+assert not re.sub(r"0x[0-9a-fA-F]{2}|[\s,]", "", pinout_array[1]), "Unexpected embedded image initializer"
+pinout_bytes = bytes.fromhex("".join(re.findall(r"0x([0-9a-fA-F]{2})", pinout_array[1])))
+assert pinout_bytes == pinout_source.read_bytes(), "Embedded image differs from the supplied JPEG"
+pinout_sha256 = sha256(pinout_bytes).hexdigest()
+assert len(pinout_bytes) == 114530 and pinout_sha256 == "bbd8c4af43121d48d94854e91782a15e6a59227a6c49be709562fe2a90ca8b38"
+profile_bytes = (ROOT / "src/panel_pin_profile.h").read_bytes()
+profile_pins = re.search(r"constexpr Pin HEADER\[\]=\{(.*?)\};", profile_bytes.decode("utf-8"), re.S)
+sensor_pins = {int(gpio): int(pin) for gpio, pin in re.findall(r"\{\s*(\d+)\s*,\s*(\d+)\s*\}", profile_pins[1])}
+assert len(sensor_pins) == 11
 out = args.output_dir.resolve()
 out.mkdir(parents=True, exist_ok=True)
 version = (ROOT / "VERSION").read_text(encoding="ascii").strip()
 names = ["Бойлер косвенного нагрева", "Электрокотёл", "Контур 1", "Контур 2",
          "Контур 3", "Дизельный отопитель", "Подогрев топлива"]
 inventory = [{"name": name, "connected": False, "state": "not_connected"} for name in names]
+
+
+def empty_connections(revision=0):
+    return {"available": True, "revision": revision, "drivers_active": False,
+            "items": [{"channel": channel, "type": "none", "gpio": -1, "jp1_pin": 0,
+                       "active": False, "online": False} for channel in range(6)]}
+
+
+def local_assignment(channel, kind, gpio):
+    # A saved assignment reserves its GPIO even while no sensor can be read.
+    return {"channel": channel, "type": kind, "gpio": gpio, "jp1_pin": sensor_pins[gpio],
+            "active": False, "online": False, "status": "Sensor not found"}
+
+
 fixture = {
     "version": version, "clock": "05.11.2026 12:40:00", "uptime_s": 600,
     "authorized": False, "pair_available": False, "pair_remaining_s": 0,
@@ -44,7 +74,7 @@ fixture = {
     "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(4)],
     "fuel": {"lower": {"valid": False}, "upper": {"valid": False}},
     "fuel_level_text": "Нет данных", "equipment": deepcopy(inventory),
-    "connections": {"revision": 0, "drivers_active": False, "items": []},
+    "connections": empty_connections(),
     "storage": {"started": True, "mounted": True, "logging": True,
                 "format_attempted": False, "format_state": 0},
     "home_assistant": {"ready": True, "supported": True, "enabled": False,
@@ -52,7 +82,7 @@ fixture = {
     "update": {"started": True, "supported": True, "busy": False, "available": False,
                "automatic_rollback": True, "phase": "current", "latest_version": version},
 }
-state = {"status_polls": 0, "mutation_requests": []}
+state = {"status_polls": 0, "mutation_requests": [], "pinout_requests": 0, "status_code": 200}
 guard = Lock()
 
 
@@ -63,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
     def reply(self, status, value, mime="application/json"):
         data = value if isinstance(value, bytes) else json.dumps(value, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", mime + "; charset=utf-8")
+        self.send_header("Content-Type", mime + ("; charset=utf-8" if mime in ("application/json", "text/html") else ""))
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -72,13 +102,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/":
             return self.reply(200, html, "text/html")
+        if self.path == "/assets/jp1-pinout.jpg":
+            with guard:
+                state["pinout_requests"] += 1
+            return self.reply(200, pinout_bytes, "image/jpeg")
         if self.path == "/api/status":
             with guard:
                 state["status_polls"] += 1
                 data = deepcopy(fixture)
+                status_code = state["status_code"]
                 # The visible uptime confirms each HTTP response reached updateView.
                 data["uptime_s"] = 600 + state["status_polls"]
-            return self.reply(200, data)
+            return self.reply(status_code, data if status_code == 200 else {"error": "fixture_offline"})
         self.reply(404, {})
 
     def do_POST(self):
@@ -102,6 +137,13 @@ result = {
     "mutation_requests": [],
     "status_polls": 0,
     "home_temperature_checks": [],
+    "pinout_asset": {"source": "src/web_assets/jp1-pinout.jpg", "bytes": len(pinout_bytes),
+                     "sha256": pinout_sha256, "embedded_header": "src/panel_web_pinout.h",
+                     "embedded_header_sha256": sha256(pinout_header_bytes).hexdigest()},
+    "pinout_checks": [],
+    "pinout_transitions": [],
+    "pin_profile_sha256": sha256(profile_bytes).hexdigest(),
+    "external_requests": [],
     "coverage": [],
     "physical_panel_contacted": False,
     "data": "isolated fixtures; status polling interval unchanged",
@@ -113,7 +155,14 @@ try:
             executable = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
         browser = playwright.chromium.launch(headless=True, executable_path=executable)
         context = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+        context.on("request", lambda request: result["external_requests"].append(request.url)
+                   if not request.url.startswith(base + "/") else None)
         page = context.new_page()
+        # Only this page owns the inline image reused across all four widths.
+        # Original-image popup navigation can arrive before its frame exists.
+        pinout_responses = []
+        page.on("response", lambda response: pinout_responses.append(response)
+                if response.url == base + "/assets/jp1-pinout.jpg" else None)
         page.on("pageerror", lambda error: result["page_errors"].append(str(error)))
         page.goto(base)
         page.click('.topnav [data-page="equipment"]')
@@ -231,6 +280,213 @@ try:
                     "number_single_line": True, "overlap_or_clipping": False,
                 })
 
+            pin_draft = {"cfg-channel": "5", "cfg-type": "3", "cfg-gpio": "33", "cfg-debounce": "275"}
+
+            def assert_pin_draft():
+                for name, value in pin_draft.items():
+                    expect(page.locator("#" + name)).to_have_value(value)
+
+            def expect_pin(gpio, state_name, label):
+                pin = page.locator(f'#jp1-map [data-gpio="{gpio}"]')
+                expect(pin).to_have_attribute("data-state", state_name)
+                expect(pin.locator(".jp1-status")).to_have_text(label)
+
+            def pinout_geometry(width, label):
+                metrics = page.locator("#jp1-map").evaluate("""map => {
+                    const box=r=>({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height});
+                    return {rows:Array.from(map.children,row=>Array.from(row.children,pin=>{
+                        const parts=Array.from(pin.children,part=>{const range=document.createRange();range.selectNodeContents(part);
+                            return {text:part.textContent,rects:Array.from(range.getClientRects(),box)};});
+                        return {pin:Number(pin.dataset.pin),gpio:pin.dataset.gpio?Number(pin.dataset.gpio):null,
+                            state:pin.dataset.state,box:box(pin.getBoundingClientRect()),parts};
+                    }))};
+                }""")
+                (out / f"sensor-pinout-{label}-{width}-metrics.json").write_text(
+                    json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                assert len(metrics["rows"]) == 13
+                pins = [pin for row in metrics["rows"] for pin in row]
+                assert [pin["pin"] for pin in pins] == list(range(1, 27))
+                assert {pin["gpio"]: pin["pin"] for pin in pins if pin["gpio"] is not None} == sensor_pins
+                for row in metrics["rows"]:
+                    assert len(row) == 2 and row[0]["box"]["right"] < row[1]["box"]["left"]
+                    for pin in row:
+                        bounds = pin["box"]
+                        assert bounds["width"] > 0 and 0 <= bounds["left"] < bounds["right"] <= width
+                        for part in pin["parts"]:
+                            for rect in part["rects"]:
+                                assert rect["left"] >= bounds["left"] - 1 and rect["right"] <= bounds["right"] + 1, (width, pin, "horizontal clipping")
+                                assert rect["top"] >= bounds["top"] - 1 and rect["bottom"] <= bounds["bottom"] + 1, (width, pin, "vertical clipping")
+                assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
+                expect(page.locator('#jp1-map button, #jp1-map input, #jp1-map select, #jp1-map [data-action]')).to_have_count(0)
+                expect(page.locator('#jp1-map [data-state="fixed"]')).to_have_count(15)
+                expect(page.locator('#jp1-map [data-pin="15"] .jp1-status')).to_have_text("BOOT · резерв")
+                return metrics
+
+            def sensor_pinout(width):
+                saved = empty_connections(width)
+                saved["items"][0] = local_assignment(0, "ds18b20", 52)
+                saved["items"][4] = local_assignment(4, "reed_nc", 28)
+                saved["items"][2]["type"] = "mqtt"
+                saved["items"][5].update(type="modbus", address=1)
+                with guard:
+                    fixture["connections"] = saved
+                page.click('.topnav [data-page="settings"]')
+                page.click('#settings-menu [data-page="connections"]')
+                expect(page.locator("#connections")).to_be_visible()
+                wait_polls()
+                expect_pin(52, "busy", "Занят · В доме")
+                expect_pin(28, "busy", "Занят · Нижний геркон")
+                expect(page.locator('#jp1-map [data-state="free"]')).to_have_count(9)
+                original_pins = page.locator("#jp1-map .jp1-pin").element_handles()
+                for name in ("cfg-channel", "cfg-type", "cfg-gpio"):
+                    page.locator("#" + name).select_option(pin_draft[name])
+                page.locator("#cfg-debounce").fill(pin_draft["cfg-debounce"])
+                # Selecting a GPIO in the form does not reserve it until saved.
+                expect_pin(33, "free", "Свободен")
+                page.locator('#jp1-map [data-gpio="33"]').click()
+                assert_pin_draft()
+                map_metrics = pinout_geometry(width, "map")
+                page.screenshot(path=str(out / f"sensor-pinout-map-{width}.png"), full_page=True)
+                photo = page.locator("#jp1-photo")
+                expect(photo).to_have_js_property("open", False)
+                photo.locator("summary").click()
+                picture = page.locator("#jp1-pinout")
+                link = page.locator("#jp1-pinout-link")
+                picture.scroll_into_view_if_needed()
+                page.wait_for_function("() => {const image=document.getElementById('jp1-pinout');return image.complete&&image.naturalWidth===800&&image.naturalHeight===800;}")
+                original_picture = picture.element_handle()
+                original_link = link.element_handle()
+                response = pinout_responses[-1]
+                assert response.status == 200 and response.headers["content-type"] == "image/jpeg"
+                assert sha256(response.body()).hexdigest() == pinout_sha256
+                metrics = picture.evaluate("""image => {
+                    const rect=image.getBoundingClientRect(),card=image.closest('.card').getBoundingClientRect();
+                    return {left:rect.left,right:rect.right,width:rect.width,height:rect.height,
+                            card_left:card.left,card_right:card.right,natural_width:image.naturalWidth,
+                            natural_height:image.naturalHeight};
+                }""")
+                assert 0 < metrics["width"] <= 800 and abs(metrics["width"] - metrics["height"]) < 0.5
+                assert metrics["left"] >= metrics["card_left"] and metrics["right"] <= metrics["card_right"]
+                assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
+                # Native Tab from the disclosure summary reaches the original-image link.
+                expect(photo.locator("summary")).to_be_focused()
+                page.keyboard.press("Tab")
+                expect(link).to_be_focused()
+                expect(link).to_have_css("outline-style", "solid")
+                expect(link).to_have_css("outline-width", "2px")
+                with guard:
+                    requests_before_poll = state["pinout_requests"]
+                wait_polls()
+                expect(link).to_be_focused()
+                expect(photo).to_have_js_property("open", True)
+                with guard:
+                    assert state["pinout_requests"] == requests_before_poll, "Polling fetched the image again"
+                assert_pin_draft()
+                expect_pin(33, "free", "Свободен")
+                assert all(handle.evaluate("node => node.isConnected") for handle in original_pins)
+                assert original_picture.evaluate("node => node===document.getElementById('jp1-pinout')")
+                assert original_link.evaluate("node => node===document.getElementById('jp1-pinout-link')")
+                page.screenshot(path=str(out / f"sensor-pinout-photo-{width}.png"), full_page=True)
+                method = "keyboard" if width in (390, 1280) else "mouse"
+                with context.expect_event("response", predicate=lambda response:
+                        response.url == base + "/assets/jp1-pinout.jpg"
+                        and response.request.is_navigation_request()) as original_response:
+                    with context.expect_page() as opened:
+                        if method == "keyboard":
+                            page.keyboard.press("Enter")
+                        else:
+                            link.click()
+                popup = opened.value
+                popup.wait_for_load_state()
+                assert popup.url == base + "/assets/jp1-pinout.jpg"
+                popup.wait_for_function("() => {const image=document.querySelector('img');return image&&image.complete&&image.naturalWidth===800&&image.naturalHeight===800;}")
+                popup_response = original_response.value
+                assert popup_response.status == 200 and popup_response.headers["content-type"] == "image/jpeg"
+                assert sha256(popup_response.body()).hexdigest() == pinout_sha256
+                popup.screenshot(path=str(out / f"sensor-pinout-original-{width}.png"))
+                popup.close()
+                expect(page.locator("#connections")).to_be_visible()
+                assert_pin_draft()
+                assert original_picture.evaluate("node => node===document.getElementById('jp1-pinout')")
+                photo.locator("summary").click()
+                expect(photo).to_have_js_property("open", False)
+                result["pinout_checks"].append({"width": width, "map": map_metrics, "image": metrics, "open_method": method,
+                    "original_sha256": pinout_sha256, "draft_preserved": True, "draft_does_not_reserve_gpio": True,
+                    "keyboard_focus_visible": True, "poll_image_reloads": 0, "overlap_or_clipping": False})
+
+            def pinout_transitions():
+                page.click('.topnav [data-page="settings"]')
+                page.click('#settings-menu [data-page="connections"]')
+                original_pins = page.locator("#jp1-map .jp1-pin").element_handles()
+                with guard:
+                    requests_before = state["pinout_requests"]
+
+                def record(name, expected):
+                    for state_name in ("free", "busy", "unknown", "conflict"):
+                        expect(page.locator(f'#jp1-map [data-kind="gpio"][data-state="{state_name}"]')).to_have_count(expected.get(state_name, 0))
+                    assert_pin_draft()
+                    assert all(handle.evaluate("node => node.isConnected") for handle in original_pins)
+                    result["pinout_transitions"].append({"name": name, "states": page.locator('#jp1-map [data-kind="gpio"]').evaluate_all(
+                        "pins=>pins.map(pin=>({gpio:Number(pin.dataset.gpio),state:pin.dataset.state,text:pin.querySelector('.jp1-status').textContent}))"), "draft_preserved": True})
+
+                def change(name, config, expected):
+                    with guard:
+                        if config is None:
+                            fixture.pop("connections", None)
+                        else:
+                            fixture["connections"] = deepcopy(config)
+                    wait_polls()
+                    record(name, expected)
+
+                change("empty-saved-configuration", empty_connections(1000), {"free": 11})
+                assigned = empty_connections(1001)
+                assigned["items"][0] = local_assignment(0, "ds18b20", 52)
+                change("saved-sensor-offline-still-occupied", assigned, {"free": 10, "busy": 1})
+                expect_pin(52, "busy", "Занят · В доме")
+                moved = empty_connections(1002)
+                moved["items"][0] = local_assignment(0, "ds18b20", 33)
+                change("saved-reassignment", moved, {"free": 10, "busy": 1})
+                expect_pin(52, "free", "Свободен")
+                expect_pin(33, "busy", "Занят · В доме")
+                change("saved-disconnection", empty_connections(1003), {"free": 11})
+                unavailable = dict(assigned, available=False)
+                change("snapshot-unavailable", unavailable, {"unknown": 11})
+                for width in (320, 390, 1280):
+                    page.set_viewport_size({"width": width, "height": 900})
+                    pinout_geometry(width, "unknown")
+                    page.screenshot(path=str(out / f"sensor-pinout-unknown-{width}.png"), full_page=True)
+                partial = empty_connections(1004)
+                partial["items"].pop()
+                change("partial-snapshot", partial, {"unknown": 11})
+                malformed = empty_connections(1005)
+                malformed["items"][0] = None
+                change("null-assignment", malformed, {"unknown": 11})
+                invalid = deepcopy(assigned)
+                invalid["items"][0].update(gpio=35, jp1_pin=15)
+                change("reserved-gpio-in-invalid-snapshot", invalid, {"unknown": 11})
+                expect(page.locator('#jp1-map [data-pin="15"] .jp1-status')).to_have_text("BOOT · резерв")
+                duplicate = deepcopy(assigned)
+                duplicate["items"][1] = local_assignment(1, "ds18b20", 52)
+                change("duplicate-gpio-conflict", duplicate, {"conflict": 1, "unknown": 10})
+                expect_pin(52, "conflict", "Конфликт · В доме / На улице")
+                page.screenshot(path=str(out / "sensor-pinout-conflict-1280.png"), full_page=True)
+                change("missing-connections", None, {"unknown": 11})
+                change("valid-snapshot-recovery", assigned, {"free": 10, "busy": 1})
+                with guard:
+                    state["status_code"] = 503
+                expect(page.locator("#jp1-state")).to_contain_text("Нет связи", timeout=10000)
+                record("transport-offline", {"unknown": 11})
+                for gpio in sensor_pins:
+                    expect_pin(gpio, "unknown", "Нет связи")
+                page.screenshot(path=str(out / "sensor-pinout-offline-1280.png"), full_page=True)
+                with guard:
+                    state["status_code"] = 200
+                wait_polls()
+                record("transport-recovery", {"free": 10, "busy": 1})
+                expect_pin(52, "busy", "Занят · В доме")
+                with guard:
+                    assert state["pinout_requests"] == requests_before, "State changes fetched the image again"
+
             for width in (320, 390, 768, 1280):
                 page.set_viewport_size({"width": width, "height": 900})
                 connected = width in (320, 768)
@@ -291,6 +547,7 @@ try:
                         ]
                     wait_polls()
                     home_temperatures(width, case, values)
+                sensor_pinout(width)
                 page.click('.topnav [data-page="equipment"]')
                 same_cards()
                 result["widths"].append(width)
@@ -318,6 +575,7 @@ try:
             wait_polls()
             expect(cards.nth(1)).to_have_js_property("open", False)
             same_cards()
+            pinout_transitions()
             result.update(result="PASS", coverage=[
                 "actual embedded HTML and three-second HTTP polls",
                 "mouse opens and closes details", "native Tab/Shift+Tab/Enter/Space",
@@ -330,9 +588,20 @@ try:
                 "four equal Home temperature font sizes without reducing the original large sizes",
                 "no-data, negative, three-digit and mixed readings on all four widths",
                 "single-line numbers, wrapping units when necessary, no text clipping or icon overlap",
+                "supplied JP1 JPEG served from the actual embedded bytes without external requests",
+                "sensor pinout decoded at 800x800 and fits all four widths without cropping",
+                "26-contact JP1 schematic matches the firmware pin profile and fits all four widths",
+                "saved assignment and reassignment reserve GPIO even when the sensor is offline",
+                "draft choices do not reserve GPIO; disconnection releases only after a valid snapshot",
+                "unavailable, partial, missing, invalid and duplicate snapshots never claim free contacts",
+                "transport loss clears occupancy certainty and a fresh snapshot restores it",
+                "mouse and keyboard open the original image in a separate tab with visible focus",
+                "unsaved sensor selections survive status polling and closing the original image",
+                "status polling retains image/link DOM and does not reload the JPEG",
             ])
         assert not result["page_errors"], result["page_errors"]
         assert not state["mutation_requests"], state["mutation_requests"]
+        assert not result["external_requests"], result["external_requests"]
         browser.close()
 except BaseException as error:
     result["result"] = "FAIL"
@@ -342,6 +611,7 @@ finally:
     with guard:
         result["status_polls"] = state["status_polls"]
         result["mutation_requests"] = deepcopy(state["mutation_requests"])
+        result["pinout_requests"] = state["pinout_requests"]
     (out / "browser-result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, ensure_ascii=False))
     server.shutdown()

@@ -25,6 +25,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include "panel_web_page.h"
+#include "panel_web_pinout.h"
 #else
 #define BP_WEB_ENABLED 0
 #endif
@@ -108,6 +109,9 @@ void errorResponse(int status,const char* code) {
 }
 void homepage() {
   responseHeaders();server.send_P(200,"text/html; charset=utf-8",kBoilerWebPage);
+}
+void pinoutImage() {
+  responseHeaders();server.send_P(200,"image/jpeg",reinterpret_cast<const char*>(kJp1PinoutJpeg),sizeof(kJp1PinoutJpeg));
 }
 bool authorized() {
   const String h=server.header("Authorization");
@@ -297,6 +301,7 @@ void statusRequest() {
   if(hasSensors)for(const auto& c:sensors.channels)if(c.active)anyInputRunning=true;
   j+=",\"connections\":{\"revision\":";
   j+=String(hasConfig?cfg.revision:0);
+  j+=",\"available\":";j+=hasConfig?"true":"false";
   j+=",\"drivers_active\":";j+=anyInputRunning?"true":"false";
   j+=",\"message\":";
   jsonQuote(j,"JP1 sensor drivers activate only on validated NVS assignments; other controllers remain offline");
@@ -548,6 +553,7 @@ void worker(void*) {
   const char* headers[]={"Authorization","X-Boiler-Pairing","Origin","Sec-Fetch-Site"};
   server.collectHeaders(headers,4);
   server.on("/",HTTP_GET,homepage);
+  server.on("/assets/jp1-pinout.jpg",HTTP_GET,pinoutImage);
   server.on("/health",HTTP_GET,[]{responseHeaders();server.send(200,"text/plain; charset=utf-8","ok");});
   server.on("/api/status",HTTP_GET,statusRequest);
   server.on("/api/pair/start",HTTP_POST,pairStartRequest);

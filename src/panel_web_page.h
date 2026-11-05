@@ -17,6 +17,8 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 .temp-icon .icon-tint{fill:#245d55}.temp:not(.temp-fuel) .temp-detail{margin-top:auto}
 @media(max-width:680px){.temp-icon{width:112px;height:112px}.temp .temp-value{margin:13px 0 4px}}
 .update-offer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:-12px 0 24px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--accent)}.update-offer button{padding:8px 14px;flex-shrink:0}.update-offer span{overflow-wrap:anywhere}.update-panel{max-width:760px}.update-panel progress{display:block;width:100%;height:12px;accent-color:var(--accent);margin:24px 0 10px}.update-panel .row b{font-variant-numeric:tabular-nums}#update-message{white-space:pre-wrap}#update-progress-text{font-variant-numeric:tabular-nums}#update-error:empty{display:none}
+.pinout{max-width:800px;margin:24px auto}.pinout figcaption{font-size:18px;font-weight:550;margin-bottom:12px}.pinout a{display:block;color:var(--accent);text-decoration:none}.pinout a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.pinout img{display:block;width:100%;height:auto}.pinout-open{display:block;min-height:46px;padding:12px 0;font-size:14px;line-height:1.5;text-decoration:underline;text-underline-offset:3px}
+.jp1-section{max-width:800px;margin:24px auto}.jp1-section h3{margin-bottom:8px}.jp1-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px}.jp1-legend span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px}.jp1-free{color:var(--accent)}.jp1-busy{color:var(--warn)}.jp1-map{display:grid;gap:6px;margin:16px 0}.jp1-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}.jp1-pin{--pin-color:var(--muted);position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:center;gap:3px 4px;min-width:0;min-height:52px;padding:8px;border:1px solid var(--pin-color);border-radius:8px;background:#142024}.jp1-pin.right{grid-template-columns:auto minmax(0,1fr)}.jp1-name{font-size:14px;font-weight:550;overflow-wrap:anywhere}.jp1-number{font-size:11px;color:var(--muted);align-self:center}.jp1-status{grid-column:1/-1;color:var(--pin-color);font-size:12px;line-height:1.4;overflow-wrap:anywhere}.jp1-pin::after{content:"";position:absolute;right:-11px;top:calc(50% - 3px);width:6px;height:6px;border-radius:50%;background:var(--pin-color)}.jp1-pin.right::after{right:auto;left:-11px}.jp1-pin[data-state=free]{--pin-color:var(--accent)}.jp1-pin[data-state=busy]{--pin-color:var(--warn)}.jp1-pin[data-state=conflict]{--pin-color:var(--red)}.jp1-pin[data-kind=power],.jp1-pin[data-kind=boot]{--pin-color:#efb28c}.jp1-pin[data-kind=c6]{--pin-color:#9cc9ed}.jp1-pin[data-kind=i2c]{--pin-color:#c2b1e9}
 </style></head><body><div class="container">
 <header><div><p class="eyebrow">Панель дома</p><h1>Котельная</h1></div><div class="header-meta"><span class="header-time" id="clock">--:--</span></div><div class="toolbar"><span id="authstate" class="tag">Просмотр</span><button id="pairbutton" class="primary" data-action="show-pair">Сопряжение</button><button id="logout" class="ghost hidden" data-action="logout">Завершить доступ</button></div></header>
 <nav class="topnav" aria-label="Разделы"><button data-page="home" class="active">Главная</button><button data-page="equipment">Оборудование</button><button data-page="fuel">Топливо</button><button data-page="settings">Настройки</button></nav>
@@ -85,6 +87,20 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
     <option value="4">Modbus RTU / RS-485 (требует контроллер)</option>
     <option value="5">MQTT (требует настроенный брокер)</option>
   </select></div>
+  <section class="jp1-section" aria-labelledby="jp1-title">
+    <h3 id="jp1-title">Схема контактов JP1</h3>
+    <p class="tiny">Ориентация — как на фото распиновки ниже. Занятость показана по сохранённым назначениям датчиков.</p>
+    <div class="jp1-legend" aria-label="Обозначения"><span class="jp1-free">Свободен</span><span class="jp1-busy">Занят</span><span class="muted">Служебный / питание</span></div>
+    <div id="jp1-map" class="jp1-map" role="group" aria-label="Разъём JP1, 26 контактов в двух колонках"></div>
+    <p id="jp1-state" class="tiny muted" role="status">Ожидаем назначения с панели.</p>
+    <details id="jp1-photo" class="details"><summary>Фото распиновки</summary><figure class="pinout">
+    <figcaption>Расположение контактов JP1</figcaption>
+    <a id="jp1-pinout-link" href="/assets/jp1-pinout.jpg" target="_blank" rel="noopener" aria-label="Открыть схему контактов JP1 в полном размере, в новой вкладке">
+      <img id="jp1-pinout" src="/assets/jp1-pinout.jpg" width="800" height="800" loading="lazy" decoding="async" alt="Схема JP1: расположение GPIO, питания, GND, I2C и выводов ESP32-C6">
+      <span class="pinout-open">Открыть схему в полном размере ↗</span>
+    </a>
+    </figure></details>
+  </section>
   <div class="field"><label for="cfg-gpio">GPIO ESP32-P4 (для локального датчика)</label>
   <select id="cfg-gpio">
    <option value="-1">Без GPIO (не назначено / удалённый источник)</option>
@@ -202,6 +218,24 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 const $=id=>document.getElementById(id);
 const names=["Бойлер косвенного нагрева","Электрокотёл","Контур 1","Контур 2","Контур 3","Дизельный отопитель","Подогрев топлива"];
 const tnames=["В доме","На улице","Теплоноситель","Топливо"];
+const inputNames=[...tnames,"Нижний геркон","Верхний геркон"];
+// Physical JP1 order; assignable GPIOs match panel_pin_profile.h.
+const jp1Pins=[
+ ["3V3","power","Питание"],["5V","power","Питание"],
+ ["3V3","power","Питание"],["5V","power","Питание"],
+ ["GND","gnd","Общий"],["GND","gnd","Общий"],
+ ["GPIO52","gpio",52],["GPIO33","gpio",33],
+ ["GPIO51","gpio",51],["GPIO31","gpio",31],
+ ["GPIO50","gpio",50],["GPIO30","gpio",30],
+ ["GPIO49","gpio",49],["GPIO29","gpio",29],
+ ["GPIO35","boot","BOOT · резерв"],["GND","gnd","Общий"],
+ ["GPIO34","gpio",34],["ESP_3V3","power","Служебное питание"],
+ ["GPIO32","gpio",32],["C6_U0RXD","c6","ESP32-C6 · резерв"],
+ ["GPIO28","gpio",28],["C6_U0TXD","c6","ESP32-C6 · резерв"],
+ ["I2C_SDA","i2c","I2C · резерв"],["C6_IO9","c6","ESP32-C6 · резерв"],
+ ["I2C_SCL","i2c","I2C · резерв"],["C6_CHIP_PU","c6","ESP32-C6 · резерв"]
+];
+const jp1Nodes=[];
 let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="home",tab="",detail=-1;
 let lastServerError="",lastToast=null,refreshInFlight=false,serverOnline=false;
 let pairTicket="",pairDeadline=0,pairGeneration=0,pairBusy=false;
@@ -221,6 +255,51 @@ function notice(message,problem=false){
 }
 function numeric(n){return Number.isFinite(Number(n))?Number(n):0}
 function apiHeaders(){const h={};if(token)h.Authorization="Bearer "+token;return h}
+function renderPinout(cfg){
+ if(!jp1Nodes.length){
+  const map=$("jp1-map");let row;
+  jp1Pins.forEach(([name,kind,value],index)=>{
+   if(index%2===0){row=document.createElement("div");row.className="jp1-row";map.append(row);}
+   const pin=document.createElement("div"),label=document.createElement("span"),number=document.createElement("span"),status=document.createElement("span");
+   pin.className="jp1-pin"+(index%2?" right":"");pin.dataset.pin=String(index+1);pin.dataset.kind=kind;
+   pin.dataset.state=kind==="gpio"?"unknown":"fixed";
+   if(kind==="gpio")pin.dataset.gpio=String(value);
+   label.className="jp1-name";label.textContent=name;
+   number.className="jp1-number";number.textContent=String(index+1);number.setAttribute("aria-label","Контакт "+(index+1));
+   status.className="jp1-status";status.textContent=kind==="gpio"?"Нет данных":value;
+   if(index%2)pin.append(number,label,status);else pin.append(label,number,status);
+   row.append(pin);jp1Nodes.push({pin,status,kind,value,index});
+  });
+ }
+ const seen=new Set(),assigned=new Map();
+ let valid=!!cfg&&cfg.available===true&&Number.isInteger(cfg.revision)&&cfg.revision>=0&&Array.isArray(cfg.items)&&cfg.items.length===6;
+ if(valid)for(const item of cfg.items){
+  if(!item||!Number.isInteger(item.channel)||item.channel<0||item.channel>=6||seen.has(item.channel)){valid=false;break;}
+  seen.add(item.channel);
+  if(["ds18b20","reed_no","reed_nc"].includes(item.type)){
+   const pin=jp1Nodes.find(node=>node.kind==="gpio"&&node.value===item.gpio);
+   if(!pin||item.jp1_pin!==pin.index+1||(item.type==="ds18b20")!==(item.channel<4)){valid=false;break;}
+   if(!assigned.has(item.gpio))assigned.set(item.gpio,[]);
+   assigned.get(item.gpio).push(inputNames[item.channel]);
+  }else if(!["none","modbus","mqtt"].includes(item.type)||item.gpio!==-1){valid=false;break;}
+ }
+ const conflict=valid&&Array.from(assigned.values()).some(names=>names.length>1);
+ for(const node of jp1Nodes){
+  if(node.kind!=="gpio")continue;
+  const owners=assigned.get(node.value)||[];
+  let state="unknown",label=lastServerError&&!serverOnline?"Нет связи":"Нет данных";
+  if(serverOnline&&valid){
+   if(conflict){if(owners.length>1){state="conflict";label="Конфликт · "+owners.join(" / ");}}
+   else{state=owners.length?"busy":"free";label=owners.length?"Занят · "+owners[0]:"Свободен";}
+  }
+  if(node.pin.dataset.state!==state)node.pin.dataset.state=state;
+  if(node.status.textContent!==label)node.status.textContent=label;
+ }
+ const message=!serverOnline?(lastServerError?"Нет связи с панелью. Занятость контактов неизвестна.":"Ожидаем назначения с панели."):
+  !valid?"Нет достоверных назначений. Занятость контактов неизвестна.":
+  conflict?"Конфликт назначений. Свободные контакты не определены.":"Сохранённые назначения · ревизия "+cfg.revision;
+ if($("jp1-state").textContent!==message)text("jp1-state",message);
+}
 function drawPage(){
  for(const n of document.querySelectorAll(".page"))n.classList.toggle("hidden",n.id!==page);
  for(const n of document.querySelectorAll(".topnav [data-page]"))n.classList.toggle("active",n.dataset.page===(["connections","ha","service","update"].includes(page)?"settings":page));
@@ -352,7 +431,7 @@ function markOffline(){
  text("fuel-temp","--.- °C");text("lower-status","Нет связи");text("upper-status","Нет связи");updateCanister(null);
 }
 function updateView(){
- const d=current;if(!d)return;
+ const d=current;renderPinout(d&&d.connections);if(!d)return;
  text("version",d.version);text("service-version",d.version);
  text("clock",d.clock||"Нет времени");text("clock-current",d.clock||"Нет времени");
  text("net",d.wifi&&d.wifi.connected?"Wi-Fi подключён":"Нет Wi-Fi");
@@ -407,10 +486,10 @@ function updateView(){
  text("cfg-message",cfg.message||"");
  const holder=$("cfg-table");if(holder){
     holder.replaceChildren();
-    const channels=["Котельная","Улица","Теплоноситель","Топливо","Нижний геркон","Верхний геркон"];
-    for(const item of (cfg.items||[])){
+    for(const item of (Array.isArray(cfg.items)?cfg.items:[])){
+      if(!item||typeof item!=="object")continue;
       const row=document.createElement("div");row.className="row";
-      const title=document.createElement("span");title.textContent=channels[item.channel]||"Канал";
+      const title=document.createElement("span");title.textContent=inputNames[item.channel]||"Канал";
       const detail=document.createElement("span");
       detail.textContent=(item.type||"none")+" · "+
         (item.gpio>=0?"GPIO "+item.gpio+" / JP1-"+(item.jp1_pin||"?"):"удалённый вход")+
