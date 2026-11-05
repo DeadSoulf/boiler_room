@@ -5,6 +5,8 @@
 #include <limits>
 using namespace panel_ha;
 int main(){
+ assert(!strcmp(ENTITIES[0].key,"room"));
+ assert(!strcmp(ENTITIES[0].name,"Температура в доме"));
  Config c;assert(validConfig(c)&&!c.enabled&&c.port==1883);
  c.enabled=1;assert(!validConfig(c));strcpy(c.host,"192.0.2.1");assert(validConfig(c));
  for(const char* bad:{"mqtt://host","host:1883","host/path","host@x","host\n","[::1]"}){strcpy(c.host,bad);assert(!validConfig(c));}

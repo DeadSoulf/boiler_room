@@ -1,0 +1,50 @@
+{
+  "version": "v0.9.1",
+  "base": "7ca0ea0c887429f0de573d6575af78af9687c209",
+  "device_updated": false,
+  "native_layout_checks": 350,
+  "clipped": 0,
+  "browser": {
+    "browser": "Chromium",
+    "desktop_and_mobile_widths": [
+      1280,
+      768,
+      390,
+      320
+    ],
+    "page_errors": [],
+    "pair_starts": 3,
+    "pair_verifies": 2,
+    "pair_cancels": 2,
+    "settings_writes": [],
+    "physical_panel_contacted": false,
+    "data": "isolated synthetic fixtures, not live measurements",
+    "result": "PASS"
+  },
+  "unchanged_backends": [
+    "src/panel_radio.cpp",
+    "src/panel_sensors.cpp",
+    "src/panel_config.cpp",
+    "src/panel_storage.cpp",
+    "src/panel_web.cpp",
+    "src/panel_pairing.h",
+    "src/panel_ha.cpp",
+    "src/panel_screen.cpp"
+  ],
+  "source_sha256": {
+    "src/main.cpp": "5a890605b71376fd6d4dc9ff3ffeab80bb292336cadde9720c26fb9dc3aa91e4",
+    "src/panel_web_page.h": "e4c716a9ea6b2beebc30b303b96c070b375e9bcca5ddba766caed446c75f0b42",
+    "src/panel_ha_protocol.h": "407ee3ee8375e1213d6b9fca41cfc3961dc5a3c733275e879cb621c3fe29a104",
+    "src/panel_types.h": "d71eafdaa776da903d09b8323848fd20899d4958ec79a236e3d8b0ba40ae3ba4"
+  },
+  "target_build": {
+    "source_commit": "db7d221b7c89990e2ef12ffc27552c9c35422945",
+    "result": "SUCCESS",
+    "firmware_bytes": 1786096,
+    "firmware_sha256": "3bcc8663c088255763e75c3d42fdc00f8920332fa9785797904199653cdaf80b",
+    "package_sha256": "15db67fa865a734b60130dc4076724d7212c50e55f09b678a6ef6bfd064bb6f2",
+    "ram_bytes": 45460,
+    "program_flash_bytes": 1738374,
+    "hardware_verified": false
+  }
+}

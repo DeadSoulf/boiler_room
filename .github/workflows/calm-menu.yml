@@ -32,6 +32,7 @@ jobs:
           (cd artifacts/calm-ui && ../../.build/calm-native/calm_test) | tee artifacts/calm-ui.log
           python3 tests/calm_ui/render_preview.py
           python3 tests/calm_ui/render_canister.py artifacts/calm-ui
+          python3 tests/calm_ui/render_home_icons.py
       - name: Existing safety and MQTT checks
         run: |
           python3 tests/storage_static_tests.py
@@ -49,5 +50,6 @@ jobs:
             docs/calm-menu/preview.html
             docs/fuel-canister/*.png
             docs/fuel-canister/preview.html
+            docs/home-icons-v091/*.png
             artifacts/calm-ui.log
           retention-days: 14

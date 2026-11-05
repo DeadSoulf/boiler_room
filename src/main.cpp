@@ -36,7 +36,7 @@ const char* const PAGES[]={"Главная","Оборудование","Топл
 constexpr int PAGE_SETTINGS=3;
 enum MenuView { Root=0,WifiView=1,BleView=2,DisplayView=4,ConnectionsView=6,HaView=7,ServiceView=8,StorageView=9,DiagnosticsView=10,AboutView=11,WifiMoreView=12 };
 int parentMenuView(int v){if(v==WifiMoreView)return WifiView;if(v==WifiView||v==BleView||v==HaView)return ConnectionsView;if(v==StorageView||v==DiagnosticsView||v==AboutView)return ServiceView;return Root;}
-const char* const SENSOR_NAMES[]={"В котельной","На улице","Теплоноситель","Топливо"};
+const char* const SENSOR_NAMES[]={"В доме","На улице","Теплоноситель","Топливо"};
 const uint32_t ACCENT[]={SKY,SKY,SKY,SKY};
 Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sensor events.
 FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
@@ -47,6 +47,7 @@ struct FuelCanister {
   lv_obj_t *crossA=nullptr,*crossB=nullptr,*glyph=nullptr,*temperature=nullptr,*status=nullptr;
 };
 FuelCanister fuelCanister;
+lv_obj_t* tempIcon[3]={};
 constexpr int CANISTER_FILL_HEIGHT=106;
 void updateCanister();
 struct FuelLevelLabels {
@@ -437,6 +438,44 @@ void passive(lv_obj_t* object){
   lv_obj_clear_flag(object,LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_flag(object,LV_OBJ_FLAG_GESTURE_BUBBLE);
 }
+// Decorative vector icons. No sensor state, weather or actuator state is inferred.
+// Coordinates match the embedded web SVGs; line point arrays have static lifetime.
+lv_obj_t* iconRect(lv_obj_t* parent,int x,int y,int w,int h,int radius=5){
+  auto* o=box(parent,x,y,w,h,CARD,radius);
+  lv_obj_set_style_border_width(o,3,0);lv_obj_set_style_border_color(o,c(SKY),0);passive(o);return o;
+}
+void iconLine(lv_obj_t* parent,const lv_point_t* points,unsigned count){
+  auto* o=lv_line_create(parent);lv_line_set_points(o,points,count);
+  lv_obj_set_style_line_color(o,c(SKY),0);lv_obj_set_style_line_width(o,3,0);
+  lv_obj_set_style_line_rounded(o,true,0);passive(o);
+}
+void temperatureIcon(lv_obj_t* tile,unsigned channel){
+  auto* root=box(tile,44,156,120,108,CARD,0);tempIcon[channel]=root;
+  lv_obj_set_style_border_width(root,0,0);passive(root);
+  if(channel==0){
+    iconRect(root,82,16,10,27,2);
+    iconRect(root,24,44,72,56,6);
+    static const lv_point_t roof[]={{10,46},{60,8},{110,46}};
+    iconLine(root,roof,3);
+    auto* door=iconRect(root,56,65,22,35,3);lv_obj_set_style_bg_color(door,c(0x245D55),0);
+    auto* window=iconRect(root,35,61,12,14,2);lv_obj_set_style_bg_color(window,c(0x245D55),0);
+  }else if(channel==1){
+    iconRect(root,18,16,40,40,LV_RADIUS_CIRCLE);
+    static const lv_point_t rays[][2]={{{38,3},{38,9}},{{8,36},{2,36}},{{64,10},{59,15}},{{10,10},{15,15}},{{67,36},{74,36}},{{10,62},{15,57}}};
+    for(const auto& ray:rays)iconLine(root,ray,2);
+    // Opaque backing occludes the sun behind a single rounded cloud contour.
+    auto* cover=box(root,32,40,78,58,CARD,0);lv_obj_set_style_border_width(cover,0,0);passive(cover);
+    static const lv_point_t cloud[]={{34,94},{25,91},{20,84},{18,76},{20,68},{26,62},{34,60},{37,49},{44,40},{54,35},{65,34},{76,37},{84,44},{88,54},{96,54},{104,58},{110,65},{112,74},{110,84},{104,91},{96,94},{34,94}};
+    iconLine(root,cloud,sizeof(cloud)/sizeof(cloud[0]));
+  }else{
+    static const lv_point_t inlet[]={{15,40},{15,18},{5,18}},outlet[]={{105,82},{115,82},{115,98}};
+    iconLine(root,inlet,3);iconLine(root,outlet,3);
+    iconRect(root,14,32,92,58,7);
+    for(int x:{25,44,63,82}){auto* fin=iconRect(root,x,36,12,50,4);lv_obj_set_style_bg_color(fin,c(0x245D55),0);}
+    static const lv_point_t feet[][2]={{{28,92},{28,100}},{{92,92},{92,100}}};
+    for(const auto& foot:feet)iconLine(root,foot,2);
+  }
+}
 void canister(lv_obj_t* tile){
   fuelCanister.temperature=label(tile,"--.- °C",18,62,172,&boiler_font_19,MUTED);
   fuelCanister.root=box(tile,48,92,112,156,CARD,0);
@@ -502,9 +541,10 @@ void home(){
     lv_obj_set_style_border_color(tile,c(SKY),LV_STATE_PRESSED);
     label(tile,SENSOR_NAMES[i],18,22,172,&boiler_font_19,MUTED);
     if(i==3){canister(tile);continue;}
-    tempValue[i]=label(tile,"--.-",16,112,178,&boiler_font_55);
-    label(tile,"°C",18,182,172,&boiler_font_19,MUTED);
-    tempState[i]=label(tile,"Нет данных",18,258,172,&boiler_font_14,MUTED);
+    tempValue[i]=label(tile,"--.-",16,50,178,&boiler_font_55);
+    label(tile,"°C",18,128,172,&boiler_font_19,MUTED);
+    temperatureIcon(tile,i);
+    tempState[i]=label(tile,"Нет данных",18,269,172,&boiler_font_14,MUTED);
   }
 }
 
@@ -725,6 +765,7 @@ void render(){
   haStatusLabel=sdStatusLabel=sdFormatNotice=sdFormatAccept=sdFormatReject=nullptr;
   equipmentFuelTemp=equipmentFuelLevel=nullptr;
   fuelCardLabels={};fuelCanister={};
+  for(auto& icon:tempIcon)icon=nullptr;
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;
   sensorSummary=sensorHint=liveTime=activity=activityDot=resultList=heapLabel=uptimeLabel=nullptr;
   body=box(lv_scr_act(),0,100,480,673,BG,0);lv_obj_set_style_border_width(body,0,0);

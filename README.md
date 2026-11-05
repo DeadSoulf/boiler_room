@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.9.0
+# Boiler Room Touch Panel — v0.9.1
+
+## v0.9.1 candidate: home temperature and matching icons
+
+Channel 0 is now labelled **«В доме»** (home temperature). House, sun/cloud and radiator line icons match the existing fuel canister, without shrinking the large temperature readings. Native LVGL and embedded web UI are updated together; MQTT retains the `room` key and unique IDs. [Screenshots and checks](docs/home-icons-v091/README.md).
+
+**The device remains on v0.9.0; this candidate has NOT been flashed.** The following installation details describe the previous installed version.
 
 Standalone GUITION JC4880P443C_I_W / ESP32-P4 + ESP32-C6, 480×800 LVGL panel. [Russian documentation](README_RU.md).
 

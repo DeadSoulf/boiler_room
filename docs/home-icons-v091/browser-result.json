@@ -1,0 +1,17 @@
+{
+  "browser": "Chromium",
+  "desktop_and_mobile_widths": [
+    1280,
+    768,
+    390,
+    320
+  ],
+  "page_errors": [],
+  "pair_starts": 3,
+  "pair_verifies": 2,
+  "pair_cancels": 2,
+  "settings_writes": [],
+  "physical_panel_contacted": false,
+  "data": "isolated synthetic fixtures, not live measurements",
+  "result": "PASS"
+}

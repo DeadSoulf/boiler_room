@@ -6,11 +6,12 @@ from urllib.parse import parse_qs
 import copy,json,time,os,sys
 from playwright.sync_api import sync_playwright,expect
 r=Path(__file__).resolve().parents[1]
+version=(r/'VERSION').read_text(encoding='ascii').strip()
 source=(r/'src/panel_web_page.h').read_text(encoding='utf-8')
 html=source[source.index('<!doctype html>'):source.index('</html>')+7].encode()
 out=r/'artifacts/web-review';out.mkdir(parents=True,exist_ok=True)
 fixture={
- 'version':'v0.9.0','clock':'04.11.2026 12:40:00','uptime_s':3600,'physical_control':False,'data_origin':'fixture',
+ 'version':version,'clock':'04.11.2026 12:40:00','uptime_s':3600,'physical_control':False,'data_origin':'fixture',
  'wifi':{'connected':True,'ready':True,'busy':False,'supported':True,'has_saved':True,'ssid':'Fixture-WiFi','ip':'192.0.2.10','rssi':-53,'aps':[]},
  'ble':{'supported':True,'message':'','devices':[]},'screen':{'timeout_s':60,'touch_ready':True,'message':''},
  'time':{'zone':0,'zone_name':'UTC','message':''},'service':{'free_heap':180000,'first_frame_ms':480,'display_ms':320,'lvgl_ms':2,'touch_ms':80},
@@ -64,8 +65,17 @@ try:
   browser=p.chromium.launch(headless=True,executable_path=executable)
   context=browser.new_context(viewport={'width':1280,'height':900},device_scale_factor=1,reduced_motion='reduce')
   page=context.new_page();errors=[];page.on('pageerror',lambda err:errors.append(str(err)))
-  page.goto(base);expect(page.locator('#version')).to_have_text('v0.9.0');expect(page.locator('#fuel-canister')).to_have_attribute('data-state','full')
+  page.goto(base);expect(page.locator('#version')).to_have_text(version);expect(page.locator('#fuel-canister')).to_have_attribute('data-state','full')
   assert len(page.locator('.topnav button').all())==4
+  expect(page.locator('#home .temp-name').first).to_have_text('В доме')
+  assert page.locator('#home svg.temp-icon').count()==3
+  for index,kind in enumerate(('house','outdoor','radiator')):
+   icon=page.locator(f'svg[data-icon="{kind}"]');expect(icon).to_be_visible()
+   assert icon.get_attribute('aria-hidden')=='true'
+   box=icon.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
+   expect(page.locator('#temperature-detail')).to_be_visible()
+   expect(page.locator('#detail-title')).to_have_text(('В доме','На улице','Теплоноситель')[index]+' — подробности')
+   page.click('[data-action="close-detail"]')
   page.screenshot(path=str(out/'desktop-home.png'),full_page=True)
   page.click('#pairbutton');expect(page.locator('#pairbox')).to_be_visible();expect(page.locator('#pair-submit')).to_be_enabled()
   assert state['starts']==1 and state['active'] and page.input_value('#paircode')==''
