@@ -6,7 +6,11 @@
 
 The supplied connector photograph remains available below the diagram as a reference and opens in another tab. Its exact JPEG is embedded in the firmware and served by the panel without Internet or microSD. The diagram updates without changing the settings form or assigning any GPIO.
 
-This version is being prepared for GitHub OTA. Publication and installation of v0.10.5 are not yet confirmed; the last verified device acceptance remains v0.10.1.
+**[v0.10.5 is published for GitHub OTA](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.5).** The final release browser run passed 13 state-transition scenarios; diagram and inline-photo geometry was checked at main-page widths 320/390/768/1280. All 26 contacts and 11 assignable GPIOs were checked; the exact supplied JPEG occurs once in the target BIN. The final GitHub native run passed 408 layout checks with zero clipping in each rendering mode. All four public assets were downloaded without authentication and hash-checked. [Verification report](docs/verification/v0.10.5-sensor-pinout-2026-11-05.md).
+
+Select **Settings → Service → Update → Check**, then confirm **v0.10.5** on the panel or in the paired browser. No intermediate v0.10.4 installation is required. Installation, live panel HTTP and the physical display remain unverified: Asus was **Offline** at `2026-11-05T11:21:21Z`; the last accepted installed version is v0.10.1.
+
+Browser captures: [390 px](docs/verification/assets/v0.10.5-jp1-390.png) · [1280 px](docs/verification/assets/v0.10.5-jp1-1280.png).
 
 ## v0.10.4: date below the Home clock
 
