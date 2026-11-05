@@ -9,6 +9,8 @@ from pathlib import Path
 import argparse,hashlib,json,os,re,subprocess,sys,urllib.request,urllib.error,urllib.parse,zipfile
 ROOT=Path(__file__).resolve().parents[1]
 REPO='DeadSoulf/boiler_room'
+sys.path.insert(0,str(ROOT/'ci'))
+from ota_manifest import MANIFEST_NAME,validate_assets
 def git(*args):return subprocess.check_output(['git',*args],cwd=ROOT,text=True).strip()
 def main():
  parser=argparse.ArgumentParser(description=__doc__)
@@ -29,8 +31,11 @@ def main():
   allowed={'firmware.bin','bootloader.bin','partitions.bin','binary-verification.json','scripts/flash_panel.py','scripts/flash_COM3.cmd','docs/flash-panel.md','SOURCE.txt','START_HERE.txt','SHA256SUMS.json'}
   assert all(n in allowed or n.startswith('licenses/') for n in files),'Unexpected files: backup/credentials must never be uploaded'
   manifest=json.loads(files['SHA256SUMS.json'])
+  assert set(manifest)==set(files)-{'SHA256SUMS.json'},'Every package payload must be hashed'
   assert all(hashlib.sha256(files[n]).hexdigest()==h for n,h in manifest.items())
   assert f'GitHub commit: {args.source}' in files['SOURCE.txt'].decode()
+ ota=validate_assets(ROOT,tag,args.source,files['firmware.bin'],files['bootloader.bin'],files['partitions.bin'])
+ firmware_name=ota['firmware']['name']
  firmware_hash=hashlib.sha256(files['firmware.bin']).hexdigest();package_hash=hashlib.sha256(package.read_bytes()).hexdigest()
  hw=json.loads(args.hardware_result.read_text(encoding='utf-8'))
  assert hw['version']==tag and hw['firmware_sha256']==firmware_hash and hw['source_commit']==args.source
@@ -57,22 +62,33 @@ def main():
    if allow404 and e.code==404:return None
    raise RuntimeError(f'GitHub {method} failed with HTTP {e.code}; credentials are not logged') from None
  release=api('GET','/releases/tags/'+tag,allow404=True)
- if release is None:release=api('POST','/releases',{'tag_name':tag,'target_commitish':args.source,'name':'Boiler Panel '+tag,'body':notes,'draft':False,'prerelease':False,'make_latest':'true'})
- else:
-  assert release['tag_name']==tag
-  release=api('PATCH','/releases/'+str(release['id']),{'body':notes,'draft':False,'prerelease':False,'make_latest':'true'})
- sums=(f'{package_hash}  {package.name}\n{firmware_hash}  firmware.bin\n').encode()
+ if release is None:
+  # Keep an incomplete asset set out of /releases/latest and the device offer.
+  release=api('POST','/releases',{'tag_name':tag,'target_commitish':args.source,'name':'Boiler Panel '+tag,'body':notes,'draft':True,'prerelease':False})
+ assert release['tag_name']==tag
+ payloads=[(package.name,package.read_bytes(),'application/zip'),
+           (firmware_name,files['firmware.bin'],'application/octet-stream'),
+           (MANIFEST_NAME,(ROOT/'artifacts'/MANIFEST_NAME).read_bytes(),'application/json')]
+ sums=''.join(f'{hashlib.sha256(data).hexdigest()}  {name}\n' for name,data,_ in payloads).encode('ascii')
+ payloads.append(('SHA256SUMS.txt',sums,'text/plain'))
  assets={a['name']:a for a in release.get('assets',[])}
- for name,data,mime in [(package.name,package.read_bytes(),'application/zip'),('SHA256SUMS.txt',sums,'text/plain')]:
+ for name,data,mime in payloads:
   digest='sha256:'+hashlib.sha256(data).hexdigest()
   if name in assets:
    assert assets[name].get('digest')==digest,'Existing asset differs; refusing to overwrite'
    continue
   asset=api('POST',f'/releases/{release["id"]}/assets?name='+urllib.parse.quote(name),data,mime,upload=True)
   assert asset['size']==len(data)
-  if asset.get('digest'):assert asset['digest']==digest
+  assert asset.get('digest')==digest,'GitHub did not confirm the uploaded asset digest'
+ checked=api('GET','/releases/'+str(release['id']))
+ actual={a['name']:a for a in checked['assets']}
+ for name,data,_ in payloads:
+  assert name in actual and actual[name]['size']==len(data)
+  assert actual[name].get('digest')=='sha256:'+hashlib.sha256(data).hexdigest()
+ # Publish only after the entire version-bound OTA/USB asset set is confirmed.
+ api('PATCH','/releases/'+str(release['id']),{'body':notes,'draft':False,'prerelease':False,'make_latest':'true'})
  final=api('GET','/releases/'+str(release['id']))
- assert not final['draft'] and any(a['name']==package.name for a in final['assets'])
+ assert not final['draft'] and {name for name,_,_ in payloads}<={a['name'] for a in final['assets']}
  print(json.dumps({'release':final['html_url'],'tag':final['tag_name'],'assets':[{'name':a['name'],'size':a['size'],'digest':a.get('digest')} for a in final['assets']]}))
  values.clear();token=None
 if __name__=='__main__':main()

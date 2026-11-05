@@ -16,6 +16,7 @@
 #include "panel_equipment.h"
 #include "panel_screen.h"
 #include "panel_storage.h"
+#include "panel_update.h"
 #include "panel_config.h"
 #include "panel_sensors.h"
 #include "panel_pin_profile.h"
@@ -340,6 +341,25 @@ void statusRequest() {
   j+=",\"discovery_prefix\":";jsonQuote(j,admin?ha.prefix:"");
   j+=",\"password_set\":";j+=(admin&&ha.passwordSet)?"true":"false";
   j+=",\"transport\":\"mqtt_tcp_lan_only\",\"read_only\":true}";
+  panel_update::Snapshot update;
+  panel_update::snapshot(update);
+  j+=",\"update\":{\"started\":";j+=update.started?"true":"false";
+  j+=",\"supported\":";j+=update.supported?"true":"false";
+  j+=",\"busy\":";j+=update.busy?"true":"false";
+  j+=",\"available\":";j+=update.available?"true":"false";
+  j+=",\"cancel_allowed\":";j+=update.cancelAllowed?"true":"false";
+  j+=",\"rollback_available\":";j+=update.rollbackAvailable?"true":"false";
+  j+=",\"boot_pending\":";j+=update.bootPending?"true":"false";
+  j+=",\"automatic_rollback\":";j+=update.automaticRollback?"true":"false";
+  j+=",\"phase\":";jsonQuote(j,panel_update::phaseName(update.phase));
+  j+=",\"done\":";j+=String(update.done);
+  j+=",\"total\":";j+=String(update.total);
+  j+=",\"percent\":";j+=String(unsigned(update.percent));
+  j+=",\"last_check\":";j+=String(update.lastCheck);
+  j+=",\"latest_version\":";jsonQuote(j,update.latestVersion);
+  j+=",\"previous_version\":";jsonQuote(j,update.previousVersion);
+  j+=",\"message\":";jsonQuote(j,update.message);
+  j+=",\"error_code\":";j+=String(update.errorCode);j+='}';
   j+=",\"service\":{\"free_heap\":";j+=String(snap.freeHeap);
   j+=",\"display_ms\":";j+=String(snap.displayMs);
   j+=",\"lvgl_ms\":";j+=String(snap.lvglMs);
@@ -351,7 +371,38 @@ void statusRequest() {
 
 void commandRequest() {
   if(!authorized()){errorResponse(401,"pair_required");return;}
+  if(!pairingOriginAllowed()){errorResponse(403,"same_origin_required");return;}
   const String kind=server.arg("action");
+  panel_update::Snapshot update;
+  if(!panel_update::snapshot(update)){errorResponse(503,"update_state_unavailable");return;}
+  if(kind=="update_check"||kind=="update_install"||kind=="update_cancel"||kind=="update_rollback"){
+    if(!update.started||!update.supported){errorResponse(503,"update_unavailable");return;}
+    if(kind=="update_cancel"){
+      if(!update.busy||!update.cancelAllowed||!panel_update::requestCancel()){
+        errorResponse(409,"update_cancel_unavailable");return;
+      }
+    }else{
+      if(update.busy||update.bootPending){errorResponse(409,"update_busy");return;}
+      if(kind=="update_check"){
+        if(!panel_update::requestCheck()){errorResponse(409,"update_not_ready");return;}
+      }else{
+        const String version=server.arg("version"),confirmation=server.arg("confirm");
+        if(version.isEmpty()||version.length()>=sizeof(update.latestVersion)||version.length()!=strlen(version.c_str())||
+           confirmation!=version){errorResponse(400,"update_confirmation_required");return;}
+        const bool rollback=kind=="update_rollback";
+        const char* expected=rollback?update.previousVersion:update.latestVersion;
+        if((rollback?!update.rollbackAvailable:!update.available)||version!=expected){
+          errorResponse(409,"update_version_changed");return;
+        }
+        if(!(rollback?panel_update::requestRollback(version.c_str()):panel_update::requestInstall(version.c_str()))){
+          errorResponse(409,"update_not_ready");return;
+        }
+      }
+    }
+    jsonResponse(202,"{\"ok\":true,\"queued\":true}");return;
+  }
+  // Read/status and pairing stay available. All other writes wait for OTA to finish.
+  if(update.busy||update.bootPending){errorResponse(409,"update_busy");return;}
   if(kind=="ha_discover"){
     if(!panel_ha::requestDiscovery()){errorResponse(409,"ha_disabled_or_unavailable");return;}
     jsonResponse(202,"{\"ok\":true,\"queued\":true}");return;

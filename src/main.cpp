@@ -14,6 +14,7 @@
 #include "panel_web.h"
 #include "panel_ha.h"
 #include "panel_storage.h"
+#include "panel_update.h"
 #include "panel_config.h"
 #include "panel_sensors.h"
 #include "panel_screen.h"
@@ -34,8 +35,8 @@ constexpr uint32_t BG=0x101719, CARD=0x1B2528, LINE=0x304044, TXT=0xEFF5F3;
 constexpr uint32_t MUTED=0xA1B3B5, SKY=0x76D6C3, GREEN=0x76D6C3, AMBER=0xE7BB78, RED=0xEF9F9A;
 const char* const PAGES[]={"Главная","Оборудование","Топливо","Настройки"};
 constexpr int PAGE_SETTINGS=3;
-enum MenuView { Root=0,WifiView=1,BleView=2,DisplayView=4,ConnectionsView=6,HaView=7,ServiceView=8,StorageView=9,DiagnosticsView=10,AboutView=11,WifiMoreView=12 };
-int parentMenuView(int v){if(v==WifiMoreView)return WifiView;if(v==WifiView||v==BleView||v==HaView)return ConnectionsView;if(v==StorageView||v==DiagnosticsView||v==AboutView)return ServiceView;return Root;}
+enum MenuView { Root=0,WifiView=1,BleView=2,DisplayView=4,ConnectionsView=6,HaView=7,ServiceView=8,StorageView=9,DiagnosticsView=10,AboutView=11,WifiMoreView=12,UpdateView=13 };
+int parentMenuView(int v){if(v==WifiMoreView)return WifiView;if(v==WifiView||v==BleView||v==HaView)return ConnectionsView;if(v==StorageView||v==DiagnosticsView||v==AboutView||v==UpdateView)return ServiceView;return Root;}
 const char* const SENSOR_NAMES[]={"В доме","На улице","Теплоноситель","Топливо"};
 const uint32_t ACCENT[]={SKY,SKY,SKY,SKY};
 Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sensor events.
@@ -64,6 +65,12 @@ lv_obj_t *tempValue[CHANNELS]={},*tempState[CHANNELS]={},*tempTrend[CHANNELS]={}
 lv_obj_t *sensorSummary=nullptr,*sensorHint=nullptr,*liveTime=nullptr,*activity=nullptr,*activityDot=nullptr;
 lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText=nullptr,*detailGraph=nullptr;
 lv_obj_t *sdStatusLabel=nullptr,*sdFormatNotice=nullptr,*sdFormatAccept=nullptr,*sdFormatReject=nullptr;
+panel_update::Snapshot updateState;
+lv_obj_t *updateLatest=nullptr,*updateStatus=nullptr,*updateMessage=nullptr,*updateProgress=nullptr,*updateProgressFill=nullptr,*updateError=nullptr;
+lv_obj_t *updateCheckButton=nullptr,*updateInstallButton=nullptr,*updateCancelButton=nullptr,*updateRollbackButton=nullptr;
+lv_obj_t *homeUpdateNotice=nullptr,*homeUpdateText=nullptr;
+char confirmedUpdateVersion[24]={};
+bool confirmUpdateRollback=false,firstFrameShown=false,startupServicesReady=false;
 int renderedPage=-1,renderedView=-1,detailChannel=-1;
 uint32_t activityStart=0,detailRevision=0;
 bool wifiLogSeen=false,wifiLogWasOnline=false;
@@ -113,10 +120,12 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
 void updateStorageLabel();
+void updateUpdateLabels();
+void confirmUpdate(bool rollback);
 void confirmNetwork(bool forget);
 lv_obj_t* scrollList(int y,int height);
 lv_obj_t* button(lv_obj_t* parent,const char* title,int x,int y,int w,int h,uintptr_t code,uint32_t fill=0x26373B,bool enabled=true){
@@ -137,13 +146,16 @@ void dismiss(){
   detailChannel=-1;detailText=detailGraph=detailValue=nullptr;fuelDetailLabels={};
   fuelDetailHint=fuelTemperatureValue=fuelTemperatureState=nullptr;
   if(overlay){clearSecretFields();lv_obj_del(overlay);}overlay=nullptr;dialogKind=0;closeDialog=false;
+  memset(confirmedUpdateVersion,0,sizeof(confirmedUpdateVersion));
 }
 void error(const char* msg){if(dialogError)lv_label_set_text(dialogError,msg);}
 bool send(Command& command){
-  const bool ok=panel_radio::submit(command);
+  panel_update::Snapshot update;panel_update::snapshot(update);
+  const bool updating=update.busy||update.bootPending;
+  const bool ok=!updating&&panel_radio::submit(command);
   // Erase the command copy after the queue has copied it.
   volatile char* p=command.password;for(size_t i=0;i<sizeof(command.password);i++)p[i]=0;
-  if(!ok){if(overlay)error("Операция уже выполняется. Повторите после завершения");else info("Операция не принята","Радио не готово или очередь занята. Повторите после завершения текущей операции.");}
+  if(!ok){if(overlay)error(updating?"Дождитесь завершения обновления":"Операция уже выполняется. Повторите после завершения");else info("Операция не принята",updating?"Дождитесь завершения обновления панели.":"Радио не готово или очередь занята. Повторите после завершения текущей операции.");}
   else activityStart=millis();
   return ok;
 }
@@ -336,6 +348,22 @@ void action(lv_event_t* e){
     case Connections:view=ConnectionsView;rebuild=true;break;
     case HaStatus:view=HaView;rebuild=true;break;
     case ServiceMenu:view=ServiceView;rebuild=true;break;
+    case UpdateMenu:closeDialog=true;pendingPage=PAGE_SETTINGS;view=UpdateView;rebuild=true;break;
+    case UpdateCheck:
+      if(!panel_update::requestCheck())info("Проверка не началась","Дождитесь завершения текущей операции и повторите.");
+      updateUpdateLabels();break;
+    case UpdateInstall:confirmUpdate(false);break;
+    case UpdateRollback:confirmUpdate(true);break;
+    case UpdateCancel:
+      if(!panel_update::requestCancel())info("Отмена недоступна","Панель уже завершает установку. Дождитесь перезапуска.");
+      updateUpdateLabels();break;
+    case UpdateConfirm:{
+      const bool accepted=confirmedUpdateVersion[0]&&(confirmUpdateRollback?
+        panel_update::requestRollback(confirmedUpdateVersion):panel_update::requestInstall(confirmedUpdateVersion));
+      if(accepted){closeDialog=true;pendingPage=PAGE_SETTINGS;view=UpdateView;rebuild=true;}
+      else error("Версия или состояние изменились.\nЗакройте окно и проверьте снова.");
+      break;
+    }
     case StorageMenu:view=StorageView;rebuild=true;break;
     case DiagnosticsMenu:view=DiagnosticsView;rebuild=true;break;
     case AboutMenu:view=AboutView;rebuild=true;break;
@@ -343,7 +371,12 @@ void action(lv_event_t* e){
     case ConfirmDisconnect:cmd.job=Job::Disconnect;if(send(cmd))closeDialog=true;break;
     case ConfirmForget:cmd.job=Job::Forget;if(send(cmd))closeDialog=true;break;
     case Display:view=4;rebuild=true;break;
-    case SdFormatApprove:panel_storage::confirmFormatPhysically();updateStorageLabel();break;
+    case SdFormatApprove:{
+      panel_update::Snapshot update;panel_update::snapshot(update);
+      if(update.busy||update.bootPending)info("Обновление панели","Дождитесь завершения обновления перед форматированием карты.");
+      else panel_storage::confirmFormatPhysically();
+      updateStorageLabel();break;
+    }
     case SdFormatCancel:panel_storage::cancelFormatPhysically();updateStorageLabel();break;
     case Wifi:view=1;rebuild=true;break;
     case Ble:view=2;rebuild=true;break;
@@ -393,7 +426,7 @@ const char* currentTitle(){
     case ConnectionsView:return "Подключения";case WifiView:return "Wi-Fi";case BleView:return "Bluetooth";
     case DisplayView:return "Экран";case HaView:return "Home Assistant";
     case ServiceView:return "Сервис";case StorageView:return "microSD";case DiagnosticsView:return "Диагностика";
-    case AboutView:return "О панели";case WifiMoreView:return "Действия Wi-Fi";default:break;
+    case AboutView:return "О панели";case WifiMoreView:return "Действия Wi-Fi";case UpdateView:return "Обновление";default:break;
   }
   return page==0?"Котельная":PAGES[page];
 }
@@ -433,6 +466,29 @@ void confirmNetwork(bool forget){
   button(overlay,"Отмена",24,350,432,60,Cancel);
   button(overlay,forget?"Забыть сеть":"Отключить",24,430,432,60,forget?ConfirmForget:ConfirmDisconnect,0x704443);
   dialogError=label(overlay,"",24,540,432,&boiler_font_19,AMBER);
+}
+void confirmUpdate(bool rollback){
+  panel_update::Snapshot snapshot;
+  if(!panel_update::snapshot(snapshot)||!snapshot.started||!snapshot.supported||snapshot.busy||snapshot.bootPending||
+     (rollback?!snapshot.rollbackAvailable:!snapshot.available)){
+    info("Обновление панели","Состояние изменилось. Проверьте доступную версию ещё раз.");return;
+  }
+  const char* version=rollback?snapshot.previousVersion:snapshot.latestVersion;
+  if(!version[0])return;
+  dismiss();confirmUpdateRollback=rollback;
+  // Keep this exact target until the explicit confirmation is accepted or dismissed.
+  snprintf(confirmedUpdateVersion,sizeof(confirmedUpdateVersion),"%s",version);
+  dialogKind=5;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
+  label(overlay,rollback?"Вернуть предыдущую версию?":"Установить обновление?",24,60,432,&boiler_font_25);
+  label(overlay,confirmedUpdateVersion,24,145,432,&boiler_font_25,SKY);
+  label(overlay,"После установки панель\nперезапустится. Дождитесь\nзавершения, сохраняя питание.",24,214,432,&boiler_font_19,MUTED);
+  button(overlay,"Отмена",24,370,432,60,Cancel);
+  button(overlay,rollback?"Вернуть версию":"Установить",24,450,432,60,UpdateConfirm,0x245D55);
+  dialogError=label(overlay,"",24,554,432,&boiler_font_19,AMBER);
+}
+bool homeUpdateVisible(){
+  return updateState.started&&updateState.supported&&(updateState.available||updateState.busy||updateState.bootPending||
+    updateState.phase==panel_update::Phase::Success||updateState.phase==panel_update::Phase::RolledBack);
 }
 void passive(lv_obj_t* object){
   lv_obj_clear_flag(object,LV_OBJ_FLAG_CLICKABLE);
@@ -546,6 +602,12 @@ void home(){
     temperatureIcon(tile,i);
     tempState[i]=label(tile,"Нет данных",18,269,172,&boiler_font_14,MUTED);
   }
+  if(homeUpdateVisible()){
+    homeUpdateNotice=box(body,24,638,432,34,BG,8);lv_obj_set_style_border_width(homeUpdateNotice,0,0);
+    lv_obj_add_event_cb(homeUpdateNotice,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(UpdateMenu));
+    homeUpdateText=label(homeUpdateNotice,"",8,8,416,&boiler_font_14,SKY);
+    lv_label_set_long_mode(homeUpdateText,LV_LABEL_LONG_DOT);lv_obj_set_height(homeUpdateText,20);
+  }
 }
 
 void updateEquipmentReadings(){
@@ -604,7 +666,7 @@ void fuelPage(){
 void settings(){
   menuRow(body,"Подключения","Wi-Fi, Bluetooth, Home Assistant",16,Connections,122);
   menuRow(body,"Экран","Сон и пробуждение",159,Display,122);
-  menuRow(body,"Сервис","Карта памяти и диагностика",302,ServiceMenu,122);
+  menuRow(body,"Сервис","Обновление, карта и диагностика",302,ServiceMenu,122);
 }
 void connectionsPage(){
   menuRow(body,"Wi-Fi",radio.connected?"Подключён":"Не подключён",16,Wifi,122);
@@ -704,9 +766,92 @@ void updateStorageLabel(){
   }
 }
 void service(){
-  menuRow(body,"microSD","Место и журналирование",16,StorageMenu,122);
-  menuRow(body,"Диагностика","Технические сведения",159,DiagnosticsMenu,122);
-  menuRow(body,"О панели","Версия и модель",302,AboutMenu,122);
+  menuRow(body,"Обновление","Новые версии панели",16,UpdateMenu,122);
+  menuRow(body,"microSD","Место и журналирование",159,StorageMenu,122);
+  menuRow(body,"Диагностика","Технические сведения",302,DiagnosticsMenu,122);
+  menuRow(body,"О панели","Версия и модель",445,AboutMenu,122);
+}
+const char* updatePhaseText(){
+  if(!updateState.started)return "Запуск обновления";
+  if(!updateState.supported)return "Обновление недоступно";
+  if(updateState.bootPending)return "Проверка запуска";
+  using panel_update::Phase;
+  switch(updateState.phase){
+    case Phase::Checking:return "Проверка обновлений";
+    case Phase::Current:return "Версия актуальна";
+    case Phase::Available:return "Доступна новая версия";
+    case Phase::Downloading:return "Загрузка";
+    case Phase::Verifying:return "Проверка файла";
+    case Phase::Installing:return "Установка";
+    case Phase::Rebooting:return "Перезапуск панели";
+    case Phase::Success:return "Обновление завершено";
+    case Phase::Error:return "Обновление не завершено";
+    case Phase::Cancelled:return "Обновление отменено";
+    case Phase::RolledBack:return "Возврат завершён";
+    default:return "Проверить новую версию";
+  }
+}
+void updateButtonState(lv_obj_t* object,bool enabled,bool visible=true){
+  if(!object)return;
+  if(visible)lv_obj_clear_flag(object,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(object,LV_OBJ_FLAG_HIDDEN);
+  if(enabled)lv_obj_clear_state(object,LV_STATE_DISABLED);else lv_obj_add_state(object,LV_STATE_DISABLED);
+  lv_obj_set_style_opa(object,enabled?LV_OPA_COVER:LV_OPA_40,0);
+}
+void updateUpdateLabels(){
+  panel_update::Snapshot next;if(panel_update::snapshot(next))updateState=next;
+  if(page==0&&bool(homeUpdateNotice)!=homeUpdateVisible())rebuild=true;
+  char out[180];
+  if(homeUpdateText){
+    if(updateState.bootPending)snprintf(out,sizeof(out),"Проверка новой версии после запуска >");
+    else if(updateState.busy){
+      if(updateState.total)snprintf(out,sizeof(out),"%s: %u%% >",updatePhaseText(),unsigned(updateState.percent));
+      else snprintf(out,sizeof(out),"%s >",updatePhaseText());
+    }
+    else if(updateState.phase==panel_update::Phase::Success)snprintf(out,sizeof(out),"Установлена %s >",VERSION);
+    else if(updateState.phase==panel_update::Phase::RolledBack)snprintf(out,sizeof(out),"Возврат к %s завершён >",VERSION);
+    else snprintf(out,sizeof(out),"Доступно обновление %s >",updateState.latestVersion);
+    lv_label_set_text(homeUpdateText,out);
+  }
+  if(!updateStatus)return;
+  lv_label_set_text(updateLatest,updateState.latestVersion[0]?updateState.latestVersion:"Ещё не проверено");
+  lv_label_set_text(updateStatus,updatePhaseText());
+  lv_obj_set_style_text_color(updateStatus,c(updateState.phase==panel_update::Phase::Error?AMBER:TXT),0);
+  lv_label_set_text(updateMessage,updateState.message[0]?updateState.message:
+    updateState.supported?"Проверка новых версий выполняется\nпри подключении к интернету.":"Проверка станет доступна после\nзапуска служб панели.");
+  const unsigned percent=updateState.percent>100?100:updateState.percent;
+  if(updateState.total){
+    char done[24],total[24];capacityString(updateState.done,done);capacityString(updateState.total,total);
+    snprintf(out,sizeof(out),"%u%%   %s / %s",percent,done,total);
+  }else out[0]=0;
+  lv_label_set_text(updateProgress,out);
+  lv_obj_set_width(updateProgressFill,percent?int(428U*percent/100U):1);
+  if(percent)lv_obj_clear_flag(updateProgressFill,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(updateProgressFill,LV_OBJ_FLAG_HIDDEN);
+  if(updateState.errorCode)snprintf(out,sizeof(out),"Код ошибки: %ld",(long)updateState.errorCode);else out[0]=0;
+  lv_label_set_text(updateError,out);
+  const bool ready=updateState.started&&updateState.supported&&!updateState.busy&&!updateState.bootPending;
+  updateButtonState(updateCheckButton,ready);
+  updateButtonState(updateInstallButton,ready&&updateState.available&&updateState.latestVersion[0]);
+  updateButtonState(updateCancelButton,updateState.busy&&updateState.cancelAllowed,updateState.busy);
+  updateButtonState(updateRollbackButton,ready&&updateState.rollbackAvailable,updateState.rollbackAvailable);
+}
+void updatePage(){
+  auto* versions=box(body,24,16,432,150);
+  label(versions,"Установлено",20,12,392,&boiler_font_14,MUTED);
+  label(versions,VERSION,20,37,392,&boiler_font_25);
+  label(versions,"Последняя версия",20,83,392,&boiler_font_14,MUTED);
+  updateLatest=label(versions,"",20,108,392,&boiler_font_19,SKY);
+  updateStatus=label(body,"",24,188,432,&boiler_font_25);
+  updateMessage=label(body,"",24,232,432,&boiler_font_19,MUTED);
+  lv_label_set_long_mode(updateMessage,LV_LABEL_LONG_DOT);lv_obj_set_height(updateMessage,102);
+  auto* progress=box(body,24,348,432,10,LINE,5);
+  updateProgressFill=box(progress,2,2,1,6,SKY,3);lv_obj_set_style_border_width(updateProgressFill,0,0);
+  updateProgress=label(body,"",24,372,432,&boiler_font_14,MUTED);
+  updateError=label(body,"",24,406,432,&boiler_font_14,AMBER);
+  updateCheckButton=button(body,"Проверить",24,444,208,56,UpdateCheck);
+  updateInstallButton=button(body,"Установить",248,444,208,56,UpdateInstall,0x245D55);
+  updateCancelButton=button(body,"Отменить обновление",24,520,432,56,UpdateCancel);
+  updateRollbackButton=button(body,"Вернуть предыдущую версию",24,592,432,56,UpdateRollback);
+  updateUpdateLabels();
 }
 void storagePage(){
   auto* card=box(body,24,16,432,230);
@@ -736,11 +881,11 @@ void aboutPage(){
   label(body,"GUITION JC4880P443",24,98,432,&boiler_font_19,MUTED);
   label(body,VERSION,24,172,432,&boiler_font_55,SKY);
   label(body,"ESP32-P4 + ESP32-C6",24,260,432,&boiler_font_19,MUTED);
-  label(body,"Обновление — через проверенный\nпакет прошивки.",24,398,432,&boiler_font_19,MUTED);
+  label(body,"Новые версии — в разделе\n«Сервис → Обновление».",24,398,432,&boiler_font_19,MUTED);
 }
 
 void updateLive(){
-  updateFuel();updateDetail();updateEquipmentReadings();const uint32_t now=millis();char text[120];
+  updateFuel();updateDetail();updateEquipmentReadings();updateUpdateLabels();const uint32_t now=millis();char text[120];
   for(unsigned i=0;i<CHANNELS;i++)if(tempValue[i]){
     const auto& m=measurements[i];temperature(text,sizeof(text),m,now);lv_label_set_text(tempValue[i],text);
     lv_obj_set_style_text_font(tempValue[i],strlen(text)>5?&boiler_font_25:&boiler_font_55,0);
@@ -763,6 +908,9 @@ void render(){
   const lv_coord_t scrollY=resultList && renderedPage==page && renderedView==view?lv_obj_get_scroll_y(resultList):0;
   if(body)lv_obj_del(body);
   haStatusLabel=sdStatusLabel=sdFormatNotice=sdFormatAccept=sdFormatReject=nullptr;
+  updateLatest=updateStatus=updateMessage=updateProgress=updateProgressFill=updateError=nullptr;
+  updateCheckButton=updateInstallButton=updateCancelButton=updateRollbackButton=nullptr;
+  homeUpdateNotice=homeUpdateText=nullptr;
   equipmentFuelTemp=equipmentFuelLevel=nullptr;
   fuelCardLabels={};fuelCanister={};
   for(auto& icon:tempIcon)icon=nullptr;
@@ -779,7 +927,7 @@ void render(){
         case WifiView:wifiPage();break;case BleView:blePage();break;case DisplayView:displayPage();break;
         case ConnectionsView:connectionsPage();break;case HaView:haPage();break;
         case ServiceView:service();break;case StorageView:storagePage();break;case DiagnosticsView:diagnosticsPage();break;
-        case AboutView:aboutPage();break;case WifiMoreView:wifiMorePage();break;default:settings();break;
+        case AboutView:aboutPage();break;case WifiMoreView:wifiMorePage();break;case UpdateView:updatePage();break;default:settings();break;
       }break;
   }
 
@@ -797,6 +945,8 @@ void gesture(lv_event_t*){
   lv_indev_wait_release(input); // prevents a swipe from also clicking a button.
 }
 void refresh(lv_timer_t*){
+  panel_update::uiHeartbeat(firstFrameShown&&panel_screen::touchReady()&&startupServicesReady);
+  updateUpdateLabels();
   if(closeDialog)dismiss();
   panel_config::State liveConfig;
   if(panel_config::snapshot(liveConfig) &&
@@ -875,13 +1025,20 @@ void setup(){
   if(!lvgl_glue_lock(0))return;
   auto* s=lv_scr_act();lv_obj_clean(s);lv_obj_clear_flag(s,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_style_bg_color(s,c(BG),0);
   lv_obj_set_style_pad_all(s,0,0);lv_obj_add_event_cb(s,gesture,LV_EVENT_GESTURE,nullptr);render();
-  lv_obj_invalidate(s);lv_refr_now(nullptr);board_p4_backlight(true);panel_screen::boot.firstFrameAt=millis();
+  lv_obj_invalidate(s);lv_refr_now(nullptr);board_p4_backlight(true);panel_screen::boot.firstFrameAt=millis();firstFrameShown=true;
   auto* timer=lv_timer_create(refresh,100,nullptr);lvgl_glue_unlock();if(!timer)return;
   // Existing 0.3.1 glue returns RELEASED until begin publishes touchReady.
   start=millis();const bool touchOK=board_p4_touch_init()==ESP_OK && board_p4_get_touch_handle()!=nullptr;
   const uint32_t touchMs=millis()-start;
   if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
-  Serial.begin(115200);panel_config::begin();panel_sensors::begin();panel_radio::begin();panel_storage::begin();panel_ha::begin();panel_web::begin();
+  Serial.begin(115200);
+  const bool configReady=panel_config::begin(),sensorsReady=panel_sensors::begin(),radioReady=panel_radio::begin();
+  const bool storageReady=panel_storage::begin(),haReady=panel_ha::begin(),webReady=panel_web::begin();
+  const bool updateReady=panel_update::begin();
+  if(lvgl_glue_lock(0)){
+    startupServicesReady=configReady&&sensorsReady&&radioReady&&storageReady&&haReady&&webReady&&updateReady;
+    lvgl_glue_unlock();
+  }
   char timing[180];snprintf(timing,sizeof(timing),"[BoilerPanel] %s equipment=NOT_CONNECTED outputs=NONE display=%lu ms LVGL=%lu ms first-frame=%lu ms touch=%lu ms",VERSION,(unsigned long)panel_screen::boot.displayMs,(unsigned long)panel_screen::boot.lvglMs,(unsigned long)panel_screen::boot.firstFrameAt,(unsigned long)touchMs);Serial.println(timing);
   panel_storage::event("boot","Panel application started");
 }

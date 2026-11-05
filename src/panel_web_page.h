@@ -16,9 +16,11 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 .temp-icon g{stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;fill:var(--card)}
 .temp-icon .icon-tint{fill:#245d55}.temp:not(.temp-fuel) .temp-detail{margin-top:auto}
 @media(max-width:680px){.temp-icon{width:112px;height:112px}.temp:not(.temp-fuel) .temp-value{margin:13px 0 4px}}
+.update-offer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:-12px 0 24px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--accent)}.update-offer button{padding:8px 14px;flex-shrink:0}.update-offer span{overflow-wrap:anywhere}.update-panel{max-width:760px}.update-panel progress{display:block;width:100%;height:12px;accent-color:var(--accent);margin:24px 0 10px}.update-panel .row b{font-variant-numeric:tabular-nums}#update-message{white-space:pre-wrap}#update-progress-text{font-variant-numeric:tabular-nums}#update-error:empty{display:none}
 </style></head><body><div class="container">
 <header><div><p class="eyebrow">Панель дома</p><h1>Котельная</h1></div><div class="header-meta"><span class="header-time" id="clock">--:--</span></div><div class="toolbar"><span id="authstate" class="tag">Просмотр</span><button id="pairbutton" class="primary" data-action="show-pair">Сопряжение</button><button id="logout" class="ghost hidden" data-action="logout">Завершить доступ</button></div></header>
 <nav class="topnav" aria-label="Разделы"><button data-page="home" class="active">Главная</button><button data-page="equipment">Оборудование</button><button data-page="fuel">Топливо</button><button data-page="settings">Настройки</button></nav>
+<div id="update-offer" class="update-offer hidden" role="status"><span id="update-offer-text"></span><button class="ghost" data-page="update">Открыть</button></div>
 <dialog id="pairbox" class="pair-dialog" aria-labelledby="pair-title"><button class="close-modal" data-action="hide-pair" aria-label="Отменить сопряжение">×</button><div class="pair-symbol" aria-hidden="true">⌁</div><h2 id="pair-title">Сопряжение</h2><p id="pair-message">Запрашиваем код на дисплее…</p><form id="pair-form"><label for="paircode">Код с физической панели</label><input id="paircode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="······" required><p id="pair-error" class="error" role="alert"></p><p id="pair-expiry" class="tiny"></p><div class="actions"><button type="button" class="ghost" data-action="pair-retry">Новый код</button><button type="submit" class="primary" id="pair-submit" disabled>Подключить</button></div></form><p class="tiny">Доступ на 1 час. HTTP не шифруется — только доверенная локальная сеть.</p></dialog>
 <section id="home" class="page"><div class="grid">
 <button class="card temp" data-temp="0"><span class="temp-name">В доме</span><span class="temp-value" id="t0">--.- °C</span><svg class="temp-icon" data-icon="house" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><rect x="82" y="16" width="10" height="27" rx="2"/><rect x="24" y="44" width="72" height="56" rx="6"/><polyline points="10,46 60,8 110,46" fill="none"/><rect class="icon-tint" x="56" y="65" width="22" height="35" rx="3"/><rect class="icon-tint" x="35" y="61" width="12" height="14" rx="2"/></g></svg><span class="temp-detail" id="tstate0">Нет данных</span></button>
@@ -37,7 +39,7 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 <button class="menu-item" data-tab="clock"><strong>Часы</strong><span>Время и часовой пояс</span><b>›</b></button>
 <button class="menu-item" data-page="ha"><strong>Home Assistant</strong><span>Подключение через MQTT</span><b>›</b></button>
 <button class="menu-item" data-page="connections"><strong>Датчики</strong><span>Назначения и контакты JP1</span><b>›</b></button>
-<button class="menu-item" data-page="service"><strong>Сервис</strong><span>microSD, диагностика, версия</span><b>›</b></button>
+<button class="menu-item" data-page="service"><strong>Сервис</strong><span>Обновление, microSD, диагностика</span><b>›</b></button>
 </div><div id="settings-back" class="subhead hidden"><button data-action="settings-root" aria-label="Назад к настройкам">‹ Настройки</button></div>
  <div id="tab-wifi" class="tab card"><h3>Wi-Fi · 2.4 ГГц</h3>
  <div class="row"><span>Соединение</span><strong id="wifi-connected">Не подключено</strong></div>
@@ -137,7 +139,7 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
  </form></div>
 </section>
 <section id="service" class="page hidden">
-<div class="subhead"><button data-action="settings-root">‹ Настройки</button><h2>Сервис</h2></div><details class="details"><summary>Диагностика ESP32-P4 / ESP32-C6</summary><div class="two service-grid">
+<div class="subhead"><button data-action="settings-root">‹ Настройки</button><h2>Сервис</h2></div><button class="menu-item" data-page="update"><strong>Обновление</strong><span id="update-service-summary">Новые версии панели</span><b>›</b></button><details class="details"><summary>Диагностика ESP32-P4 / ESP32-C6</summary><div class="two service-grid">
 <div class="card"><h3>ESP32-P4</h3>
 <div class="row"><span>Версия панели</span><b id="service-version">—</b></div>
 <div class="row"><span>Время работы</span><b id="uptime">—</b></div>
@@ -177,7 +179,23 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
  </details><div id="sd-format-progress" class="notice hidden" role="status"></div>
 </div>
 <div class="actions"><button data-action="refresh" class="primary">Обновить сведения</button></div>
-<div class="notice">Эта страница не обновляет прошивку. Управляющие выходы отключены.</div>
+<div class="notice">Выходы управления отоплением не подключены.</div>
+</section>
+<section id="update" class="page hidden">
+ <div class="subhead"><button data-page="service">‹ Сервис</button><h2>Обновление</h2></div>
+ <div class="card update-panel">
+  <div class="row"><span>Установлено</span><b id="update-current">—</b></div>
+  <div class="row"><span>Последняя версия</span><b id="update-latest">Ещё не проверено</b></div>
+  <div class="row"><span>Состояние</span><b id="update-phase">Ожидание панели</b></div>
+  <p id="update-message" role="status" aria-live="polite"></p>
+  <progress id="update-progress" max="100" value="0" aria-label="Ход обновления"></progress>
+  <p id="update-progress-text" class="tiny muted"></p><p id="update-error" class="error" role="alert"></p>
+  <div id="update-result" class="notice hidden" role="status" aria-live="polite"></div>
+  <p id="update-auth" class="hint"></p>
+  <div class="actions"><button id="update-check" data-action="update_check" data-write="1">Проверить</button><button id="update-install" class="primary" data-action="update_install" data-write="1">Установить</button><button id="update-cancel" class="ghost hidden" data-action="update_cancel" data-write="1">Отменить обновление</button></div>
+  <details id="update-rollback-box" class="details hidden"><summary>Вернуть предыдущую версию</summary><p id="update-previous" class="tiny"></p><button id="update-rollback" class="ghost" data-action="update_rollback" data-write="1">Вернуть версию</button></details>
+  <p class="tiny muted">Проверка новых выпусков выполняется автоматически. Установка начинается после вашего подтверждения. Во время установки сохраняйте питание панели; после неё панель перезапустится.</p>
+ </div>
 </section><footer><span>Boiler Panel <span id="version">подключение...</span></span><span id="net" class="status">Подключение…</span><span id="last-update">Ожидание панели</span></footer></div><div id="toast" class="hidden" role="status" aria-live="polite"></div><script>
 (()=>{
 "use strict";
@@ -188,6 +206,8 @@ let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="ho
 let lastServerError="",lastToast=null,refreshInFlight=false,serverOnline=false;
 let pairTicket="",pairDeadline=0,pairGeneration=0,pairBusy=false;
 let haFormRevision=null,haDirty=false;
+let updateRequestInFlight=false,pendingUpdate=null,updateResult="",updateResultError=false;
+try{const saved=JSON.parse(sessionStorage.getItem("boiler_panel_update")||"null");if(saved&&typeof saved.target==="string"&&saved.target.length>0&&saved.target.length<24&&typeof saved.from==="string"&&["update_install","update_rollback"].includes(saved.action)&&Number.isFinite(saved.at)&&Date.now()>=saved.at&&Date.now()-saved.at<3600000)pendingUpdate=saved;}catch(_){}
 const timeout=s=>s===0?"Не выключать":s<60?s+" секунд":s/60+" минут";
 const storageBytes=n=>Number.isFinite(n)&&n>0
     ?(n>=1073741824?(n/1073741824).toFixed(2)+" ГБ":
@@ -203,7 +223,7 @@ function numeric(n){return Number.isFinite(Number(n))?Number(n):0}
 function apiHeaders(){const h={};if(token)h.Authorization="Bearer "+token;return h}
 function drawPage(){
  for(const n of document.querySelectorAll(".page"))n.classList.toggle("hidden",n.id!==page);
- for(const n of document.querySelectorAll(".topnav [data-page]"))n.classList.toggle("active",n.dataset.page===(["connections","ha","service"].includes(page)?"settings":page));
+ for(const n of document.querySelectorAll(".topnav [data-page]"))n.classList.toggle("active",n.dataset.page===(["connections","ha","service","update"].includes(page)?"settings":page));
  show("settings-menu",!tab);show("settings-back",!!tab);
  for(const n of document.querySelectorAll(".tab"))n.classList.toggle("hidden",n.id!=="tab-"+tab);
  for(const n of document.querySelectorAll("[data-tab]"))n.classList.toggle("active",n.dataset.tab===tab);
@@ -274,7 +294,7 @@ function renderHA(){
  text("ha-id",h.id||"—");text("ha-message",(h.message||"")+(h.error_code?" · код "+h.error_code:""));
  text("ha-discovery-count",h.discovery_messages||0);
  text("ha-password-info",admin?(h.password_set?"Пароль сохранён, его содержимое скрыто":"Пароль не сохранён"):"Требуется сопряжение");
- for(const el of $("ha-form").querySelectorAll("input"))el.disabled=!admin||!h.ready;
+ for(const el of $("ha-form").querySelectorAll("input"))el.disabled=!admin||!h.ready||!!d.update?.busy||!!d.update?.boot_pending;
  if(!admin){
   for(const id of ["ha-host","ha-user","ha-password"])$(id).value="";
   haFormRevision=null;haDirty=false;return;
@@ -288,6 +308,7 @@ function renderHA(){
 }
 async function saveHA(e){
  e.preventDefault();if(!current||!current.authorized||haFormRevision===null){startPairing();return;}
+ if(current.update?.busy||current.update?.boot_pending){notice("Дождитесь завершения обновления панели",true);return;}
  const enabled=$("ha-enabled").checked;
  if(enabled&&!$("ha-lan").checked){notice("Подтвердите доверенную локальную сеть",true);return;}
  if($("ha-password").value&&$("ha-clear-password").checked){notice("Выберите новый пароль ИЛИ удаление сохранённого",true);return;}
@@ -303,7 +324,7 @@ async function saveHA(e){
  finally{values.password="";}
 }
 async function request(path,options){const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);try{return await fetch(path,{...options,signal:c.signal});}finally{clearTimeout(timer);}}
-function errorText(code){return ({same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера"})[code]||code;}
+function errorText(code){return ({same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера",update_busy:"Дождитесь завершения обновления панели",update_unavailable:"Обновление пока недоступно",update_state_unavailable:"Состояние обновления временно недоступно. Повторите запрос.",update_confirmation_required:"Подтвердите выбранную версию ещё раз",update_version_changed:"Доступная версия изменилась. Проверьте сведения и подтвердите нужную версию.",update_not_ready:"Обновление не принято. Проверьте состояние панели.",update_cancel_unavailable:"На этом этапе отмена уже недоступна"})[code]||code;}
 function updateCanister(f){
  let state="unknown",title="Нет данных",height=0,symbol="?";
  if(f?.lower?.valid&&f?.upper?.valid){
@@ -400,7 +421,7 @@ function updateView(){
    (phase===1?" · осталось "+(sd.format_remaining_s||0)+" сек":"")+
    (sd.format_message?" · "+sd.format_message:""));
  const formButton=$("sd-format-button");
- formButton.disabled=!d.authorized || !!sd.format_attempted || formatActive;
+ formButton.disabled=!d.authorized || !!sd.format_attempted || formatActive || !!d.update?.busy || !!d.update?.boot_pending;
  // The last step still requires physically touching the separate panel button.
  if(document.activeElement!==$("zone-select"))$("zone-select").value=String(tm.zone||0);
  if(document.activeElement!==$("screen-select"))$("screen-select").value=String(screen.timeout_s||0);
@@ -408,22 +429,24 @@ function updateView(){
    const wifiAction=b.dataset.action&&b.dataset.action.startsWith("wifi_");
    const bleAction=b.dataset.action==="ble_scan";
    const needsTouch=b.dataset.action==="screen"&&numeric($("screen-select").value)>0;
-   b.disabled=!d.authorized || (wifi.busy&&(wifiAction||bleAction||b.dataset.action==="zone"||b.dataset.action==="clock"||b.dataset.action==="screen"))
+   b.disabled=!serverOnline || !d.authorized || !!d.update?.busy || !!d.update?.boot_pending || !!pendingUpdate || updateRequestInFlight || (wifi.busy&&(wifiAction||bleAction||b.dataset.action==="zone"||b.dataset.action==="clock"||b.dataset.action==="screen"))
      || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction)
      || (b.dataset.action==="sd_format_prepare" && (!!sd.format_attempted || formatActive));
  }
  renderAP();renderBLE();renderEquipment();renderHA();updateCanister(d.fuel);
  if(!serverOnline)markOffline();
- for(const b of document.querySelectorAll('[data-action="ha_discover"]'))b.disabled=!d.authorized||!d.home_assistant?.enabled;
+ for(const b of document.querySelectorAll('[data-action="ha_discover"]'))b.disabled=!serverOnline||!d.authorized||!d.home_assistant?.enabled||!!d.update?.busy||!!d.update?.boot_pending||!!pendingUpdate||updateRequestInFlight;
+ renderUpdate();
 }
 async function sendPost(path,data,secret){
+ if(path==="/api/command"&&!String(data.action||"").startsWith("update_")&&(current?.update?.busy||current?.update?.boot_pending||pendingUpdate||updateRequestInFlight))throw Error("Дождитесь завершения обновления панели");
  const headers={"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","X-Boiler-Pairing":"1"};
  if(secret&&token)headers.Authorization="Bearer "+token;
  const r=await request(path,{method:"POST",headers,body:new URLSearchParams(data),cache:"no-store"});
  let obj;
  try{obj=await r.json()}catch(_){obj={error:"invalid_response"}}
  if(r.status===401){token="";sessionStorage.removeItem("boiler_panel_token");}
- if(!r.ok)throw Error(errorText(obj.error||("HTTP "+r.status)));
+ if(!r.ok){const failure=Error(errorText(obj.error||("HTTP "+r.status)));failure.httpStatus=r.status;throw failure;}
  return obj;
 }
 async function command(action,options={}){
@@ -492,8 +515,113 @@ async function requestStorageFormat(){
    await poll();
  }catch(e){notice("Форматирование не запрошено: "+e.message,true)}
 }
+function saveUpdatePending(){
+ try{if(pendingUpdate)sessionStorage.setItem("boiler_panel_update",JSON.stringify(pendingUpdate));else sessionStorage.removeItem("boiler_panel_update");}catch(_){}
+}
+function finishUpdate(message,problem=false){
+ updateResult=message;updateResultError=problem;pendingUpdate=null;saveUpdatePending();
+}
+function reconcileUpdate(d){
+ const u=d.update||{};
+ if(!pendingUpdate){
+   // automatic_rollback is a capability, not evidence that a rollback occurred.
+   if(u.phase==="success"&&!u.boot_pending)finishUpdate("Обновление завершено. Установлена "+d.version+".");
+   else if(u.phase==="rolled_back"&&!u.boot_pending)finishUpdate("Возврат завершён. Панель работает на "+d.version+".");
+   return;
+ }
+ if(d.version===pendingUpdate.target&&!u.boot_pending&&(u.started||pendingUpdate.action==="update_rollback")){
+   const prefix=pendingUpdate.connectionLost?"Связь восстановлена. ":"";
+   finishUpdate(prefix+(pendingUpdate.action==="update_rollback"?"Возврат завершён. Панель работает на ":"Установлена ")+d.version+".");return;
+ }
+ if(u.busy||u.boot_pending){
+   pendingUpdate.observed=true;
+   if(u.phase==="rebooting"||u.boot_pending)pendingUpdate.rebootSeen=true;
+   saveUpdatePending();return;
+ }
+ if(u.phase==="rolled_back"){
+   finishUpdate("Панель работает на "+d.version+". Новая версия не прошла проверку; выполнен возврат.",true);return;
+ }
+ if(u.phase==="error"||u.phase==="cancelled"){
+   finishUpdate(u.phase==="cancelled"?"Обновление отменено. Установлена "+d.version+".":"Обновление не завершено. Панель работает на "+d.version+".",u.phase==="error");return;
+ }
+ if(pendingUpdate.rebootSeen&&pendingUpdate.connectionLost&&d.version!==pendingUpdate.target){
+   finishUpdate("Связь восстановлена. Панель работает на "+d.version+"; установка "+pendingUpdate.target+" не подтверждена.",true);return;
+ }
+ if(Date.now()-pendingUpdate.at>30000&&!pendingUpdate.rebootSeen){
+   finishUpdate("Панель доступна с версией "+d.version+". Начало установки не подтверждено. Проверьте сведения перед повторной попыткой.",true);
+ }
+}
+function updatePhaseText(u){
+ if(u.boot_pending)return "Проверка запуска";
+ return ({idle:"Ожидает проверки",checking:"Проверка обновлений",current:"Версия актуальна",available:"Доступна новая версия",downloading:"Загрузка",verifying:"Проверка файла",installing:"Установка",rebooting:"Перезапуск панели",success:"Обновление завершено",error:"Обновление не завершено",cancelled:"Обновление отменено",rolled_back:"Возврат завершён"})[u.phase]||"Ожидание панели";
+}
+function renderUpdate(){
+ const d=current||{},u=d.update||{},admin=!!d.authorized&&!!token;
+ const working=!!u.busy||!!u.boot_pending,ready=serverOnline&&admin&&u.started&&u.supported;
+ const waiting=!!pendingUpdate;
+ text("update-current",d.version||"—");text("update-latest",u.latest_version||"Ещё не проверено");
+ text("update-phase",!serverOnline?"Ожидание связи":!u.started?"Запуск службы":!u.supported?"Недоступно":updatePhaseText(u));
+ text("update-message",u.message||(!u.started?"Ожидаем сведения об обновлении.":""));
+ text("update-service-summary",u.available?"Доступна "+u.latest_version:working?updatePhaseText(u):"Установлена "+(d.version||"—"));
+ const percent=Math.max(0,Math.min(100,numeric(u.percent))),total=Math.max(0,numeric(u.total)),done=Math.max(0,numeric(u.done));
+ $("update-progress").value=percent;show("update-progress",total>0||working);
+ text("update-progress-text",total?percent+"% · "+done.toLocaleString("ru-RU")+" / "+total.toLocaleString("ru-RU")+" Б":"");
+ text("update-error",u.error_code?"Код ошибки: "+u.error_code:"");
+ let result=updateResult;
+ if(!serverOnline&&(working||waiting))result="Связь с панелью прервалась. Ждём её возвращения для подтверждения результата.";
+ else if(waiting&&u.boot_pending)result="Панель запущена с версией "+d.version+". Идёт проверка запуска.";
+ else if(waiting&&!working)result="Ожидаем подтверждения установки "+pendingUpdate.target+".";
+ text("update-result",result);show("update-result",!!result);
+ $("update-result").classList.toggle("warn",updateResultError&&serverOnline&&!waiting);
+ text("update-auth",!admin?"Для действий выполните сопряжение с физическим дисплеем.":working?"Другие настройки будут доступны после обновления.":"");
+ $("update-check").disabled=!ready||working||waiting||updateRequestInFlight;
+ $("update-install").disabled=!ready||working||waiting||updateRequestInFlight||!u.available||!u.latest_version;
+ $("update-install").dataset.version=u.latest_version||"";
+ $("update-cancel").disabled=!ready||!u.busy||!u.cancel_allowed||updateRequestInFlight;
+ show("update-cancel",!!u.busy);
+ $("update-rollback").disabled=!ready||working||waiting||updateRequestInFlight||!u.rollback_available||!u.previous_version;
+ $("update-rollback").dataset.version=u.previous_version||"";
+ show("update-rollback-box",!!u.rollback_available);
+ text("update-previous","Сохранена версия "+(u.previous_version||"—")+". Для возврата понадобится подтверждение.");
+ const offer=u.available||working||waiting||!!updateResult;
+ show("update-offer",page!=="update"&&!!offer);
+ text("update-offer-text",!serverOnline&&(working||waiting)?"Обновление: ожидаем связь с панелью":working?updatePhaseText(u)+(total?" · "+percent+"%":""):waiting?"Ожидаем установку "+pendingUpdate.target:u.available?"Доступно обновление "+u.latest_version:updateResult);
+}
+async function requestUpdate(action,shownVersion=""){
+ if(updateRequestInFlight)return;
+ if(!token||!current?.authorized){startPairing();return;}
+ if(!serverOnline){notice("Дождитесь восстановления связи с панелью",true);return;}
+ const u=current.update||{},change=action==="update_install"||action==="update_rollback";
+ if(!u.started||!u.supported){notice("Обновление пока недоступно",true);return;}
+ if(action==="update_cancel"){
+   if(!u.busy||!u.cancel_allowed){notice("На этом этапе отмена уже недоступна",true);return;}
+ }else if(u.busy||u.boot_pending||pendingUpdate){notice("Дождитесь завершения текущего обновления",true);return;}
+ const values={action};
+ if(change){
+   const rollback=action==="update_rollback",version=String(shownVersion);
+   if(!version||version!==(rollback?u.previous_version:u.latest_version)||!(rollback?u.rollback_available:u.available)){
+     notice("Доступная версия изменилась. Проверьте сведения ещё раз.",true);return;
+   }
+   if(!confirm((rollback?"Вернуть версию ":"Установить версию ")+version+"?\nСейчас установлена "+current.version+". После установки панель перезапустится."))return;
+   values.version=version;values.confirm=version;
+   pendingUpdate={target:version,from:current.version,action,at:Date.now(),rebootSeen:false,connectionLost:false};
+   saveUpdatePending();
+ }
+ updateResult="";updateResultError=false;updateRequestInFlight=true;updateView();
+ try{
+   await sendPost("/api/command",values,true);
+   notice(action==="update_cancel"?"Отмена запрошена. Ожидаем состояние панели.":action==="update_check"?"Проверка запрошена.":"Установка "+values.version+" запрошена.");
+   await poll();
+ }catch(e){
+   if(change&&e.httpStatus)finishUpdate("Запрос не принят: "+e.message,true);
+   else if(change&&pendingUpdate){updateResult="Связь прервалась. Проверяем, приняла ли панель запрос.";pendingUpdate.connectionLost=true;saveUpdatePending();}
+   else if(change)return; // A concurrent status response already supplied the final outcome.
+   notice("Обновление: "+e.message,true);
+ }finally{updateRequestInFlight=false;updateView();}
+}
 function handleAction(b){
  const action=b.dataset.action;
+ if(["update_check","update_install","update_cancel","update_rollback"].includes(action)){requestUpdate(action,b.dataset.version);return;}
  if(action==="settings-root"){tab="";page="settings";drawPage();return;}
  if(action==="ha_reload"){haDirty=false;haFormRevision=null;renderHA();return;}
  if(action==="show-pair"||action==="pair-retry"){startPairing();return;}
@@ -574,11 +702,13 @@ async function poll(){
    const r=await request("/api/status",{cache:"no-store",headers:apiHeaders()});
    if(!r.ok)throw Error("HTTP "+r.status);
    const d=await r.json();
-   if(!d.authorized&&token){token="";sessionStorage.removeItem("boiler_panel_token");notice("Сессия истекла. Повторите сопряжение.");}
-   current=d;serverOnline=true;lastServerError="";updateView();
+   if(!d.authorized&&token){token="";sessionStorage.removeItem("boiler_panel_token");if(!pendingUpdate)notice("Сессия истекла. Повторите сопряжение.");}
+   reconcileUpdate(d);current=d;serverOnline=true;lastServerError="";updateView();
  }catch(e){
    if(lastServerError!==e.message)notice("Нет связи с панелью: "+e.message,true);
-   lastServerError=e.message;serverOnline=false;markOffline();
+   lastServerError=e.message;serverOnline=false;
+   if(pendingUpdate){pendingUpdate.connectionLost=true;saveUpdatePending();}
+   updateView();markOffline();
    text("net","● Нет ответа панели");
    $("net").className="status";
    text("last-update","Сервер не отвечает, повторяем");

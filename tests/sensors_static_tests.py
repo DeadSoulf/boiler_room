@@ -11,7 +11,9 @@ page=read("src/panel_web_page.h")
 main=read("src/main.cpp")
 ci=read("ci/prepare.py")
 version=read("src/panel_types.h")
-assert 'VERSION = "v0.9.1"' in version
+release_version=read("VERSION").strip()
+assert re.fullmatch(r'v\d+\.\d+\.\d+',release_version)
+assert f'VERSION = "{release_version}"' in version
 expected={52:7,33:8,51:9,31:10,50:11,30:12,49:13,29:14,34:17,32:19,28:21}
 pairs={int(g):int(p) for g,p in re.findall(r"\{(\d+),(\d+)\}",pins)}
 assert pairs==expected,(pairs,expected)

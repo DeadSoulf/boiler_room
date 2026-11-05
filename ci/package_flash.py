@@ -17,6 +17,7 @@ def windows_launcher_bytes(data: bytes) -> bytes:
 
 
 def main():
+    from ota_manifest import write_assets, validate_assets
     root = Path(__file__).resolve().parents[1]
     artifacts = root / 'artifacts'
     version = re.search(r'VERSION\s*=\s*"(v\d+\.\d+\.\d+)"',
@@ -26,6 +27,11 @@ def main():
                ('firmware.bin', 'bootloader.bin', 'partitions.bin', 'binary-verification.json')}
     report = json.loads(payload['binary-verification.json'])
     assert report['image_chip_id'] == 18 and report['image_bytes'] == len(payload['firmware.bin'])
+    # Validate before writing either public transport of the same application.
+    write_assets(root, version, commit, payload['firmware.bin'],
+                 payload['bootloader.bin'], payload['partitions.bin'])
+    validate_assets(root, version, commit, payload['firmware.bin'],
+                    payload['bootloader.bin'], payload['partitions.bin'])
     for name in ('scripts/flash_panel.py', 'scripts/flash_COM3.cmd', 'docs/flash-panel.md'):
         payload[name] = (root / name).read_bytes()
     payload['scripts/flash_COM3.cmd'] = windows_launcher_bytes(payload['scripts/flash_COM3.cmd'])
