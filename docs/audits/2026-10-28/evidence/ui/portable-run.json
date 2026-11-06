@@ -1,0 +1,21 @@
+{
+  "lvgl": "8.3.11",
+  "leak_check": false,
+  "status": "defect_reproduced",
+  "inputs_sha256": {
+    "src/main.cpp": "724fa4a275696fa2c6e9a9d831f511b6645554c9fbe24844145ed72f0b8f3c47",
+    "src/panel_types.h": "4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c",
+    "src/screen_state.h": "ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba",
+    "src/panel_screen.cpp": "7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767",
+    "src/boiler_fonts.c": "2bc21156983acec91e8bb89f992302057a25b09b38e600c6da258b3d2c82ea9f",
+    "tests/host/host.cpp": "fbd3929f77966cc9a04c36cfe6231531de0967fa2c0198dcbf5dc86225e96f39",
+    "tests/host/lv_conf.h": "6a7fe672685c077b79a32d05d5a6d8072ca6406d0ace2386858fac11afe9e244"
+  },
+  "baseline_exit_code": 0,
+  "probe_exit_code": 1,
+  "keyboard_failures": [
+    "FAIL switching to symbols must not type a character",
+    "FAIL abc must return to lowercase without entering characters",
+    "FAIL direct lowercase-to-symbol switch inserted text"
+  ]
+}

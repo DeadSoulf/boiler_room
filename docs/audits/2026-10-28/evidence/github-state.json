@@ -1,0 +1,22 @@
+{
+  "observed_at_utc": "2026-10-28",
+  "repository": "DeadSoulf/boiler_room",
+  "sources": [
+    "https://api.github.com/repos/DeadSoulf/boiler_room",
+    "https://api.github.com/repos/DeadSoulf/boiler_room/branches/main",
+    "https://api.github.com/repos/DeadSoulf/boiler_room/rulesets",
+    "https://api.github.com/repos/DeadSoulf/boiler_room/releases"
+  ],
+  "visibility": "public",
+  "private": false,
+  "default_branch": "main",
+  "main_head": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "main_protected": false,
+  "protection_required_status_checks": {
+    "enforcement_level": "off",
+    "contexts": [],
+    "checks": []
+  },
+  "rulesets": [],
+  "releases": []
+}

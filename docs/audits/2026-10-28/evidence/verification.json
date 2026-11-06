@@ -1,0 +1,162 @@
+{
+  "native": {
+    "commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+    "inputs": 68,
+    "outputs": 27,
+    "input_mismatches": [],
+    "output_mismatches": [],
+    "files": [
+      "page1.ppm",
+      "ble_results_test_fixture.ppm",
+      "service_timing_max_test_fixture.ppm",
+      "settings2.ppm",
+      "wifi_keyboard.ppm",
+      "service_timing_zero.ppm",
+      "host-ui.log",
+      "model.log",
+      "page0.ppm",
+      "settings1.ppm",
+      "display.log",
+      "updater.log",
+      "page3.ppm",
+      "settings3.ppm",
+      "settings4.ppm",
+      "wifi_results_test_fixture.ppm",
+      "host-build.log",
+      "radio.log",
+      "clock_keyboard.ppm",
+      "before_home_click.ppm",
+      "history_test_fixture.ppm",
+      "busy_test_fixture.ppm",
+      "output-sha256.json",
+      "input-manifest.json",
+      "page2.ppm",
+      "home.ppm",
+      "sensor_detail.ppm",
+      "lvgl-native-source.tar.gz"
+    ],
+    "artifact_id": 12772276287,
+    "archive_bytes": 3988817,
+    "archive_sha256": "e4c5cbb6c20ec747e60080a3636ad4fc9215329654041365a2700558da522ad5",
+    "matches_github_digest": true
+  },
+  "firmware": {
+    "commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+    "inputs": 68,
+    "outputs": 12,
+    "input_mismatches": [],
+    "output_mismatches": [],
+    "files": [
+      "packages.txt",
+      "platformio.ini",
+      "lvgl_glue.c",
+      "bootloader.bin",
+      "firmware-build.log",
+      "jc4880p4.json",
+      "binary-verification.json",
+      "firmware.bin",
+      "partitions.bin",
+      "firmware.elf",
+      "pip.log",
+      "output-sha256.json",
+      "input-manifest.json"
+    ],
+    "artifact_id": 12772760093,
+    "archive_bytes": 8743497,
+    "archive_sha256": "7b6cc29a453639e5a31d8315005470dd41eaad63d0511cdf517c35a0d2f96881",
+    "matches_github_digest": true
+  },
+  "binary_verification": {
+    "chip": "ESP32-P4",
+    "image_chip_id": 18,
+    "image_bytes": 1393648,
+    "min_chip_revision_legacy": 0,
+    "min_chip_revision_full": 0,
+    "max_chip_revision_full": 65535,
+    "partitions": [
+      {
+        "type": 1,
+        "subtype": 2,
+        "offset": 36864,
+        "size": 20480,
+        "label": "nvs",
+        "flags": 0
+      },
+      {
+        "type": 1,
+        "subtype": 0,
+        "offset": 57344,
+        "size": 8192,
+        "label": "otadata",
+        "flags": 0
+      },
+      {
+        "type": 0,
+        "subtype": 16,
+        "offset": 65536,
+        "size": 6553600,
+        "label": "app0",
+        "flags": 0
+      },
+      {
+        "type": 0,
+        "subtype": 17,
+        "offset": 6619136,
+        "size": 6553600,
+        "label": "app1",
+        "flags": 0
+      },
+      {
+        "type": 1,
+        "subtype": 130,
+        "offset": 13172736,
+        "size": 3538944,
+        "label": "spiffs",
+        "flags": 0
+      },
+      {
+        "type": 1,
+        "subtype": 3,
+        "offset": 16711680,
+        "size": 65536,
+        "label": "coredump",
+        "flags": 0
+      }
+    ],
+    "hardware_verified": false,
+    "note": "Image revision requirements must be checked against real board before manual installation. No C6 image or flash operation."
+  },
+  "firmware_sha256": "cf0bd58fbbd36bf67af2845ff432b6a4c64bb31da98dd3e58b97b1fcd0eecd91",
+  "repository": "DeadSoulf/boiler_room",
+  "audited_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "audited_tree": "dbe41735d0b81424861c3c1976985bf5aed94b9e",
+  "audit_date": "2026-10-28",
+  "ci": {
+    "run_id": 40585643270,
+    "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/40585643270",
+    "head_sha": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+    "conclusion": "success",
+    "native_job_id": 122476187297,
+    "firmware_job_id": 122476462314,
+    "updated_at": "2026-10-27T21:21:55Z"
+  },
+  "source_integrity": {
+    "files": 75,
+    "unique_git_blobs": 69,
+    "bytes": 1146099,
+    "git_blob_sha1_matches": true,
+    "sha256_matches": true,
+    "source_files_modified": false
+  },
+  "execution_limits": {
+    "target_build": "existing GitHub Actions build at audited commit; archive and file bytes verified",
+    "local_native_rerun": true,
+    "local_ui": "real LVGL 8.3.11, board/radio stubs",
+    "local_radio": "production panel_radio.cpp with SDK mocks; official Arduino 3.3.6 wrapper for BLE",
+    "address_sanitizer": true,
+    "undefined_behavior_sanitizer": true,
+    "leak_sanitizer": false,
+    "hardware_verified": false,
+    "formal_codex_security_workflow_executed": false
+  }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "test": "model",
+    "returncode": 0,
+    "summary": [
+      "PASS: 40031 assertions (navigation, validity, stale readings, wraparound, password validation, date parsing)"
+    ]
+  },
+  {
+    "test": "display",
+    "returncode": 0,
+    "summary": [
+      "PASS: v031 30min choice, 120ms wake debounce, first-touch safety, missing touch, wraparound, hold, 100000 random steps"
+    ]
+  },
+  {
+    "test": "radio",
+    "returncode": 0,
+    "summary": [
+      "PASS: radio admission, priority, secrets, timeout/reason, cancellation, persistence failures, display timeout commands, scan code/timing (host mocks only)",
+      "PASS: no-radio, Wi-Fi+BLE, BLE-only optional branch smoke (host mocks only)"
+    ]
+  },
+  {
+    "test": "updater",
+    "returncode": 0,
+    "summary": [
+      "Ran 30 tests in 0.558s",
+      "OK"
+    ]
+  }
+]

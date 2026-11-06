@@ -1,0 +1,25 @@
+{
+  "audited_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "returncode": 1,
+  "expected_returncode": 1,
+  "keyboard_failures": [
+    "FAIL switching to symbols must not type a character",
+    "FAIL abc must return to lowercase without entering characters",
+    "FAIL direct lowercase-to-symbol switch inserted text"
+  ],
+  "key_observations": [
+    "KEYBOARD map symbols=1 selected=41 text_before_digit=[qQ~]",
+    "KEYBOARD text_after_digit=[qQ~1]",
+    "PASS keyboard input survives 20 radio revisions",
+    "KEYBOARD return_to_abc upper=1 symbols=0 text=[qQ~1]",
+    "KEYBOARD lowercase_to_symbols text=[~]",
+    "STALE count=1 state=[Нет свежих данных] summary=[Свежие каналы: 0 / 4] hint=[Нет реальных измерений. Датчики не подключены]",
+    "PASS manual-date DST gap rejection and valid Berlin/Moscow dates on native libc",
+    "COMPLETE targeted UI probes; behavior failures=3"
+  ],
+  "stderr": "",
+  "sanitizer_report": false,
+  "interpretation": "exit 1 confirms three manifestations of the keyboard defect; not a passing functional UI test",
+  "hardware_verified": false,
+  "leak_sanitizer": false
+}

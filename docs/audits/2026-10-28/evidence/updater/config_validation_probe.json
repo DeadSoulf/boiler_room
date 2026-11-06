@@ -1,0 +1,38 @@
+{
+  "commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "mode": "preflight_only_no_build_no_flash",
+  "results": [
+    {
+      "case": "baseline",
+      "accepted": true,
+      "recognized_version": "v031",
+      "planned_source_changes": 6,
+      "configuration_changed": false,
+      "configuration_preserved": true
+    },
+    {
+      "case": "chip_variant_override",
+      "accepted": true,
+      "recognized_version": "v031",
+      "planned_source_changes": 6,
+      "configuration_changed": true,
+      "configuration_preserved": true
+    },
+    {
+      "case": "mcu_override",
+      "accepted": true,
+      "recognized_version": "v031",
+      "planned_source_changes": 6,
+      "configuration_changed": true,
+      "configuration_preserved": true
+    },
+    {
+      "case": "lvgl_major_override",
+      "accepted": true,
+      "recognized_version": "v031",
+      "planned_source_changes": 6,
+      "configuration_changed": true,
+      "configuration_preserved": true
+    }
+  ]
+}

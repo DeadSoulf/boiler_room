@@ -1,0 +1,21 @@
+{
+  "audited_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "source_files_rehashed": 75,
+  "original_source_files_unchanged": true,
+  "missing_relative_links": [],
+  "python_syntax_parsed": 6,
+  "published_json_valid": true,
+  "radio_package_hashes_match_final_run": true,
+  "updater_package_hashes_match_portability_check": true,
+  "ui_baseline_exit_code": 0,
+  "ui_expected_defect_probe_exit_code": 1,
+  "absolute_workspace_paths_in_publication": false,
+  "independent_subject_reviews_completed": [
+    "UI/LVGL/display",
+    "radio/SDK/NVS",
+    "updater/CI/artifacts"
+  ],
+  "minor_review_corrections_incorporated": true,
+  "production_fixes_included": false,
+  "hardware_verified": false
+}

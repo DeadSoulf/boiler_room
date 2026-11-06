@@ -1,0 +1,14 @@
+[
+  {
+    "name": "config_validation_probe",
+    "returncode": 0,
+    "stdout": "{\n  \"commit\": \"b700ef6f837f5fc1dbd0bad91a569159123c3851\",\n  \"mode\": \"preflight_only_no_build_no_flash\",\n  \"results\": [\n    {\n      \"case\": \"baseline\",\n      \"accepted\": true,\n      \"recognized_version\": \"v031\",\n      \"planned_source_changes\": 6,\n      \"configuration_changed\": false,\n      \"configuration_preserved\": true\n    },\n    {\n      \"case\": \"chip_variant_override\",\n      \"accepted\": true,\n      \"recognized_version\": \"v031\",\n      \"planned_source_changes\": 6,\n      \"configuration_changed\": true,\n      \"configuration_preserved\": true\n    },\n    {\n      \"case\": \"mcu_override\",\n      \"accepted\": true,\n      \"recognized_version\": \"v031\",\n      \"planned_source_changes\": 6,\n      \"configuration_changed\": true,\n      \"configuration_preserved\": true\n    },\n    {\n      \"case\": \"lvgl_major_override\",\n      \"accepted\": true,\n      \"recognized_version\": \"v031\",\n      \"planned_source_changes\": 6,\n      \"configuration_changed\": true,\n      \"configuration_preserved\": true\n    }\n  ]\n}\n",
+    "stderr": ""
+  },
+  {
+    "name": "persistent_write_failure_probe",
+    "returncode": 0,
+    "stdout": "{\n  \"commit\": \"b700ef6f837f5fc1dbd0bad91a569159123c3851\",\n  \"fault\": \"OS RLIMIT_FSIZE=512 after the second successful source replacement; SIGXFSZ ignored to return EFBIG\",\n  \"apply\": {\n    \"error_type\": \"OSError\",\n    \"error\": \"[Errno 27] File too large\"\n  },\n  \"backup_manifest_bytes\": 512,\n  \"applied_source_files\": [\n    \"examples/LvglUi/src/main.cpp\",\n    \"examples/LvglUi/src/panel_types.h\"\n  ],\n  \"original_source_files\": [\n    \"examples/LvglUi/src/panel_radio.h\",\n    \"examples/LvglUi/src/panel_radio.cpp\",\n    \"examples/LvglUi/src/screen_state.h\",\n    \"examples/LvglUi/src/panel_screen.cpp\"\n  ],\n  \"backup_data_intact\": true,\n  \"backup_manifest_parseable\": false,\n  \"parse_error\": \"Unterminated string starting at: line 13 column 21 (char 486)\",\n  \"documented_restore_after_fault_removed\": {\n    \"error_type\": \"JSONDecodeError\",\n    \"error\": \"Unterminated string starting at: line 13 column 21 (char 486)\"\n  }\n}\n",
+    "stderr": ""
+  }
+]

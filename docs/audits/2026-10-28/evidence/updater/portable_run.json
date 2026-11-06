@@ -1,0 +1,93 @@
+{
+  "reference_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "updater_sha256": "d7ae1f43a44d5165778f695f284ba26c555f4dc10421ac3a1b64e467fc82ffc3",
+  "all_expected_defects_reproduced": true,
+  "probes": [
+    {
+      "probe": "config_validation_probe.py",
+      "exit_code": 0,
+      "evidence": {
+        "reference_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+        "updater_sha256": "d7ae1f43a44d5165778f695f284ba26c555f4dc10421ac3a1b64e467fc82ffc3",
+        "mode": "preflight_only_no_build_no_flash",
+        "baseline_control_passed": true,
+        "defect_reproduced": true,
+        "results": [
+          {
+            "case": "baseline",
+            "configuration_changed": false,
+            "accepted": true,
+            "recognized_version": "v031",
+            "planned_source_changes": 6,
+            "configuration_preserved": true
+          },
+          {
+            "case": "chip_variant_override",
+            "configuration_changed": true,
+            "accepted": true,
+            "recognized_version": "v031",
+            "planned_source_changes": 6,
+            "configuration_preserved": true
+          },
+          {
+            "case": "mcu_override",
+            "configuration_changed": true,
+            "accepted": true,
+            "recognized_version": "v031",
+            "planned_source_changes": 6,
+            "configuration_preserved": true
+          },
+          {
+            "case": "lvgl_major_override",
+            "configuration_changed": true,
+            "accepted": true,
+            "recognized_version": "v031",
+            "planned_source_changes": 6,
+            "configuration_preserved": true
+          }
+        ]
+      }
+    },
+    {
+      "probe": "persistent_write_failure_probe.py",
+      "exit_code": 0,
+      "evidence": {
+        "reference_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+        "updater_sha256": "d7ae1f43a44d5165778f695f284ba26c555f4dc10421ac3a1b64e467fc82ffc3",
+        "fault": "process-local RLIMIT_FSIZE=512 after two successful source replacements; SIGXFSZ ignored to return EFBIG",
+        "apply": {
+          "error_type": "OSError",
+          "errno": 27
+        },
+        "fault_activated": true,
+        "limit_restored": true,
+        "backup_manifest_bytes": 512,
+        "applied_source_files": [
+          "examples/LvglUi/src/main.cpp",
+          "examples/LvglUi/src/panel_types.h"
+        ],
+        "original_source_files": [
+          "examples/LvglUi/src/panel_radio.h",
+          "examples/LvglUi/src/panel_radio.cpp",
+          "examples/LvglUi/src/screen_state.h",
+          "examples/LvglUi/src/panel_screen.cpp"
+        ],
+        "backup_data_intact": true,
+        "backup_manifest_parseable": false,
+        "parse_error": {
+          "error_type": "JSONDecodeError",
+          "message": "Unterminated string starting at",
+          "line": 12,
+          "column": 5
+        },
+        "documented_restore_after_fault_removed": {
+          "error_type": "JSONDecodeError",
+          "message": "Unterminated string starting at",
+          "line": 12,
+          "column": 5
+        },
+        "defect_reproduced": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "started_at_utc": "2026-10-28T08:48:03.658921+00:00",
+  "meaning_of_exit_0": "All three expected defects were observed; this is not a firmware acceptance test.",
+  "paths": {
+    "<probe>": "this probe package",
+    "<repo>": "selected boiler_room checkout",
+    "<output>": "temporary build output"
+  },
+  "python_version": "3.12.14",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "compiler": {
+    "command": [
+      "/usr/bin/g++",
+      "--version"
+    ],
+    "status": "completed",
+    "returncode": 0,
+    "stdout": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "stderr": "",
+    "duration_seconds": 0.002
+  },
+  "sanitizer_environment": {
+    "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+    "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+  },
+  "reference_repository": "https://github.com/DeadSoulf/boiler_room",
+  "reference_commit": "b700ef6f837f5fc1dbd0bad91a569159123c3851",
+  "tested_source_sha256": {
+    "src/panel_radio.cpp": "49a38d2cf26a0d115cf8dd251381457adb65ea89ced513a5e02ad5bb99c883a4",
+    "src/panel_radio.h": "85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7",
+    "src/panel_types.h": "4180eb3acd6dedec742430e95460510ece7716f02595ccde5b6c7324e8f88b5c"
+  },
+  "matches_reference_source_hashes": true,
+  "probe_file_sha256": {
+    "README.md": "f599d4fa4b6495d9139d536a3577648ca68538c65c6d201fc69e2d1d899dc39d",
+    "UPSTREAM_BLE_LICENSE.txt": "7d8319b3fa758be565e482754bc39b191853d68b030ff6e5fbc0c0b4cd18db6c",
+    "UPSTREAM_BLE_NOTICE.md": "aa3a023046def42a7ac1b1cbae7ec94d75f3ed28a6fdca27cc0d1b6d3ef6ab27",
+    "baseline.json": "4bed3ab965cb91fb238c0950b1c670d0eebc744e1c9de5d7dbc8a88cd2541489",
+    "official_sources.json": "5d28da8b869bdc480a4369edc4dbe583971d4daa1bc2dc688aef5ac8681915f6",
+    "repro_ble.cpp": "3c78cfd16218807299f093642b3e6089d66d5b6e19c34a595a8bbc40223fa49a",
+    "repro_wifi_begin_failure.cpp": "6ce115c8c6c5cc48346d972272aafe561f361eeeb1792b45be1fa1b94f0ace25",
+    "repro_wifi_transition.cpp": "7740293f492e196b8601bbb18a44ecc64ef7dda30c58d6fe7a86a32a6009b8c1",
+    "run.py": "24338f8b695f7b1670f2e1b4c3de8c6b4d3e4bc2631ed430563147fd2d95095c",
+    "stubs/Arduino.h": "b09c3c6c8bcfd4c62e0ab45d0a214c0bec9008b310ec76badb908f9f1db93ff2",
+    "stubs/BLEAdvertisedDevice.h": "030c5b5382d1d64e47ca0f024bbc274036291739e87cde2c1bce03bb6f6b72a6",
+    "stubs/BLEDevice.h": "789d0143f5811d106b1eaa45c6468bb8db38724df8664851aef806a53894deee",
+    "stubs/BLEScan.h": "030c5b5382d1d64e47ca0f024bbc274036291739e87cde2c1bce03bb6f6b72a6",
+    "stubs/Preferences.h": "68cd908c91869826acecaf71121568aff7dc793f573a0af6f54e1e8808a57a24",
+    "stubs/WiFi.h": "886144d260940051be35c710146b5c34d65d192104b15209603c5bc1d72abd44",
+    "stubs/ble_scan_blocking_wrapper.inc": "9ce88464f34ad596e4d08c4b2f81bba42548ec85afa6925530b503e8343c13f4",
+    "stubs/esp32-hal-hosted.h": "61e50dd999ff8733455f582a89bc5e0d9b19fbfc0a96f3b9a8b86881a6a9da2b",
+    "stubs/freertos/FreeRTOS.h": "6991448f0dd66b1b4853035229e59b0ab01882deb4eaa6d56e688277cecaee27",
+    "stubs/freertos/semphr.h": "9143cd010ab9bc6c2c5c5a04233d872ae9f87be3c50511f8e2cc7d81c97a3f98",
+    "stubs/freertos/task.h": "899332854d57734fde5835a3c4eeb88aec7f24c780a0cda3b88caa49b9c698a8",
+    "stubs/sdkconfig.h": "ed657232ebf4810c19495139e2346eb6fd85addf34e02fe79fbe3dd3d5781e34",
+    "stubs/soc/soc_caps.h": "b3adf106d95b8934f690943f2921308b90be5b766c4c8ba250c792de56400201"
+  },
+  "probes": [
+    {
+      "name": "repro_wifi_transition",
+      "compile": {
+        "command": [
+          "/usr/bin/g++",
+          "-std=c++17",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-g",
+          "-fsanitize=address,undefined",
+          "-fno-sanitize-recover=all",
+          "-fno-omit-frame-pointer",
+          "-UNDEBUG",
+          "-I",
+          "<probe>/stubs",
+          "-I",
+          "<repo>/src",
+          "<probe>/repro_wifi_transition.cpp",
+          "-o",
+          "<output>/repro_wifi_transition"
+        ],
+        "status": "completed",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "duration_seconds": 0.703
+      },
+      "run": {
+        "command": [
+          "<output>/repro_wifi_transition"
+        ],
+        "status": "completed",
+        "returncode": 0,
+        "stdout": "disconnect_failure: actual_connected=1 ui_connected=1 message=Wi-Fi отключён. Автоподключение выключено\nswitch_failure: requested_ssid=requested-new-network actual_ssid=test credential_writes=1 saved_ssid=requested-new-network elapsed_ms=0 message=Подключено. Время синхронизируется\nДефект воспроизведён: сбой отключения и перехода на новую сеть выдан за успех.\n",
+        "stderr": "",
+        "duration_seconds": 0.005
+      },
+      "outcome": "expected_defect_observed"
+    },
+    {
+      "name": "repro_wifi_begin_failure",
+      "compile": {
+        "command": [
+          "/usr/bin/g++",
+          "-std=c++17",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-g",
+          "-fsanitize=address,undefined",
+          "-fno-sanitize-recover=all",
+          "-fno-omit-frame-pointer",
+          "-UNDEBUG",
+          "-I",
+          "<probe>/stubs",
+          "-I",
+          "<repo>/src",
+          "<probe>/repro_wifi_begin_failure.cpp",
+          "-o",
+          "<output>/repro_wifi_begin_failure"
+        ],
+        "status": "completed",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "duration_seconds": 0.694
+      },
+      "run": {
+        "command": [
+          "<output>/repro_wifi_begin_failure"
+        ],
+        "status": "completed",
+        "returncode": 0,
+        "stdout": "begin_failed_without_old_connection: begin_calls=1 connected=0 credential_writes=0 elapsed_ms=20000 message=Таймаут Wi-Fi: нет IP за 20 с. Проверьте журнал C6\nДефект воспроизведён: немедленный отказ begin выдан за таймаут; credentials не записаны.\n",
+        "stderr": "",
+        "duration_seconds": 0.006
+      },
+      "outcome": "expected_defect_observed"
+    },
+    {
+      "name": "repro_ble",
+      "compile": {
+        "command": [
+          "/usr/bin/g++",
+          "-std=c++17",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-g",
+          "-fsanitize=address,undefined",
+          "-fno-sanitize-recover=all",
+          "-fno-omit-frame-pointer",
+          "-UNDEBUG",
+          "-I",
+          "<probe>/stubs",
+          "-I",
+          "<repo>/src",
+          "-DCONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=1",
+          "-DCONFIG_NIMBLE_ENABLED=1",
+          "-DCONFIG_BT_NIMBLE_ROLE_OBSERVER=1",
+          "<probe>/repro_ble.cpp",
+          "-o",
+          "<output>/repro_ble"
+        ],
+        "status": "completed",
+        "returncode": 0,
+        "stdout": "",
+        "stderr": "",
+        "duration_seconds": 0.78
+      },
+      "run": {
+        "command": [
+          "<output>/repro_ble"
+        ],
+        "status": "completed",
+        "returncode": 0,
+        "stdout": "start_called=1 actual_start_success=0\nble_count=0 message=Поиск завершён. Только BLE, без подключения\nДефект воспроизведён: отказ запуска BLE-сканирования выдан за завершённый поиск.\n",
+        "stderr": "",
+        "duration_seconds": 0.004
+      },
+      "outcome": "expected_defect_observed"
+    }
+  ],
+  "source_files_unchanged": true,
+  "exit_code": 0,
+  "all_expected_defects_observed": true,
+  "finished_at_utc": "2026-10-28T08:48:05.857457+00:00"
+}
