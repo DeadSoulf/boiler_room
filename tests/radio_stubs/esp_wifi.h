@@ -19,6 +19,7 @@ struct WifiDriver {
  esp_err_t startResult=ESP_OK, stopResult=ESP_OK, storageResult=ESP_OK, configResult=ESP_OK;
  esp_err_t powerResult=ESP_OK, disconnectResult=ESP_OK, countResult=ESP_OK, recordsResult=ESP_OK;
  wifi_mode_t mode=WIFI_MODE_STA;
+ String associatedSsid;
  bool startEvent=true,stopEvent=true,runtimeConfigCleared=false;
  unsigned startCalls=0,stopCalls=0,storageCalls=0,configCalls=0,disconnectCalls=0;
  unsigned scanCalls=0,scanStopCalls=0,clearCalls=0,scanElapsed=0;
@@ -29,6 +30,7 @@ inline WifiDriver wifiDriver;
 inline esp_err_t esp_wifi_get_mode(wifi_mode_t* mode){*mode=wifiDriver.mode;return wifiDriver.modeResult;}
 inline esp_err_t esp_wifi_set_ps(int){return wifiDriver.powerResult;}
 inline esp_err_t esp_wifi_sta_get_ap_info(wifi_ap_record_t* ap){
+ if(!wifiDriver.associatedSsid.empty()){std::snprintf(reinterpret_cast<char*>(ap->ssid),sizeof(ap->ssid),"%s",wifiDriver.associatedSsid.c_str());return ESP_OK;}
  if(wifiDriver.linkResult!=ESP_ERR_WIFI_NOT_CONNECT)return wifiDriver.linkResult;
  if(!WiFi.connected)return ESP_ERR_WIFI_NOT_CONNECT;
  std::snprintf(reinterpret_cast<char*>(ap->ssid),sizeof(ap->ssid),"%s",WiFi.connectedSsid.c_str());return ESP_OK;

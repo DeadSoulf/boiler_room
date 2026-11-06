@@ -10,15 +10,16 @@ struct Wifi {
  int scanResult=0;unsigned scanElapsed=0,scanCount=0;
  bool connectSuccess=false,connected=false,reconnect=false;unsigned beginCount=0,disconnectCount=0;
  bool disconnectSuccess=true,disconnectChangesState=true,beginFailure=false,hasIp=true;
- String connectedSsid="test",beginSsidOverride;
+ String connectedSsid="test",beginSsidOverride,lastBeginSsid,lastBeginPassword;
+ bool lastBeginOpen=false,modeSuccess=true;
  void(*callback)(arduino_event_id_t,arduino_event_info_t)=nullptr;
  void onEvent(void(*cb)(arduino_event_id_t,arduino_event_info_t)){callback=cb;}
  void emit(arduino_event_id_t event){if(callback)callback(event,{});}
- void persistent(bool){} void setHostname(const char*){} bool mode(int){return true;}
+ void persistent(bool){} void setHostname(const char*){} bool mode(int){return modeSuccess;}
  void setSleep(bool){} void setScanTimeout(unsigned){} void setAutoReconnect(bool b){reconnect=b;}
  bool getAutoReconnect()const{return reconnect;}
  bool disconnect(bool,bool){++disconnectCount;if(!disconnectSuccess)return false;if(disconnectChangesState)connected=false;return true;} void setMinSecurity(int){}
- int begin(const char* ssid,const char*){++beginCount;if(beginFailure)return WL_CONNECT_FAILED;connected=connectSuccess;if(connected)connectedSsid=beginSsidOverride.empty()?ssid:beginSsidOverride;return status();}
+ int begin(const char* ssid,const char* password){++beginCount;lastBeginSsid=ssid;lastBeginPassword=password?password:"";lastBeginOpen=password==nullptr;if(beginFailure)return WL_CONNECT_FAILED;connected=connectSuccess;if(connected)connectedSsid=beginSsidOverride.empty()?ssid:beginSsidOverride;return status();}
  int status(){return connected?WL_CONNECTED:0;} IP localIP(){return {connected&&hasIp?1u:0u};}
  String SSID(int index=-1){return index<0?connectedSsid:"test";}int RSSI(int=-1){return -45;}
  void scanDelete(){}int scanNetworks(bool,bool,bool,int){++scanCount;fakeMillis+=scanElapsed;return scanResult;}int encryptionType(int){return WIFI_AUTH_WPA2_PSK;}

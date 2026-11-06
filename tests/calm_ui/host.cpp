@@ -236,6 +236,16 @@ int main(int argc,char** argv){
  touch("Wi-Fi");assert(view==WifiView);save("wifi");touch("Другие действия");assert(view==WifiMoreView);
  unsigned sent=panel_radio::submitted;touch("Забыть сеть");assert(overlay&&panel_radio::submitted==sent);save("forget-confirm");touch("Отмена");assert(!overlay&&view==WifiMoreView&&panel_radio::submitted==sent);
  touch("Отключить Wi-Fi");panel_radio::accept=false;touch("Отключить");assert(overlay&&dialogError&&strlen(lv_label_get_text(dialogError))>0);panel_radio::accept=true;touch("Отключить");assert(!overlay&&panel_radio::submitted==sent+1&&panel_radio::last.job==Job::Disconnect);
+ // A reconnect pause is idle/offline, but the user must still be able to stop it.
+ const auto connectedFixture=panel_radio::fixture;
+ panel_radio::fixture.connected=false;panel_radio::fixture.busy=false;
+ panel_radio::fixture.job=Job::None;panel_radio::fixture.autoConnect=true;
+ ++panel_radio::fixture.revision;step(400);go(PAGE_SETTINGS,WifiMoreView);
+ sent=panel_radio::submitted;touch("Отключить Wi-Fi");touch("Отмена");
+ assert(!overlay&&panel_radio::submitted==sent);
+ touch("Отключить Wi-Fi");touch("Отключить");
+ assert(!overlay&&panel_radio::submitted==sent+1&&panel_radio::last.job==Job::Disconnect);
+ panel_radio::fixture=connectedFixture;++panel_radio::fixture.revision;step(400);
  touch("<");assert(view==WifiView);touch("<");assert(view==ConnectionsView);
  touch("Home Assistant");assert(view==HaView);save("home-assistant");touch("<");assert(view==ConnectionsView);touch("<");assert(view==Root);
  // A browser request displays a code left of the clock, even from another page.

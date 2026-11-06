@@ -700,7 +700,7 @@ void wifiPage(){
   if(radio.wifiMessage[0])label(body,radio.wifiMessage,24,618,432,&boiler_font_14,MUTED);
 }
 void wifiMorePage(){
-  button(body,"Отключить Wi-Fi",24,30,432,64,WifiDisconnect,0x26373B,radio.ready&&(radio.connected||(radio.busy&&radio.job==Job::Connect)));
+  button(body,"Отключить Wi-Fi",24,30,432,64,WifiDisconnect,0x26373B,radio.ready&&(radio.connected||radio.autoConnect||(radio.busy&&radio.job==Job::Connect)));
   button(body,"Забыть сеть",24,116,432,64,WifiForget,0x26373B,radio.ready&&radio.hasSaved);
   label(body,"Для каждого действия потребуется\nотдельное подтверждение.",24,230,432,&boiler_font_19,MUTED);
 }

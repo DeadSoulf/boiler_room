@@ -23,7 +23,7 @@ int main(){
  reset();delayHook=[](){arduino_event_info_t info{};info.wifi_sta_disconnected.reason=WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT;wifiEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,info);};
  connectWifi(c,true);assert(strstr(state.wifiMessage,"4WAY_HANDSHAKE_TIMEOUT"));assert(prefs.credentialWrites==0);
  reset();delayHook=[](){cancel();};connectWifi(c,true);assert(fakeMillis==200);assert(!WiFi.connected);assert(prefs.credentialWrites==0);
- reset();WiFi.connectSuccess=true;connectWifi(c,true);assert(prefs.credentialWrites==1);assert(haveCredentials&&state.autoConnect&&WiFi.reconnect);
+ reset();WiFi.connectSuccess=true;connectWifi(c,true);assert(prefs.credentialWrites==1);assert(haveCredentials&&state.autoConnect&&!WiFi.reconnect&&reconnectEnabled);
  updateConnection();assert(strstr(state.wifiMessage,"синхронизируется"));
  reset();WiFi.connectSuccess=true;prefs.writes=false;connectWifi(c,true);assert(!state.autoConnect&&!haveCredentials);updateConnection();assert(strstr(state.wifiMessage,"не сохранены"));
  reset();state.autoConnect=true;WiFi.connectSuccess=true;connectWifi(c,false);assert(prefs.credentialWrites==0&&state.autoConnect);

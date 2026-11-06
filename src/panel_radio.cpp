@@ -49,13 +49,24 @@ Preferences screenPrefs;
 bool screenNvsOK=false;
 bool pinsReady=false;
 struct Credentials { uint32_t magic=0x42503033; char ssid[33]={}; char password[65]={}; uint8_t open=0; };
-Credentials saved;
 bool haveCredentials=false;
 const char* const ZONES[] = {"UTC0", "MSK-3", "CET-1CEST,M3.5.0/2,M10.5.0/3"};
 const char* const ZONE_NAMES[] = {"UTC", "Москва UTC+3", "Берлин CET/CEST"};
 void lock() { xSemaphoreTake(stateMutex, portMAX_DELAY); }
 void unlock() { ++state.revision; xSemaphoreGive(stateMutex); }
 void wipe(void* ptr, size_t size) { volatile unsigned char* p=static_cast<volatile unsigned char*>(ptr); while(size--) *p++=0; }
+// Credentials live only for one read/attempt, never in the shared snapshot.
+bool loadCredentials(Credentials& credentials) {
+  wipe(&credentials,sizeof(credentials));
+  const bool valid=nvsOK && prefs.getBytesLength("credentials")==sizeof(credentials) &&
+    prefs.getBytes("credentials",&credentials,sizeof(credentials))==sizeof(credentials) &&
+    credentials.magic==0x42503033 && credentials.open<=1 && credentials.ssid[0] &&
+    memchr(credentials.ssid,0,sizeof(credentials.ssid)) &&
+    memchr(credentials.password,0,sizeof(credentials.password)) &&
+    passwordValid(credentials.password,credentials.open!=0);
+  if(!valid)wipe(&credentials,sizeof(credentials));
+  return valid;
+}
 void message(const char* text, bool ble=false) {
   lock(); snprintf(ble?state.bleMessage:state.wifiMessage,150,"%s",text); unlock();
 }
@@ -128,6 +139,21 @@ bool configurePins() {
 }
 #if PANEL_WIFI
 bool wifiStarted=false;
+// Worker-owned policy, separate from persisted autoconnect. A failed NVS write
+// must never undo a manual Disconnect/Forget or revive old credentials.
+bool reconnectEnabled=false;
+bool reconnectWaiting=false;
+uint32_t reconnectSince=0,reconnectDelay=0,reconnectNext=15000;
+void resetReconnect(bool enabled, bool immediate=false) {
+  reconnectEnabled=enabled;reconnectWaiting=enabled && immediate;
+  reconnectSince=millis();reconnectDelay=0;reconnectNext=15000;
+}
+void scheduleReconnect() {
+  reconnectWaiting=true;reconnectSince=millis();reconnectDelay=reconnectNext;
+  reconnectNext=std::min<uint32_t>(reconnectNext*2U,300000U);
+  char text[150];snprintf(text,sizeof(text),"Автоподключение: повтор через %lu с",(unsigned long)(reconnectDelay/1000U));
+  message(text);
+}
 bool recoveryPending=false;
 bool eventInstalled=false;
 // Set only while the initialized Wi-Fi driver is stopped for bounded recovery.
@@ -375,12 +401,13 @@ void scanWifi() {
   snprintf(state.wifiMessage,sizeof(state.wifiMessage),"Найдено: %u. В списке: %u",unsigned(total),unsigned(count));unlock();
   if(Serial)Serial.printf("[BP-WIFI] scan_result: total=%u listed=%u\n",unsigned(total),unsigned(count));
 }
-void connectWifi(const Command& cmd, bool save) {
-  if(stopRequested()){message("Подключение отменено");return;}
-  if(!cmd.ssid[0] || !passwordValid(cmd.password,cmd.open)) { message("Проверьте имя сети и пароль");return; }
+bool connectWifi(const Command& cmd, bool save) {
+  if(stopRequested()){message("Подключение отменено");return false;}
+  if(!cmd.ssid[0] || !passwordValid(cmd.password,cmd.open)) { message("Проверьте имя сети и пароль");return false; }
+  if(save)resetReconnect(false); // Explicit credentials replace the previous intent.
   recoveryPending=false;
   message("Подключение к Wi-Fi...");
-  if(!startWifi()) return;
+  if(!startWifi()) return false;
   WiFi.setAutoReconnect(false);
   observeConnect.store(false); // Intentional disconnect must not overwrite failure reason.
   const bool hadConnection=WiFi.status()==WL_CONNECTED;
@@ -389,33 +416,48 @@ void connectWifi(const Command& cmd, bool save) {
   // An existing association must be gone before a new command can be accepted.
   if((hadConnection && !disconnected) || WiFi.status()==WL_CONNECTED) {
     updateConnection();recoveryPending=false;
-    message("Не удалось отключить прежнюю сеть. Настройки не изменены");return;
+    message("Не удалось отключить прежнюю сеть. Настройки не изменены");return false;
   }
   updateConnection();recoveryPending=false;
   vTaskDelay(pdMS_TO_TICKS(200)); // Settle previous remote association state.
   // Open networks require an explicit UI choice; no silent security downgrade.
   WiFi.setMinSecurity(cmd.open?WIFI_AUTH_OPEN:WIFI_AUTH_WPA2_PSK);
-  if(stopRequested())return;
+  if(stopRequested())return false;
   disconnectReason.store(0);
   observeConnect.store(true);
   const uint32_t attemptAt=millis();
   const wl_status_t beginResult=WiFi.begin(cmd.ssid,cmd.open?nullptr:cmd.password);
-  if(Serial) Serial.printf("[BP-WIFI] connect_begin status=%u open=%u pass_len=%u\n",
-                           unsigned(beginResult),unsigned(cmd.open),unsigned(strlen(cmd.password)));
+  if(Serial) Serial.printf("[BP-WIFI] connect_begin status=%u open=%u\n",
+                           unsigned(beginResult),unsigned(cmd.open));
   if(beginResult==WL_CONNECT_FAILED) {
     observeConnect.store(false);
     updateConnection();recoveryPending=false;
-    message("Не удалось запустить подключение. Настройки не изменены");return;
+    message("Не удалось запустить подключение. Настройки не изменены");return false;
   }
   const auto requestedNetwork=[&cmd]() {
     return WiFi.status()==WL_CONNECTED && uint32_t(WiFi.localIP())!=0 && !strcmp(WiFi.SSID().c_str(),cmd.ssid);
   };
   const uint32_t start=millis();
-  while(!stopRequested() && uint32_t(millis()-start)<20000U && !requestedNetwork()) vTaskDelay(pdMS_TO_TICKS(100));
+  // An AP may associate before its DHCP service is ready after a power outage.
+  // Preserve that association for a bounded grace period instead of restarting
+  // it every 20 s. This still runs only in the worker; Cancel polls every 100 ms.
+  uint32_t timeout=20000U;
+  while(!stopRequested() && !requestedNetwork()) {
+    if(uint32_t(millis()-start)>=timeout) {
+      wifi_ap_record_t current={};
+      // Arduino may not report WL_CONNECTED until GOT_IP. Query the driver
+      // once at the first deadline, rather than assuming DHCP has already run.
+      if(timeout==20000U && esp_wifi_sta_get_ap_info(&current)==ESP_OK &&
+          memchr(current.ssid,0,sizeof(current.ssid)) &&
+          !strcmp(reinterpret_cast<const char*>(current.ssid),cmd.ssid))timeout=60000U;
+      else break;
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
   if(stopRequested()){
     observeConnect.store(false);
     WiFi.disconnect(false,false);updateConnection();recoveryPending=false;
-    message(WiFi.status()==WL_CONNECTED?"Запрос отменён; Wi-Fi остался подключён":"Подключение отменено");return;
+    message(WiFi.status()==WL_CONNECTED?"Запрос отменён; Wi-Fi остался подключён":"Подключение отменено");return false;
   }
   if(!requestedNetwork()) {
     observeConnect.store(false);
@@ -428,10 +470,10 @@ void connectWifi(const Command& cmd, bool save) {
        reason,unsigned(statusBefore),unsigned(link),(unsigned long)uint32_t(millis()-attemptAt));
     WiFi.disconnect(false,false);updateConnection();recoveryPending=false;char detail[150];
     if(wrongNetwork)snprintf(detail,sizeof(detail),"Подтверждена другая сеть. Настройки не сохранены");
-    else if(reason)snprintf(detail,sizeof(detail),"%s (%u). Нет IP за 20 с; повторите вручную",reasonName(reason),reason);
-    else snprintf(detail,sizeof(detail),"%s",associated?"Таймаут DHCP: нет IP за 20 с":"Таймаут Wi-Fi: нет IP за 20 с. Проверьте журнал C6");
+    else if(reason)snprintf(detail,sizeof(detail),"%s (%u). Нет IP за %lu с",reasonName(reason),reason,(unsigned long)(uint32_t(millis()-start)/1000U));
+    else snprintf(detail,sizeof(detail),"%s",timeout==60000U?"Таймаут DHCP: нет IP за 60 с":"Таймаут Wi-Fi: нет IP за 20 с. Проверьте журнал C6");
     message(detail);
-    return;
+    return false;
   }
   observeConnect.store(false);
   if(Serial) Serial.printf("[BP-WIFI] connected_with_ip elapsed_ms=%lu\n",(unsigned long)uint32_t(millis()-attemptAt));
@@ -445,14 +487,48 @@ void connectWifi(const Command& cmd, bool save) {
     if(stored) {haveCredentials=true;stored=prefs.putBool("autoconnect",true)==1;automatic=stored || prefs.getBool("autoconnect",false);}
     wipe(&candidate,sizeof(candidate));
   }
-  WiFi.setAutoReconnect(true);
+  // One retry owner: the supervisor, not an independent SDK reconnect loop.
+  WiFi.setAutoReconnect(false);
+  if(save)resetReconnect(stored && automatic);
   configTime(0,0,"pool.ntp.org","time.cloudflare.com");
   // configTime may change TZ; restore the user's selected timezone.
   lock();const uint8_t zone=state.zone;unlock();setenv("TZ",ZONES[zone],1);tzset();
   lock();state.hasSaved=haveCredentials;state.autoConnect=automatic;
   snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s",stored?"Подключено. Время синхронизируется":"Подключено, но настройки не сохранены");
   unlock();versions();
+  return true;
 }
+void superviseWifi() {
+  if(!reconnectEnabled)return;
+  // Admission is atomic with submit(): queued user work wins over background work.
+  lock();
+  if(state.busy || pendingCommand || urgent!=Job::None) {xSemaphoreGive(stateMutex);return;}
+  if(state.connected) {
+    reconnectWaiting=false;reconnectNext=15000;
+    xSemaphoreGive(stateMutex);return;
+  }
+  if(!reconnectWaiting) {xSemaphoreGive(stateMutex);scheduleReconnect();return;}
+  if(uint32_t(millis()-reconnectSince)<reconnectDelay) {xSemaphoreGive(stateMutex);return;}
+  state.job=Job::Connect;state.busy=true;unlock();
+  Credentials credentials;
+  Command cmd;cmd.job=Job::Connect;
+  bool connected=false;
+  if(loadCredentials(credentials)) {
+    cmd.open=credentials.open!=0;
+    snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",credentials.ssid);
+    snprintf(cmd.password,sizeof(cmd.password),"%s",credentials.password);
+    wipe(&credentials,sizeof(credentials));
+    connected=connectWifi(cmd,false);
+  } else {
+    message("NVS: не удалось прочитать сохранённую сеть");
+    wifiTrace("reconnect_credentials",ESP_FAIL);
+  }
+  wipe(&credentials,sizeof(credentials));wipe(&cmd,sizeof(cmd));
+  if(connected) {reconnectWaiting=false;reconnectNext=15000;}
+  else if(!stopRequested())scheduleReconnect();
+  jobState(Job::None,false);
+}
+
 #endif
 #if PANEL_BLE
 std::atomic<bool> bleScanComplete{false};
@@ -515,6 +591,7 @@ void scanBle() {
 void disconnectWifi(bool forget) {
   bool disconnected=true;
 #if PANEL_WIFI
+  resetReconnect(false); // Inhibit even if disconnect or NVS persistence fails.
   if(wifiStarted){
     recoveryPending=false;WiFi.setAutoReconnect(false);
     const bool hadConnection=WiFi.status()==WL_CONNECTED;
@@ -527,7 +604,7 @@ void disconnectWifi(bool forget) {
   bool forgotten=true;
   if(forget){
     forgotten=nvsOK && (!prefs.isKey("credentials") || prefs.remove("credentials"));
-    wipe(&saved,sizeof(saved));if(forgotten)haveCredentials=false;
+    if(forgotten)haveCredentials=false;
   }
   lock();state.autoConnect=haveCredentials && !autoStored && state.autoConnect;state.hasSaved=haveCredentials;
   if(disconnected){state.connected=false;state.ssid[0]=0;state.ip[0]=0;state.rssi=0;}
@@ -538,17 +615,14 @@ void worker(void*) {
   nvsOK=prefs.begin("boiler03",false);
   uint8_t zone=nvsOK?prefs.getUChar("timezone",0):0;if(zone>2)zone=0;
   setenv("TZ",ZONES[zone],1);tzset();
-  if(nvsOK && prefs.getBytesLength("credentials")==sizeof(saved)) {
-    const bool read=prefs.getBytes("credentials",&saved,sizeof(saved))==sizeof(saved);
-    haveCredentials=read && saved.magic==0x42503033 && saved.open<=1 && saved.ssid[0] &&
-      memchr(saved.ssid,0,sizeof(saved.ssid)) && memchr(saved.password,0,sizeof(saved.password)) && passwordValid(saved.password,saved.open!=0);
-    if(!haveCredentials)wipe(&saved,sizeof(saved));
-  }
+  Credentials credentials;
+  haveCredentials=loadCredentials(credentials);
+  wipe(&credentials,sizeof(credentials));
   const bool automatic=nvsOK && haveCredentials && prefs.getBool("autoconnect",false);
   const uint16_t displayTimeout=initializeDisplaySettings();
   lock();state.displayTimeoutSec=displayTimeout;
   snprintf(state.displayMessage,sizeof(state.displayMessage),"%s",screenNvsOK?"":"NVS недоступна: таймаут не сохранится");
-  state.busy=automatic && PANEL_WIFI;state.job=state.busy?Job::Connect:Job::None;state.zone=zone;state.ready=true;state.hasSaved=haveCredentials;state.autoConnect=automatic;
+  state.busy=false;state.job=Job::None;state.zone=zone;state.ready=true;state.hasSaved=haveCredentials;state.autoConnect=automatic;
   state.wifiSupported=PANEL_WIFI;state.bleSupported=PANEL_BLE;
   snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s",PANEL_WIFI?"Wi-Fi не подключён":"Wi-Fi Remote отсутствует в этой сборке");
   snprintf(state.bleMessage,sizeof(state.bleMessage),"%s",PANEL_BLE?"Нажмите Поиск. Устройства не подключаются":"BLE не включён в установленной сборке Arduino");
@@ -556,12 +630,8 @@ void worker(void*) {
   if(!nvsOK)message("NVS недоступна: настройки не будут сохранены");
   versions();
 #if PANEL_WIFI
-  if(automatic) {
-    Command cmd;cmd.job=Job::Connect;cmd.open=saved.open;snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",saved.ssid);snprintf(cmd.password,sizeof(cmd.password),"%s",saved.password);
-    jobState(Job::Connect,true);connectWifi(cmd,false);wipe(&cmd,sizeof(cmd));jobState(Job::None,false);
-  }
+  resetReconnect(automatic,true); // First attempt is immediate; commands still win.
 #endif
-  wipe(&saved,sizeof(saved)); // Boot credential copy is no longer needed.
   for(;;) {
     Command cmd;
     if(takeCommand(cmd)) {
@@ -601,6 +671,7 @@ void worker(void*) {
     }
 #if PANEL_WIFI
     updateConnection();
+    superviseWifi();
 #endif
     vTaskDelay(pdMS_TO_TICKS(100));
   }
