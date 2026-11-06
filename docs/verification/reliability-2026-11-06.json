@@ -120,5 +120,16 @@
     "Real sensor electrical faults/power reset, C6/RF and SD hot-plug not tested.",
     "SD remount recovery not implemented.",
     "Unchanged JP1 JPEG not downloaded locally; Git blob unchanged and browser fixture verifies embedded bytes."
-  ]
+  ],
+  "integration": {
+    "target": "main",
+    "method": "fast-forward without force",
+    "previous_main": "a31c8abd9244055348d47b419e39355cd4ee668b",
+    "integrated_commit": "6b9564352dc950433e17420f1f2596a22f6408db",
+    "pull_request_created": false,
+    "new_branch_created": false,
+    "historical_preparation_branch_deleted": false,
+    "source_code_identical_to_verified_commit": true,
+    "note": "User requested no separate branches; subsequent integration instructions update is documentation-only. Main-triggered CI is separate from the recorded successful source verification."
+  }
 }
