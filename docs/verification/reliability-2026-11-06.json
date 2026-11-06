@@ -130,6 +130,74 @@
     "new_branch_created": false,
     "historical_preparation_branch_deleted": false,
     "source_code_identical_to_verified_commit": true,
-    "note": "User requested no separate branches; subsequent integration instructions update is documentation-only. Main-triggered CI is separate from the recorded successful source verification."
+    "note": "User requested no separate branches; direct main integration preserved history. The final results record changes documentation only. All eight applicable main workflows passed; the earlier OTA run was superseded automatically.",
+    "documentation_commit": "7ed24f65fc25523f338bd53c7e1fd555d108c8b0",
+    "main_workflow_runs": [
+      {
+        "id": 42155343217,
+        "name": "Pairing and web v0.9",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "7ed24f65fc25523f338bd53c7e1fd555d108c8b0",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155343217"
+      },
+      {
+        "id": 42155343214,
+        "name": "GitHub OTA checks and ESP32-P4 build",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "7ed24f65fc25523f338bd53c7e1fd555d108c8b0",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155343214"
+      },
+      {
+        "id": 42155190721,
+        "name": "v0.6.0 connection config safety",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "6b9564352dc950433e17420f1f2596a22f6408db",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155190721"
+      },
+      {
+        "id": 42155190709,
+        "name": "microSD and web safety checks",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "6b9564352dc950433e17420f1f2596a22f6408db",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155190709"
+      },
+      {
+        "id": 42155190669,
+        "name": "Home Assistant MQTT safety",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "6b9564352dc950433e17420f1f2596a22f6408db",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155190669"
+      },
+      {
+        "id": 42155190793,
+        "name": "v0.6.1 real sensor safety",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "6b9564352dc950433e17420f1f2596a22f6408db",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155190793"
+      },
+      {
+        "id": 42155190692,
+        "name": "Calm physical menu",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "6b9564352dc950433e17420f1f2596a22f6408db",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155190692"
+      },
+      {
+        "id": 42155190794,
+        "name": "Boiler panel build and tests",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "6b9564352dc950433e17420f1f2596a22f6408db",
+        "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42155190794"
+      }
+    ],
+    "main_ci_complete": true
   }
 }
