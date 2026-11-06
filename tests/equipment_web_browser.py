@@ -317,7 +317,8 @@ try:
                                 assert rect["left"] >= bounds["left"] - 1 and rect["right"] <= bounds["right"] + 1, (width, pin, "horizontal clipping")
                                 assert rect["top"] >= bounds["top"] - 1 and rect["bottom"] <= bounds["bottom"] + 1, (width, pin, "vertical clipping")
                 assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
-                expect(page.locator('#jp1-map button, #jp1-map input, #jp1-map select, #jp1-map [data-action]')).to_have_count(0)
+                expect(page.locator('#jp1-map button[data-kind="gpio"]')).to_have_count(11)
+                expect(page.locator('#jp1-map input, #jp1-map select, #jp1-map [data-kind]:not([data-kind="gpio"])[data-action]')).to_have_count(0)
                 expect(page.locator('#jp1-map [data-state="fixed"]')).to_have_count(15)
                 expect(page.locator('#jp1-map [data-pin="15"] .jp1-status')).to_have_text("BOOT · резерв")
                 return metrics
@@ -338,13 +339,22 @@ try:
                 expect_pin(28, "busy", "Занят · Нижний геркон")
                 expect(page.locator('#jp1-map [data-state="free"]')).to_have_count(9)
                 original_pins = page.locator("#jp1-map .jp1-pin").element_handles()
+                advanced = page.locator("#cfg-advanced")
+                if not advanced.evaluate("node => node.open"):
+                    advanced.locator("summary").click()
                 for name in ("cfg-channel", "cfg-type", "cfg-gpio"):
                     page.locator("#" + name).select_option(pin_draft[name])
                 page.locator("#cfg-debounce").fill(pin_draft["cfg-debounce"])
                 # Selecting a GPIO in the form does not reserve it until saved.
                 expect_pin(33, "free", "Свободен")
                 page.locator('#jp1-map [data-gpio="33"]').click()
+                expect(page.locator("#pin-dialog")).to_have_js_property("open", True)
+                expect(page.locator("#pin-title")).to_have_text("GPIO33")
+                expect(page.locator("#pin-save")).to_be_disabled()
                 assert_pin_draft()
+                page.keyboard.press("Escape")
+                expect(page.locator("#pin-dialog")).to_have_js_property("open", False)
+                expect(page.locator('#jp1-map [data-gpio="33"]')).to_be_focused()
                 map_metrics = pinout_geometry(width, "map")
                 page.screenshot(path=str(out / f"sensor-pinout-map-{width}.png"), full_page=True)
                 photo = page.locator("#jp1-photo")
@@ -593,6 +603,7 @@ try:
                 "26-contact JP1 schematic matches the firmware pin profile and fits all four widths",
                 "saved assignment and reassignment reserve GPIO even when the sensor is offline",
                 "draft choices do not reserve GPIO; disconnection releases only after a valid snapshot",
+                "GPIO menu opens and closes without writing; advanced-source draft is retained",
                 "unavailable, partial, missing, invalid and duplicate snapshots never claim free contacts",
                 "transport loss clears occupancy certainty and a fresh snapshot restores it",
                 "mouse and keyboard open the original image in a separate tab with visible focus",

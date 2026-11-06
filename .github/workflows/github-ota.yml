@@ -1,9 +1,9 @@
 name: GitHub OTA checks and ESP32-P4 build
 on:
   push:
-    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/ota_candidate_*', 'tests/equipment_web_browser.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml', '.github/workflows/release-candidate.yml']
+    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/ota_candidate_*', 'tests/equipment_web_browser.py', 'tests/pin_actions_web_browser.py', 'tests/config_pin*', 'tests/config_pin_stubs/**', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml', '.github/workflows/release-candidate.yml']
   pull_request:
-    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/ota_candidate_*', 'tests/equipment_web_browser.py', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml', '.github/workflows/release-candidate.yml']
+    paths: ['src/**', 'ci/**', 'scripts/**', 'tests/update_*', 'tests/update_stubs/**', 'tests/ota_release_tests.py', 'tests/ota_candidate_*', 'tests/equipment_web_browser.py', 'tests/pin_actions_web_browser.py', 'tests/config_pin*', 'tests/config_pin_stubs/**', 'VERSION', 'README*', 'CHANGELOG.md', '.github/workflows/github-ota.yml', '.github/workflows/release-candidate.yml']
   workflow_dispatch:
   workflow_call:
     outputs:
@@ -33,6 +33,8 @@ jobs:
           bash tests/update_run.sh
           node tests/update_web_state_tests.mjs
           python3 tests/update_web_commands.py
+          python3 tests/config_pin_tests.py
+          python3 tests/config_pin_web_commands.py
           python3 tests/ota_release_tests.py
           python3 tests/ota_candidate_tests.py
           python3 tests/artifact_manifest_tests.py
@@ -46,6 +48,8 @@ jobs:
         run: python3 tests/update_web_browser.py
       - name: Keep equipment details and focus across live status polls
         run: python3 tests/equipment_web_browser.py
+      - name: Assign and clear pins through the real embedded page in an isolated fixture
+        run: python3 tests/pin_actions_web_browser.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         id: review
         if: always()
@@ -54,6 +58,7 @@ jobs:
           path: |
             artifacts/update-web-review/
             artifacts/equipment-web-review/
+            artifacts/pin-actions-web-review/
           retention-days: 14
   firmware:
     needs: ota-checks

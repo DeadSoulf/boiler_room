@@ -19,6 +19,7 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 .update-offer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:-12px 0 24px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--accent)}.update-offer button{padding:8px 14px;flex-shrink:0}.update-offer span{overflow-wrap:anywhere}.update-panel{max-width:760px}.update-panel progress{display:block;width:100%;height:12px;accent-color:var(--accent);margin:24px 0 10px}.update-panel .row b{font-variant-numeric:tabular-nums}#update-message{white-space:pre-wrap}#update-progress-text{font-variant-numeric:tabular-nums}#update-error:empty{display:none}
 .pinout{max-width:800px;margin:24px auto}.pinout figcaption{font-size:18px;font-weight:550;margin-bottom:12px}.pinout a{display:block;color:var(--accent);text-decoration:none}.pinout a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.pinout img{display:block;width:100%;height:auto}.pinout-open{display:block;min-height:46px;padding:12px 0;font-size:14px;line-height:1.5;text-decoration:underline;text-underline-offset:3px}
 .jp1-section{max-width:800px;margin:24px auto}.jp1-section h3{margin-bottom:8px}.jp1-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px}.jp1-legend span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px}.jp1-free{color:var(--accent)}.jp1-busy{color:var(--warn)}.jp1-map{display:grid;gap:6px;margin:16px 0}.jp1-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}.jp1-pin{--pin-color:var(--muted);position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:center;gap:3px 4px;min-width:0;min-height:52px;padding:8px;border:1px solid var(--pin-color);border-radius:8px;background:#142024}.jp1-pin.right{grid-template-columns:auto minmax(0,1fr)}.jp1-name{font-size:14px;font-weight:550;overflow-wrap:anywhere}.jp1-number{font-size:11px;color:var(--muted);align-self:center}.jp1-status{grid-column:1/-1;color:var(--pin-color);font-size:12px;line-height:1.4;overflow-wrap:anywhere}.jp1-pin::after{content:"";position:absolute;right:-11px;top:calc(50% - 3px);width:6px;height:6px;border-radius:50%;background:var(--pin-color)}.jp1-pin.right::after{right:auto;left:-11px}.jp1-pin[data-state=free]{--pin-color:var(--accent)}.jp1-pin[data-state=busy]{--pin-color:var(--warn)}.jp1-pin[data-state=conflict]{--pin-color:var(--red)}.jp1-pin[data-kind=power],.jp1-pin[data-kind=boot]{--pin-color:#efb28c}.jp1-pin[data-kind=c6]{--pin-color:#9cc9ed}.jp1-pin[data-kind=i2c]{--pin-color:#c2b1e9}
+button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-pin:hover{background:#213437}button.jp1-pin:focus-visible{outline-offset:3px}.pin-dialog{width:min(560px,calc(100% - 32px));overflow-wrap:anywhere}.pin-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.pin-dialog-head h2{font-size:24px;min-width:0}.pin-dialog-head button{padding:8px 12px;min-height:44px;flex-shrink:0}.pin-dialog .field{margin:18px 0}.pin-dialog .actions{margin-top:16px}.pin-dialog .actions button{flex:1 1 auto}.pin-dialog .notice{margin:16px 0}.pin-dialog-status{min-height:21px}.pin-dialog-status:empty{display:none}.pin-dialog .tiny{margin:8px 0}.pin-dialog [role=status]{white-space:pre-line}#pin-impact{white-space:pre-line}#pin-reload{width:100%;margin-top:12px}#pin-current{color:var(--ink)}
 </style></head><body><div class="container">
 <header><div><p class="eyebrow">Панель дома</p><h1>Котельная</h1></div><div class="header-meta"><span class="header-time" id="clock">--:--</span></div><div class="toolbar"><span id="authstate" class="tag">Просмотр</span><button id="pairbutton" class="primary" data-action="show-pair">Сопряжение</button><button id="logout" class="ghost hidden" data-action="logout">Завершить доступ</button></div></header>
 <nav class="topnav" aria-label="Разделы"><button data-page="home" class="active">Главная</button><button data-page="equipment">Оборудование</button><button data-page="fuel">Топливо</button><button data-page="settings">Настройки</button></nav>
@@ -69,6 +70,22 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 <div class="card">
   <div class="row"><span>Ревизия конфигурации</span><strong id="cfg-revision">0</strong></div>
   <div class="row"><span>Применение GPIO</span><strong id="cfg-state">Не активировано</strong></div>
+  <section class="jp1-section" aria-labelledby="jp1-title">
+    <h3 id="jp1-title">Схема контактов JP1</h3>
+    <p class="tiny">Нажмите GPIO, чтобы назначить датчик, изменить подключение или освободить пин. Занятость показана по сохранённым назначениям. Ориентация — как на фото ниже.</p>
+    <div class="jp1-legend" aria-label="Обозначения"><span class="jp1-free">Свободен</span><span class="jp1-busy">Занят</span><span class="muted">Служебный / питание</span></div>
+    <div id="jp1-map" class="jp1-map" role="group" aria-label="Разъём JP1, 26 контактов в двух колонках"></div>
+    <p id="jp1-state" class="tiny muted" role="status">Ожидаем назначения с панели.</p>
+    <details id="jp1-photo" class="details"><summary>Фото распиновки</summary><figure class="pinout">
+    <figcaption>Расположение контактов JP1</figcaption>
+    <a id="jp1-pinout-link" href="/assets/jp1-pinout.jpg" target="_blank" rel="noopener" aria-label="Открыть схему контактов JP1 в полном размере, в новой вкладке">
+      <img id="jp1-pinout" src="/assets/jp1-pinout.jpg" width="800" height="800" loading="lazy" decoding="async" alt="Схема JP1: расположение GPIO, питания, GND, I2C и выводов ESP32-C6">
+      <span class="pinout-open">Открыть схему в полном размере ↗</span>
+    </a>
+    </figure></details>
+  </section>
+  <details id="cfg-advanced" class="details"><summary>Дополнительные настройки источников</summary>
+  <p class="tiny">Для локального датчика выберите GPIO на схеме. Здесь также доступны описания удалённых источников Modbus/MQTT и возврат прошлой конфигурации.</p>
   <div class="field"><label for="cfg-channel">Канал / назначение</label>
   <select id="cfg-channel">
     <option value="0">Температура в доме</option>
@@ -87,20 +104,6 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
     <option value="4">Modbus RTU / RS-485 (требует контроллер)</option>
     <option value="5">MQTT (требует настроенный брокер)</option>
   </select></div>
-  <section class="jp1-section" aria-labelledby="jp1-title">
-    <h3 id="jp1-title">Схема контактов JP1</h3>
-    <p class="tiny">Ориентация — как на фото распиновки ниже. Занятость показана по сохранённым назначениям датчиков.</p>
-    <div class="jp1-legend" aria-label="Обозначения"><span class="jp1-free">Свободен</span><span class="jp1-busy">Занят</span><span class="muted">Служебный / питание</span></div>
-    <div id="jp1-map" class="jp1-map" role="group" aria-label="Разъём JP1, 26 контактов в двух колонках"></div>
-    <p id="jp1-state" class="tiny muted" role="status">Ожидаем назначения с панели.</p>
-    <details id="jp1-photo" class="details"><summary>Фото распиновки</summary><figure class="pinout">
-    <figcaption>Расположение контактов JP1</figcaption>
-    <a id="jp1-pinout-link" href="/assets/jp1-pinout.jpg" target="_blank" rel="noopener" aria-label="Открыть схему контактов JP1 в полном размере, в новой вкладке">
-      <img id="jp1-pinout" src="/assets/jp1-pinout.jpg" width="800" height="800" loading="lazy" decoding="async" alt="Схема JP1: расположение GPIO, питания, GND, I2C и выводов ESP32-C6">
-      <span class="pinout-open">Открыть схему в полном размере ↗</span>
-    </a>
-    </figure></details>
-  </section>
   <div class="field"><label for="cfg-gpio">GPIO ESP32-P4 (для локального датчика)</label>
   <select id="cfg-gpio">
    <option value="-1">Без GPIO (не назначено / удалённый источник)</option>
@@ -121,6 +124,7 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
   <div class="field"><label for="cfg-debounce">Подавление дребезга геркона, мс</label><input id="cfg-debounce" type="number" min="0" max="5000" value="50"></div>
   <div class="actions"><button class="primary" data-action="connection_set" data-write="1">Применить реальное подключение</button><button class="ghost" data-action="connection_reset" data-write="1">Отключить канал</button><button class="ghost" data-action="connection_rollback" data-write="1">Вернуть прошлую конфигурацию</button></div>
   <p id="cfg-message" class="hint"></p>
+  </details>
 </div>
 <div class="card section">
 <h3>Сохранённые назначения</h3>
@@ -128,6 +132,26 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 <p class="tiny muted">Поддерживаются реальные входные датчики на JP1: DS18B20 (один на GPIO) и герконы NO/NC. До подключения датчика статус «Не найден». Modbus/MQTT пока только описываются, без работы драйвера. Реле, котлы и нагреватели не управляются.</p>
 </div>
 </section>
+<dialog id="pin-dialog" class="pin-dialog" aria-labelledby="pin-title" aria-describedby="pin-current pin-dialog-status">
+ <div class="pin-dialog-head"><div><p class="eyebrow" id="pin-location"></p><h2 id="pin-title">Настройка пина</h2></div><button type="button" id="pin-close" class="ghost" aria-label="Закрыть настройку пина">×</button></div>
+ <p id="pin-current"></p><p id="pin-base-revision" class="tiny muted"></p>
+ <form id="pin-form">
+  <div class="field"><label for="pin-channel">Назначить на</label><select id="pin-channel" required>
+   <option value="">Выберите назначение</option><option value="0">Температура в доме</option><option value="1">Температура улицы</option><option value="2">Температура теплоносителя</option><option value="3">Температура топлива</option><option value="4">Нижний геркон топлива</option><option value="5">Верхний геркон топлива</option>
+  </select></div>
+  <p id="pin-temperature" class="tiny hidden">Датчик DS18B20 · отдельная линия OneWire.</p>
+  <div id="pin-reed" class="hidden">
+   <div class="field"><label for="pin-type">Режим геркона</label><select id="pin-type"><option value="">Выберите NO или NC</option><option value="2">NO — замкнут = достигнут</option><option value="3">NC — разомкнут = достигнут</option></select></div>
+   <div class="field"><label for="pin-debounce">Подавление дребезга, мс</label><input id="pin-debounce" type="number" min="0" max="5000" step="1" value="50" inputmode="numeric"></div>
+  </div>
+  <p id="pin-wiring" class="tiny"></p><p id="pin-impact" class="notice hidden"></p>
+  <p id="pin-dialog-status" class="pin-dialog-status hint" role="status" aria-live="polite"></p>
+  <button type="button" id="pin-pair" class="ghost hidden" data-action="show-pair">Сопряжение</button>
+  <button type="button" id="pin-reload" class="ghost hidden">Перечитать назначения</button>
+  <p id="pin-reload-hint" class="tiny hidden">Перечитывание заменит несохранённый выбор текущими настройками панели.</p>
+  <div class="actions"><button type="submit" id="pin-save" class="primary" disabled>Сохранить</button><button type="button" id="pin-clear" class="danger hidden" disabled>Освободить пин</button></div>
+ </form>
+</dialog>
 <section id="ha" class="page hidden">
  <div class="subhead"><button data-action="settings-root">‹ Настройки</button><h2>Home Assistant</h2></div>
  <div class="notice">Панель передаёт показания через MQTT Discovery. Нужен MQTT-брокер, подключённый к Home Assistant. Это не адрес веб-интерфейса HA (порт 8123). Управление нагревом и реле не передаётся.</div>
@@ -241,6 +265,7 @@ let lastServerError="",lastToast=null,refreshInFlight=false,serverOnline=false;
 let pairTicket="",pairDeadline=0,pairGeneration=0,pairBusy=false;
 let haFormRevision=null,haDirty=false;
 let updateRequestInFlight=false,pendingUpdate=null,updateResult="",updateResultError=false;
+let pinSnapshot=null,pinEditor=null,pinPollSerial=0,pinPollStarted=0,pinPollQueued=false;
 try{const saved=JSON.parse(sessionStorage.getItem("boiler_panel_update")||"null");if(saved&&typeof saved.target==="string"&&saved.target.length>0&&saved.target.length<24&&typeof saved.from==="string"&&["update_install","update_rollback"].includes(saved.action)&&Number.isFinite(saved.at)&&Date.now()>=saved.at&&Date.now()-saved.at<3600000)pendingUpdate=saved;}catch(_){}
 const timeout=s=>s===0?"Не выключать":s<60?s+" секунд":s/60+" минут";
 const storageBytes=n=>Number.isFinite(n)&&n>0
@@ -255,15 +280,37 @@ function notice(message,problem=false){
 }
 function numeric(n){return Number.isFinite(Number(n))?Number(n):0}
 function apiHeaders(){const h={};if(token)h.Authorization="Bearer "+token;return h}
+function readPinSnapshot(cfg){
+ const seen=new Set(),assigned=new Map(),items=[];
+ let valid=!!cfg&&cfg.available===true&&Number.isInteger(cfg.revision)&&cfg.revision>=0&&cfg.revision<=4294967295&&Array.isArray(cfg.items)&&cfg.items.length===6;
+ if(valid)for(const item of cfg.items){
+  if(!item||!Number.isInteger(item.channel)||item.channel<0||item.channel>=6||seen.has(item.channel)){valid=false;break;}
+  seen.add(item.channel);items[item.channel]=item;
+  if(["ds18b20","reed_no","reed_nc"].includes(item.type)){
+   const pin=jp1Nodes.find(node=>node.kind==="gpio"&&node.value===item.gpio);
+   if(!pin||item.jp1_pin!==pin.index+1||(item.type==="ds18b20")!==(item.channel<4)){valid=false;break;}
+   if(!assigned.has(item.gpio))assigned.set(item.gpio,[]);
+   assigned.get(item.gpio).push(item);
+  }else if(!["none","modbus","mqtt"].includes(item.type)||item.gpio!==-1){valid=false;break;}
+ }
+ const conflict=valid&&Array.from(assigned.values()).some(owners=>owners.length>1);
+ // Occupancy needs the GPIO/type mapping; editing also needs every saved field.
+ const editable=valid&&!conflict&&items.every(item=>Number.isInteger(item.debounce_ms)&&item.debounce_ms>=0&&item.debounce_ms<=5000&&
+  Number.isInteger(item.address)&&item.address>=0&&item.address<=247&&
+  (item.type==="modbus"?item.address>=1:item.address===0)&&
+  (item.type!=="ds18b20"||item.debounce_ms===50)&&
+  (item.gpio>=0||item.jp1_pin===0));
+ return {valid,conflict,editable,assigned,items,revision:valid?cfg.revision:null};
+}
 function renderPinout(cfg){
  if(!jp1Nodes.length){
   const map=$("jp1-map");let row;
   jp1Pins.forEach(([name,kind,value],index)=>{
    if(index%2===0){row=document.createElement("div");row.className="jp1-row";map.append(row);}
-   const pin=document.createElement("div"),label=document.createElement("span"),number=document.createElement("span"),status=document.createElement("span");
+   const pin=document.createElement(kind==="gpio"?"button":"div"),label=document.createElement("span"),number=document.createElement("span"),status=document.createElement("span");
    pin.className="jp1-pin"+(index%2?" right":"");pin.dataset.pin=String(index+1);pin.dataset.kind=kind;
    pin.dataset.state=kind==="gpio"?"unknown":"fixed";
-   if(kind==="gpio")pin.dataset.gpio=String(value);
+   if(kind==="gpio"){pin.type="button";pin.dataset.gpio=String(value);pin.setAttribute("aria-haspopup","dialog");pin.setAttribute("aria-controls","pin-dialog");}
    label.className="jp1-name";label.textContent=name;
    number.className="jp1-number";number.textContent=String(index+1);number.setAttribute("aria-label","Контакт "+(index+1));
    status.className="jp1-status";status.textContent=kind==="gpio"?"Нет данных":value;
@@ -271,22 +318,11 @@ function renderPinout(cfg){
    row.append(pin);jp1Nodes.push({pin,status,kind,value,index});
   });
  }
- const seen=new Set(),assigned=new Map();
- let valid=!!cfg&&cfg.available===true&&Number.isInteger(cfg.revision)&&cfg.revision>=0&&Array.isArray(cfg.items)&&cfg.items.length===6;
- if(valid)for(const item of cfg.items){
-  if(!item||!Number.isInteger(item.channel)||item.channel<0||item.channel>=6||seen.has(item.channel)){valid=false;break;}
-  seen.add(item.channel);
-  if(["ds18b20","reed_no","reed_nc"].includes(item.type)){
-   const pin=jp1Nodes.find(node=>node.kind==="gpio"&&node.value===item.gpio);
-   if(!pin||item.jp1_pin!==pin.index+1||(item.type==="ds18b20")!==(item.channel<4)){valid=false;break;}
-   if(!assigned.has(item.gpio))assigned.set(item.gpio,[]);
-   assigned.get(item.gpio).push(inputNames[item.channel]);
-  }else if(!["none","modbus","mqtt"].includes(item.type)||item.gpio!==-1){valid=false;break;}
- }
- const conflict=valid&&Array.from(assigned.values()).some(names=>names.length>1);
+ pinSnapshot=readPinSnapshot(cfg);
+ const {valid,conflict,assigned}=pinSnapshot;
  for(const node of jp1Nodes){
   if(node.kind!=="gpio")continue;
-  const owners=assigned.get(node.value)||[];
+  const owners=(assigned.get(node.value)||[]).map(item=>inputNames[item.channel]);
   let state="unknown",label=lastServerError&&!serverOnline?"Нет связи":"Нет данных";
   if(serverOnline&&valid){
    if(conflict){if(owners.length>1){state="conflict";label="Конфликт · "+owners.join(" / ");}}
@@ -294,11 +330,140 @@ function renderPinout(cfg){
   }
   if(node.pin.dataset.state!==state)node.pin.dataset.state=state;
   if(node.status.textContent!==label)node.status.textContent=label;
+  node.pin.setAttribute("aria-label","GPIO"+node.value+", контакт JP1 "+(node.index+1)+". "+label+". Настроить пин");
  }
  const message=!serverOnline?(lastServerError?"Нет связи с панелью. Занятость контактов неизвестна.":"Ожидаем назначения с панели."):
   !valid?"Нет достоверных назначений. Занятость контактов неизвестна.":
   conflict?"Конфликт назначений. Свободные контакты не определены.":"Сохранённые назначения · ревизия "+cfg.revision;
  if($("jp1-state").textContent!==message)text("jp1-state",message);
+}
+function copyPinItems(items){return items.map(item=>({channel:item.channel,type:item.type,gpio:item.gpio,address:item.address,debounce_ms:item.debounce_ms}));}
+function samePinItems(left,right){return left.length===right.length&&left.every((item,i)=>["channel","type","gpio","address","debounce_ms"].every(key=>item[key]===right[i][key]));}
+function pinOwner(editor){return editor.base?.items.find(item=>item.gpio===editor.gpio)||null;}
+function pinTypeLabel(type){return ({ds18b20:"DS18B20",reed_no:"Геркон NO",reed_nc:"Геркон NC",mqtt:"MQTT",modbus:"Modbus"})[type]||"Не назначено";}
+function loadPinDraft(editor){
+ editor.base=pinSnapshot?.editable&&serverOnline?{revision:pinSnapshot.revision,items:copyPinItems(pinSnapshot.items)}:null;
+ editor.stale=false;editor.needsReload=false;editor.awaiting=null;editor.reloadAfter=null;
+ const owner=pinOwner(editor);
+ $("pin-channel").value=owner?String(owner.channel):"";
+ $("pin-type").value=owner?.type==="reed_no"?"2":owner?.type==="reed_nc"?"3":"";
+ $("pin-debounce").value=String(owner?.debounce_ms??50);
+}
+function openPinEditor(button){
+ if(pinEditor?.pending)return;
+ const node=jp1Nodes.find(node=>node.pin===button&&node.kind==="gpio");if(!node)return;
+ pinEditor={gpio:node.value,button,pending:false,message:"",problem:false};loadPinDraft(pinEditor);
+ text("pin-title","GPIO"+node.value);text("pin-location","JP1 · контакт "+(node.index+1));
+ renderPinEditor();$("pin-dialog").showModal();$("pin-channel").focus();
+}
+function closePinEditor(){
+ if(pinEditor?.pending)return;
+ const button=pinEditor?.button;$("pin-dialog").close();pinEditor=null;
+ if(button?.isConnected)button.focus();
+}
+function pinDraft(){
+ const channelValue=$("pin-channel").value;
+ if(!/^[0-5]$/.test(channelValue))return null;
+ const channel=Number(channelValue),type=channel<4?1:Number($("pin-type").value),raw=$("pin-debounce").value;
+ if(channel>=4&&(![2,3].includes(type)||!/^\d+$/.test(raw)||Number(raw)>5000))return null;
+ return {channel,type,debounce:channel<4?50:Number(raw)};
+}
+function pinBlockReason(editor){
+ if(!serverOnline)return "Нет связи с панелью. Несохранённый выбор сохранён в этом окне.";
+ if(!pinSnapshot?.editable)return "Нет полного достоверного снимка назначений. Сохранение недоступно.";
+ if(editor.needsReload)return editor.message||"Сохранение не подтверждено. Перечитайте назначения.";
+ if(editor.stale)return "Назначения изменились. Перечитайте их перед сохранением; ваш выбор пока сохранён в этом окне.";
+ if(!editor.base)return "Перечитайте назначения, чтобы начать настройку по свежим данным.";
+ if(!current?.authorized||!token)return "Для сохранения выполните сопряжение. Ваш выбор останется в этом окне.";
+ if(current?.update?.busy||current?.update?.boot_pending||pendingUpdate||updateRequestInFlight)return "Дождитесь завершения обновления панели. Ваш выбор сохранён в этом окне.";
+ return "";
+}
+function renderPinEditor(){
+ const editor=pinEditor;if(!editor)return;
+ if(editor.reloadAfter!=null&&pinPollSerial>editor.reloadAfter){
+  editor.reloadAfter=null;
+  if(serverOnline&&pinSnapshot?.editable){loadPinDraft(editor);editor.message="Назначения перечитаны. Выберите действие.";editor.problem=false;}
+  else{editor.message="Не удалось перечитать назначения. Ваш выбор сохранён в этом окне.";editor.problem=true;}
+ }
+ if(editor.awaiting){
+  const ack=editor.awaiting;
+  if(pinPollSerial>ack.after&&serverOnline&&pinSnapshot?.editable&&pinSnapshot.revision===ack.revision&&samePinItems(pinSnapshot.items,ack.items)){
+   const clear=ack.clear;loadPinDraft(editor);
+   editor.message=clear?"Пин освобождён. Сохранённые назначения подтверждены панелью.":"Сохранено. Назначения подтверждены панелью.";editor.problem=false;
+  }else if(Date.now()>=ack.deadline||(pinPollSerial>ack.after&&serverOnline&&pinSnapshot?.editable&&pinSnapshot.revision!==editor.base.revision&&pinSnapshot.revision!==ack.revision)){
+   editor.awaiting=null;editor.needsReload=true;editor.message="Сохранение не подтверждено. Перечитайте назначения.";editor.problem=true;
+  }
+ }
+ if(!editor.pending&&!editor.awaiting&&editor.base&&pinSnapshot?.editable&&pinSnapshot.revision!==editor.base.revision)editor.stale=true;
+ const owner=pinOwner(editor),channelValue=$("pin-channel").value,channel=/^[0-5]$/.test(channelValue)?Number(channelValue):-1,reed=channel>=4;
+ text("pin-current",editor.base?(owner?"Занят: "+inputNames[owner.channel]+" · "+pinTypeLabel(owner.type):"Свободен — датчик не назначен"):"Занятость не подтверждена");
+ text("pin-base-revision",editor.base?"Снимок назначений · ревизия "+editor.base.revision:"");
+ show("pin-temperature",channel>=0&&!reed);show("pin-reed",reed);
+ text("pin-wiring",channel<0?"Выберите, показания какого датчика получать с этого GPIO.":reed?"Геркон подключается между выбранным GPIO и GND. Выберите NO/NC по схеме вашего датчика; обрыв провода отдельно не определяется.":"DS18B20: один датчик на GPIO, внешняя подтяжка 4,7 кОм к 3,3 В. Питание и GND — по схеме JP1.");
+ const impact=[];
+ if(channel>=0&&editor.base){
+  const target=editor.base.items[channel];
+  if(owner&&owner.channel!==channel)impact.push("«"+inputNames[owner.channel]+"» будет отключён от GPIO"+editor.gpio+".");
+  if(target.gpio>=0&&target.gpio!==editor.gpio)impact.push("«"+inputNames[channel]+"» перейдёт с GPIO"+target.gpio+" на GPIO"+editor.gpio+". GPIO"+target.gpio+" освободится.");
+  else if(["modbus","mqtt"].includes(target.type))impact.push("Источник "+pinTypeLabel(target.type)+" для «"+inputNames[channel]+"» будет заменён датчиком на GPIO"+editor.gpio+".");
+  else impact.push("Назначение: «"+inputNames[channel]+"» → GPIO"+editor.gpio+".");
+ }
+ text("pin-impact",impact.join("\n"));show("pin-impact",impact.length>0);
+ const working=editor.pending||!!editor.awaiting||editor.reloadAfter!=null,blocked=pinBlockReason(editor),draft=pinDraft();
+ $("pin-dialog").setAttribute("aria-busy",working?"true":"false");
+ $("pin-channel").disabled=working;$("pin-type").disabled=working||!reed;$("pin-type").required=reed;
+ $("pin-debounce").disabled=working||!reed;$("pin-debounce").required=reed;
+ $("pin-close").disabled=editor.pending;
+ $("pin-save").disabled=working||!!blocked||!draft;
+ show("pin-clear",!!owner);$("pin-clear").disabled=working||!!blocked||!owner;
+ const reload=editor.stale||editor.needsReload||!editor.base||!pinSnapshot?.editable||editor.reloadAfter!=null;
+ show("pin-reload",reload);show("pin-reload-hint",reload);
+ $("pin-reload").disabled=working;
+ show("pin-pair",!current?.authorized||!token);$("pin-pair").disabled=working||!serverOnline;
+ let message=editor.pending?"Сохраняем назначение…":editor.awaiting?"Запрос принят. Проверяем сохранённые назначения на панели…":editor.reloadAfter!=null?"Перечитываем назначения…":blocked||editor.message;
+ if(!message&&!draft)message=channel<0?"Выберите назначение для этого пина.":reed&&!$("pin-type").value?"Выберите режим NO или NC.":"Дребезг: целое число от 0 до 5000 мс.";
+ text("pin-dialog-status",message);$("pin-dialog-status").classList.toggle("error",!!blocked||editor.problem);
+}
+function changePinChannel(){
+ const editor=pinEditor;if(!editor||editor.pending||editor.awaiting)return;
+ const channel=Number($("pin-channel").value),target=editor.base?.items[channel];
+ $("pin-type").value=target?.type==="reed_no"?"2":target?.type==="reed_nc"?"3":"";
+ $("pin-debounce").value=String(target?.debounce_ms??50);
+ editor.message="";editor.problem=false;renderPinEditor();
+}
+function reloadPinEditor(){
+ const editor=pinEditor;if(!editor||editor.pending||editor.awaiting||editor.reloadAfter!=null)return;
+ editor.reloadAfter=pinPollStarted;editor.message="";editor.problem=false;renderPinEditor();pollPinFresh();
+}
+function pollPinFresh(){
+ // An already-running GET may predate this action. Queue one subsequent GET.
+ if(refreshInFlight){pinPollQueued=true;return;}
+ poll();
+}
+async function savePin(clear=false){
+ const editor=pinEditor;if(!editor||editor.pending||editor.awaiting||editor.reloadAfter!=null)return;
+ renderPinEditor();if(pinBlockReason(editor))return;
+ const owner=pinOwner(editor),draft=pinDraft();if(clear?!owner:!draft)return;
+ if(clear&&!confirm("Освободить GPIO"+editor.gpio+"? Назначение «"+inputNames[owner.channel]+"» будет отключено."))return;
+ const items=copyPinItems(editor.base.items);
+ for(let i=0;i<items.length;i++)if(items[i].gpio===editor.gpio)items[i]={channel:i,type:"none",gpio:-1,address:0,debounce_ms:50};
+ if(!clear)items[draft.channel]={channel:draft.channel,type:["none","ds18b20","reed_no","reed_nc"][draft.type],gpio:editor.gpio,address:0,debounce_ms:draft.debounce};
+ const data={action:clear?"connection_pin_clear":"connection_pin_set",gpio:editor.gpio,revision:editor.base.revision};
+ if(!clear)Object.assign(data,draft);
+ editor.pending=true;editor.message="";editor.problem=false;renderPinEditor();
+ try{
+  const result=await sendPost("/api/command",data,true);
+  if(result.ok!==true||result.saved!==true||!Number.isInteger(result.revision)||result.revision<0||result.revision>4294967295)throw Error("Сохранение не подтверждено");
+  editor.awaiting={revision:result.revision,items,clear,after:pinPollStarted,deadline:Date.now()+12000};
+  setTimeout(()=>{if(pinEditor===editor)renderPinEditor();},12050);
+ }catch(error){
+  editor.problem=true;
+  if(error.code==="stale_revision"){editor.stale=true;editor.message="Назначения изменились. Перечитайте их перед сохранением.";}
+  else if(!error.httpStatus||error.httpStatus>=500){editor.needsReload=true;editor.message="Сохранение не подтверждено. Перечитайте назначения. Повторный запрос автоматически не отправляется.";}
+  else editor.message=error.message;
+ }finally{
+  editor.pending=false;renderPinEditor();pollPinFresh();
+ }
 }
 function drawPage(){
  for(const n of document.querySelectorAll(".page"))n.classList.toggle("hidden",n.id!==page);
@@ -409,8 +574,15 @@ async function saveHA(e){
  }catch(e){notice("Не сохранено: "+e.message,true);}
  finally{values.password="";}
 }
-async function request(path,options){const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);try{return await fetch(path,{...options,signal:c.signal});}finally{clearTimeout(timer);}}
-function errorText(code){return ({same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера",update_busy:"Дождитесь завершения обновления панели",update_unavailable:"Обновление пока недоступно",update_state_unavailable:"Состояние обновления временно недоступно. Повторите запрос.",update_confirmation_required:"Подтвердите выбранную версию ещё раз",update_version_changed:"Доступная версия изменилась. Проверьте сведения и подтвердите нужную версию.",update_not_ready:"Обновление не принято. Проверьте состояние панели.",update_cancel_unavailable:"На этом этапе отмена уже недоступна"})[code]||code;}
+async function request(path,options){
+ const c=new AbortController(),timer=setTimeout(()=>c.abort(),8000);
+ try{
+  const response=await fetch(path,{...options,signal:c.signal});
+  // Headers alone do not finish a request: the body has the same deadline.
+  const body=await response.text();return {response,body};
+ }finally{clearTimeout(timer);}
+}
+function errorText(code){return ({stale_revision:"Назначения изменились. Перечитайте их перед сохранением.",invalid_pin_fields:"Проверьте поля назначения пина.",invalid_pin_assignment:"Этот датчик нельзя назначить на выбранный пин.",configuration_unavailable:"Назначения временно недоступны. Перечитайте их.",configuration_write_failed:"Сохранение не подтверждено. Перечитайте назначения.",same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера",update_busy:"Дождитесь завершения обновления панели",update_unavailable:"Обновление пока недоступно",update_state_unavailable:"Состояние обновления временно недоступно. Повторите запрос.",update_confirmation_required:"Подтвердите выбранную версию ещё раз",update_version_changed:"Доступная версия изменилась. Проверьте сведения и подтвердите нужную версию.",update_not_ready:"Обновление не принято. Проверьте состояние панели.",update_cancel_unavailable:"На этом этапе отмена уже недоступна"})[code]||code;}
 function updateCanister(f){
  let state="unknown",title="Нет данных",height=0,symbol="?";
  if(f?.lower?.valid&&f?.upper?.valid){
@@ -431,7 +603,7 @@ function markOffline(){
  text("fuel-temp","--.- °C");text("lower-status","Нет связи");text("upper-status","Нет связи");updateCanister(null);
 }
 function updateView(){
- const d=current;renderPinout(d&&d.connections);if(!d)return;
+ const d=current;renderPinout(d&&d.connections);if(!d){renderPinEditor();return;}
  text("version",d.version);text("service-version",d.version);
  text("clock",d.clock||"Нет времени");text("clock-current",d.clock||"Нет времени");
  text("net",d.wifi&&d.wifi.connected?"Wi-Fi подключён":"Нет Wi-Fi");
@@ -523,16 +695,17 @@ function updateView(){
  if(!serverOnline)markOffline();
  for(const b of document.querySelectorAll('[data-action="ha_discover"]'))b.disabled=!serverOnline||!d.authorized||!d.home_assistant?.enabled||!!d.update?.busy||!!d.update?.boot_pending||!!pendingUpdate||updateRequestInFlight;
  renderUpdate();
+ renderPinEditor();
 }
 async function sendPost(path,data,secret){
  if(path==="/api/command"&&!String(data.action||"").startsWith("update_")&&(current?.update?.busy||current?.update?.boot_pending||pendingUpdate||updateRequestInFlight))throw Error("Дождитесь завершения обновления панели");
  const headers={"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","X-Boiler-Pairing":"1"};
  if(secret&&token)headers.Authorization="Bearer "+token;
- const r=await request(path,{method:"POST",headers,body:new URLSearchParams(data),cache:"no-store"});
+ const {response:r,body}=await request(path,{method:"POST",headers,body:new URLSearchParams(data),cache:"no-store"});
  let obj;
- try{obj=await r.json()}catch(_){obj={error:"invalid_response"}}
+ try{obj=JSON.parse(body)}catch(_){obj={error:"invalid_response"}}
  if(r.status===401){token="";sessionStorage.removeItem("boiler_panel_token");}
- if(!r.ok){const failure=Error(errorText(obj.error||("HTTP "+r.status)));failure.httpStatus=r.status;throw failure;}
+ if(!r.ok){const failure=Error(errorText(obj.error||("HTTP "+r.status)));failure.httpStatus=r.status;failure.code=obj.error;throw failure;}
  return obj;
 }
 async function command(action,options={}){
@@ -745,6 +918,8 @@ function handleAction(b){
 document.addEventListener("click",e=>{
  const target=e.target;
  if(!(target instanceof Element))return;
+ const pin=target.closest('#jp1-map button[data-gpio]');
+ if(pin){openPinEditor(pin);return;}
  const p=target.closest("[data-page]");
  if(p){page=p.dataset.page;if(page==="settings")tab="";detail=-1;drawPage();return;}
  const t=target.closest("[data-tab]");
@@ -754,6 +929,13 @@ document.addEventListener("click",e=>{
  const button=target.closest("[data-action]");
  if(button){if(button.disabled)return;handleAction(button)}
 });
+$("pin-form").addEventListener("submit",e=>{e.preventDefault();savePin();});
+$("pin-channel").addEventListener("change",changePinChannel);
+for(const id of ["pin-type","pin-debounce"])$(id).addEventListener("input",()=>{if(pinEditor){pinEditor.message="";pinEditor.problem=false;renderPinEditor();}});
+$("pin-close").addEventListener("click",closePinEditor);
+$("pin-clear").addEventListener("click",()=>savePin(true));
+$("pin-reload").addEventListener("click",reloadPinEditor);
+$("pin-dialog").addEventListener("cancel",e=>{e.preventDefault();closePinEditor();});
 $("ha-form").addEventListener("input",()=>{haDirty=true;});
 $("ha-form").addEventListener("submit",saveHA);
 $("cfg-type").addEventListener("change",e=>{
@@ -784,21 +966,25 @@ $("wifi-form").addEventListener("submit",e=>{
 async function poll(){
  if(refreshInFlight)return;
  refreshInFlight=true;
+ const serial=++pinPollStarted,requestToken=token;
  try{
-   const r=await request("/api/status",{cache:"no-store",headers:apiHeaders()});
+   const {response:r,body}=await request("/api/status",{cache:"no-store",headers:apiHeaders()});
+   if(requestToken!==token){pinPollQueued=true;return;}
    if(!r.ok)throw Error("HTTP "+r.status);
-   const d=await r.json();
+   const d=JSON.parse(body);
    if(!d.authorized&&token){token="";sessionStorage.removeItem("boiler_panel_token");if(!pendingUpdate)notice("Сессия истекла. Повторите сопряжение.");}
-   reconcileUpdate(d);current=d;serverOnline=true;lastServerError="";updateView();
+   reconcileUpdate(d);current=d;serverOnline=true;lastServerError="";pinPollSerial=serial;updateView();
  }catch(e){
+   if(requestToken!==token){pinPollQueued=true;return;}
    if(lastServerError!==e.message)notice("Нет связи с панелью: "+e.message,true);
    lastServerError=e.message;serverOnline=false;
    if(pendingUpdate){pendingUpdate.connectionLost=true;saveUpdatePending();}
+   pinPollSerial=serial;
    updateView();markOffline();
    text("net","● Нет ответа панели");
    $("net").className="status";
    text("last-update","Сервер не отвечает, повторяем");
- }finally{refreshInFlight=false}
+ }finally{refreshInFlight=false;if(pinPollQueued){pinPollQueued=false;poll();}}
 }
 $("pair-form").addEventListener("submit",e=>{e.preventDefault();login();});
 $("pairbox").addEventListener("cancel",e=>{e.preventDefault();cancelPairing();});

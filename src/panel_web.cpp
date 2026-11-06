@@ -453,6 +453,32 @@ void commandRequest() {
     jsonResponse(202,"{\"ok\":true,\"status\":\"awaiting_physical_confirmation\",\"expires_in_s\":90}");
     return;
   }
+  if(kind=="connection_pin_set"||kind=="connection_pin_clear"){
+    const String pinValue=server.arg("gpio"),revision=server.arg("revision");
+    if(!allDigits(pinValue,1,2)||!allDigits(revision,1,10)||
+       strtoull(revision.c_str(),nullptr,10)>0xffffffffULL){
+      errorResponse(400,"invalid_pin_fields");return;
+    }
+    const auto expectedRevision=uint32_t(strtoull(revision.c_str(),nullptr,10));
+    const int16_t gpio=int16_t(asUint(pinValue));
+    uint32_t savedRevision=0;
+    panel_config::PinResult result;
+    if(kind=="connection_pin_set"){
+      const String channel=server.arg("channel"),type=server.arg("type"),debounce=server.arg("debounce");
+      if(!allDigits(channel,1,1)||asUint(channel)>=panel_config::COUNT||
+         !allDigits(type,1,1)||asUint(type)<1||asUint(type)>3||
+         !allDigits(debounce,1,4)||asUint(debounce)>5000){
+        errorResponse(400,"invalid_pin_fields");return;
+      }
+      result=panel_config::setPin(gpio,static_cast<panel_config::Channel>(asUint(channel)),
+        static_cast<panel_config::Type>(asUint(type)),uint16_t(asUint(debounce)),expectedRevision,savedRevision);
+    }else result=panel_config::clearPin(gpio,expectedRevision,savedRevision);
+    if(result==panel_config::PinResult::Invalid){errorResponse(400,"invalid_pin_assignment");return;}
+    if(result==panel_config::PinResult::Conflict){errorResponse(409,"stale_revision");return;}
+    if(result==panel_config::PinResult::StorageError){errorResponse(503,"configuration_write_failed");return;}
+    if(result!=panel_config::PinResult::Saved){errorResponse(503,"configuration_unavailable");return;}
+    jsonResponse(200,String("{\"ok\":true,\"saved\":true,\"revision\":")+String(savedRevision)+"}");return;
+  }
   if(kind=="connection_rollback"){
     if(!panel_config::rollback()){
       errorResponse(409,"no_valid_previous_configuration");return;

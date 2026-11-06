@@ -63,12 +63,26 @@ bool writeSlot(unsigned slot,const State& next){
   entry.hash=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
   Preferences prefs;
   if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false))return false;
+  Persist previous{};
+  const bool hadPrevious=prefs.getBytesLength("config")==sizeof(previous);
+  if(hadPrevious&&prefs.getBytes("config",&previous,sizeof(previous))!=sizeof(previous)){
+    prefs.end();return false;
+  }
   const bool stored=prefs.putBytes("config",&entry,sizeof(entry))==sizeof(entry);
   prefs.end();
   Persist verification{};
-  return stored&&readSlot(slot,verification)&&
+  const bool verified=stored&&readSlot(slot,verification)&&
          verification.revision==entry.revision&&
          memcmp(verification.item,entry.item,sizeof(entry.item))==0;
+  if(verified)return true;
+  // A failed read-back must not leave a newer candidate for rollback/reboot.
+  // Recovery is best effort: a persistent NVS write fault can also prevent it.
+  if(prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false)){
+    if(hadPrevious)prefs.putBytes("config",&previous,sizeof(previous));
+    else prefs.remove("config");
+    prefs.end();
+  }
+  return false;
 }
 bool commit(const State& next){
   const unsigned target=activeSlot^1U;
@@ -76,6 +90,34 @@ bool commit(const State& next){
   current=next;
   activeSlot=target;
   return true;
+}
+PinResult changePin(int16_t gpio,unsigned channel,const Assignment* assignment,
+                    uint32_t expectedRevision,uint32_t& savedRevision){
+  if(!ready||xSemaphoreTake(lock,pdMS_TO_TICKS(45))!=pdTRUE)return PinResult::Unavailable;
+  if(current.revision!=expectedRevision){
+    xSemaphoreGive(lock);return PinResult::Conflict;
+  }
+  State next=current;
+  for(unsigned i=0;i<COUNT;i++)if(next.item[i].gpio==gpio)next.item[i]=Assignment{};
+  if(assignment)next.item[channel]=*assignment;
+  if(!checked(next.item)){
+    xSemaphoreGive(lock);return PinResult::Invalid;
+  }
+  bool unchanged=true;
+  for(unsigned i=0;i<COUNT;i++){
+    const Assignment& a=current.item[i];const Assignment& b=next.item[i];
+    if(a.type!=b.type||a.gpio!=b.gpio||a.busAddress!=b.busAddress||a.debounceMs!=b.debounceMs){
+      unchanged=false;break;
+    }
+  }
+  if(!unchanged){
+    ++next.revision;
+    snprintf(next.message,sizeof(next.message),"NVS saved and verified (rev %lu)",
+      (unsigned long)next.revision);
+    if(!commit(next)){xSemaphoreGive(lock);return PinResult::StorageError;}
+  }
+  savedRevision=current.revision;
+  xSemaphoreGive(lock);return PinResult::Saved;
 }
 } // namespace
 
@@ -159,11 +201,22 @@ bool set(Channel ch,Type type,int16_t gpio,uint8_t address,uint16_t debounceMs){
 bool reset(Channel ch){
   return set(ch,Type::None,-1,0,50);
 }
+PinResult setPin(int16_t gpio,Channel channel,Type type,uint16_t debounceMs,
+                 uint32_t expectedRevision,uint32_t& savedRevision){
+  Assignment assignment{};
+  assignment.type=type;assignment.gpio=gpio;assignment.debounceMs=debounceMs;
+  if(!isLocal(type)||!isValid(channel,assignment))return PinResult::Invalid;
+  return changePin(gpio,unsigned(channel),&assignment,expectedRevision,savedRevision);
+}
+PinResult clearPin(int16_t gpio,uint32_t expectedRevision,uint32_t& savedRevision){
+  if(!panel_pins::sensorPin(gpio))return PinResult::Invalid;
+  return changePin(gpio,0,nullptr,expectedRevision,savedRevision);
+}
 bool rollback(){
   if(!ready||xSemaphoreTake(lock,pdMS_TO_TICKS(45))!=pdTRUE)return false;
   Persist previous{};
   const bool oldValid=readSlot(activeSlot^1U,previous);
-  if(!oldValid || previous.revision==current.revision){
+  if(!oldValid || int32_t(current.revision-previous.revision)<=0){
     xSemaphoreGive(lock);return false;
   }
   State restored=current;

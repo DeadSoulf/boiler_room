@@ -169,7 +169,7 @@ int main(){
  reset("update_rollback");fixture.rollbackAvailable=false;server.args["version"]=server.args["confirm"]="v0.9.0";expectStatus(409);assert(!called);
  reset("update_rollback");server.args["version"]=server.args["confirm"]="v1.1.0";expectStatus(409);assert(!called);
  // All other mutating command branches are unreachable during OTA/self-test.
- for(const char* action:{"wifi_scan","wifi_disconnect","wifi_forget","wifi_connect","ble_scan","clock","screen","ha_save","ha_discover","sd_format_prepare","connection_set","connection_rollback","update_install","update_rollback","update_check"}){
+ for(const char* action:{"wifi_scan","wifi_disconnect","wifi_forget","wifi_connect","ble_scan","clock","screen","ha_save","ha_discover","sd_format_prepare","connection_set","connection_pin_set","connection_pin_clear","connection_rollback","update_install","update_rollback","update_check"}){
   reset(action);fixture.busy=true;expectStatus(409);assert(!otherMutations&&!called);
   reset(action);fixture.bootPending=true;expectStatus(409);assert(!otherMutations&&!called);
  }

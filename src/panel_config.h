@@ -27,6 +27,12 @@ bool snapshot(State& out);
 bool set(Channel channel,Type type,int16_t gpio,uint8_t address,uint16_t debounceMs);
 bool reset(Channel channel);
 bool rollback();
+enum class PinResult:uint8_t { Saved,Invalid,Conflict,StorageError,Unavailable };
+// Compare the revision and change both owners in one verified configuration commit.
+// Saved also covers an unchanged assignment; savedRevision then stays the same.
+PinResult setPin(int16_t gpio,Channel channel,Type type,uint16_t debounceMs,
+                 uint32_t expectedRevision,uint32_t& savedRevision);
+PinResult clearPin(int16_t gpio,uint32_t expectedRevision,uint32_t& savedRevision);
 const char* typeName(Type type);
 const char* pinRestriction(int gpio);
 bool isLocal(Type type);
