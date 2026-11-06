@@ -2,7 +2,12 @@
 
 ## Область и база
 
-Исправление сделано непосредственно для `main` после проверки актуального
+Код сохранён непосредственно в `main` коммитом
+[`a439e0d40ccb0aa9cceb77a3f7e503b058003eb2`](https://github.com/DeadSoulf/boiler_room/commit/a439e0d40ccb0aa9cceb77a3f7e503b058003eb2),
+без перезаписи истории. Все 16 изменённых blobs повторно сверены с локально
+проверенными файлами, расхождений и удалений нет.
+
+Исправление сделано после проверки актуального
 `d5c2b6d1444de6cfbf08f8d070974c32c1146a3f`. Локальные исходники затронутых файлов
 сверены по Git blob SHA. Старые открытые PR #1 (аудит) и #10 (Neon/exFAT)
 не включаются. Отдельная ветка, PR, Release и установка не нужны для этой правки.
@@ -60,7 +65,27 @@ optional Wi-Fi/BLE ветви и новый `radio_reconnect_tests.cpp`.
 окружении не работает под ptrace, поэтому проверка утечек отдельно не выполнена.
 Локальный полный native bootstrap остановлен ограничением сети: закреплённый
 LVGL через GitHub Git URL вернул HTTP 403; это не ошибка компиляции.
-Точные результаты финального GitHub CI будут записаны после завершения.
+Независимое ревью не нашло блокирующих дефектов и повторило radio/static-набор.
+Дополнительный отдельный harness проверил отмену на 25,2 с DHCP, включая millis
+wrap, пять повреждённых NVS-записей, ошибку begin, сочетание ошибок disconnect/NVS
+и восстановление после ошибки offline-поиска. Файлы проверяющим не менялись.
+
+Финальный GitHub CI для точного кода `a439e0d`: **все восемь workflow SUCCESS**.
+
+- [Общий native + ESP32-P4](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014798): SUCCESS.
+- [Настоящий LVGL](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014738): SUCCESS, **413 проверок / 0 обрезаний** в partial и full-refresh.
+- [GitHub OTA/browser + ESP32-P4](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014849): SUCCESS.
+- [Pairing/web](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014895): SUCCESS.
+- [MQTT](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014824), [датчики](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014797), [настройки](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014745), [microSD/web](https://github.com/DeadSoulf/boiler_room/actions/runs/42159014723): SUCCESS.
+
+Общая target-сборка создала ESP32-P4 image размером **2 067 328 байт**;
+RAM 47 468 / 327 680, Flash 2 015 518 / 6 553 600 байт по PlatformIO.
+CI-артефакт `esp32p4-build-a439e0d40ccb0aa9cceb77a3f7e503b058003eb2`,
+ID `13476396022`, размер ZIP 13 350 546 байт, digest по GitHub:
+`sha256:39f4c3f96e0bb85a72bb62954b7c564599b1186b2fa570a96c50ca0e93092bb8`.
+Это данные workflow/хранилища GitHub, не независимое считывание устройства и не
+публикация нового установочного выпуска. Тестовый пакет сохраняет строку v0.10.5;
+не устанавливать его под видом опубликованного v0.10.5.
 
 Это adapter/host-проверки, не испытание RF, C6, настоящего DHCP или NVS.
 Устройство не прошивалось, `VERSION`, `panel::VERSION`, `installed.json`
