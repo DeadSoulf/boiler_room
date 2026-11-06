@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare a pending OTA release from this create-event's successful CI jobs.
+"""Prepare a pending OTA release from an explicit main push and its successful CI jobs.
 
 No device access. The only remote mutation here is creating an absent, exact
 lightweight tag after complete local validation. Publication uses the existing
@@ -25,43 +25,74 @@ REPO = publisher.REPO
 require = publisher.require
 
 
+def version_tuple(version):
+    require(type(version) is str and re.fullmatch(
+            r'v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)', version),
+            'Release VERSION must be canonical stable SemVer')
+    parts = tuple(int(part) for part in version[1:].split('.'))
+    require(len(version) < 24 and all(part <= 0xffffffff for part in parts),
+            'Release VERSION exceeds the device protocol')
+    return parts
+
+
+def request_message(version):
+    return 'release: ' + version + ' GitHub OTA candidate'
+
+
 def event_source(env, event, version):
     require(env.get('GITHUB_ACTIONS') == 'true' and env.get('GITHUB_REPOSITORY') == REPO,
             'Release workflow is restricted to this repository in GitHub Actions')
-    require(env.get('GITHUB_EVENT_NAME') == 'create' and event.get('ref_type') == 'branch',
-            'Only explicit creation of a release branch may request publication')
-    require(re.fullmatch(r'v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)', version),
-            'Release VERSION must be canonical stable SemVer')
-    branch = 'release/ota-' + version
-    require(event.get('ref') == branch and env.get('GITHUB_REF') == 'refs/heads/' + branch,
-            'Created release branch must exactly match VERSION')
+    require(env.get('GITHUB_EVENT_NAME') == 'push' and event.get('ref') == 'refs/heads/main'
+            and env.get('GITHUB_REF') == 'refs/heads/main',
+            'Only an explicit release commit pushed to main may request publication')
+    require(event.get('deleted') is False and event.get('forced') is False
+            and event.get('created') is False, 'Main creation, deletion and forced pushes cannot publish')
+    version_tuple(version)
     source = env.get('GITHUB_SHA', '')
-    require(re.fullmatch(r'[0-9a-f]{40}', source), 'An immutable event source SHA is required')
+    before = event.get('before', '')
+    require(re.fullmatch(r'[0-9a-f]{40}', source) and source != '0' * 40,
+            'An immutable event source SHA is required')
+    require(type(before) is str and re.fullmatch(r'[0-9a-f]{40}', before)
+            and before != '0' * 40 and before != source, 'A distinct previous main SHA is required')
+    head = event.get('head_commit')
+    require(type(head) is dict and event.get('after') == source and head.get('id') == source,
+            'Push event and checkout must identify the same immutable source')
+    require(head.get('message') == request_message(version),
+            'The head commit must explicitly request this exact release version')
     require(re.fullmatch(r'[1-9][0-9]*', env.get('GITHUB_RUN_ID', '')), 'Missing workflow run identity')
-    return source, branch
+    return source, before
 
 
 def git(root, *args):
     return subprocess.check_output(['git', *args], cwd=root, text=True).strip()
 
 
-def check_source(root, source, branch):
+def check_source(root, source, before, version):
     require(git(root, 'rev-parse', 'HEAD') == source, 'Checkout differs from immutable event source')
     require(git(root, 'remote', 'get-url', 'origin').removesuffix('.git') == 'https://github.com/' + REPO,
             'Unexpected origin repository')
     subprocess.run(['git', 'fetch', '--no-tags', 'origin',
                     '+refs/heads/main:refs/remotes/origin/main'], cwd=root, check=True)
     subprocess.run(['git', 'merge-base', '--is-ancestor', source, 'origin/main'], cwd=root, check=True)
-    ref = git(root, 'ls-remote', 'origin', 'refs/heads/' + branch).split()
-    require(len(ref) == 2 and ref[0] == source, 'Release branch moved or disappeared after the request')
+    ref = git(root, 'ls-remote', 'origin', 'refs/heads/main').split()
+    require(ref == [source, 'refs/heads/main'],
+            'Main changed after the release request; stop instead of publishing an obsolete source')
+    require(git(root, 'rev-list', '--parents', '-n', '1', source).split() == [source, before],
+            'Release must be one direct commit on previous main, not a merge or multi-commit push')
+    require(git(root, 'show', '-s', '--format=%B', source) == request_message(version),
+            'The immutable commit must explicitly request this release')
+    current = git(root, 'show', source + ':VERSION')
+    previous = git(root, 'show', before + ':VERSION')
+    require(current == version and version_tuple(current) > version_tuple(previous),
+            'Release must increase VERSION in the exact requested commit')
     publisher.candidate_inputs_match(root, source)
 
 
 def context(root=ROOT):
     version = (root / 'VERSION').read_text(encoding='ascii').strip()
     event = publisher.strict_json(Path(os.environ['GITHUB_EVENT_PATH']).read_bytes(), 'Workflow event')
-    source, branch = event_source(os.environ, event, version)
-    check_source(root, source, branch)
+    source, before = event_source(os.environ, event, version)
+    check_source(root, source, before, version)
     subprocess.run([sys.executable, str(root / 'scripts/check_release_version.py')], cwd=root, check=True)
     return version, source
 

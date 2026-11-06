@@ -1,19 +1,23 @@
 name: Publish explicitly requested GitHub OTA candidate
 
-# Creating this branch after merging its exact source into main is the release
-# command. Ordinary pushes, main merges, PRs and tag creation cannot publish.
-on: create
+# Only an explicit, single version-increasing release commit on main can publish.
+# Ordinary commits, PRs, tags and branch creation cannot request a release.
+on:
+  push:
+    branches: [main]
+    paths: [VERSION]
 
 permissions:
   contents: read
 
 concurrency:
-  group: ota-release-${{ github.ref }}
+  group: ota-release-main
   cancel-in-progress: false
 
 jobs:
   request:
-    if: github.repository == 'DeadSoulf/boiler_room' && github.event.ref_type == 'branch' && startsWith(github.event.ref, 'release/ota-v')
+    if: >-
+      github.repository == 'DeadSoulf/boiler_room' && github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: v')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -25,7 +29,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Validate the explicit branch, exact source and fresh main ancestry
+      - name: Validate explicit main release commit, increasing version and exact source
         id: check
         run: python3 scripts/prepare_ota_candidate.py request
 

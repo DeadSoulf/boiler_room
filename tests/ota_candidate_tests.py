@@ -1,11 +1,13 @@
 """Candidate pipeline fault checks; isolated fixtures, no network or device I/O."""
 from pathlib import Path
+import copy
 import hashlib
 import io
 import json
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 import zipfile
 from contextlib import redirect_stdout
@@ -21,29 +23,41 @@ import ota_release_tests as release_fixtures
 
 class RequestTests(unittest.TestCase):
     def setUp(self):
-        self.source = 'a' * 40
-        self.version = 'v0.10.3'
-        self.branch = 'release/ota-' + self.version
+        self.source, self.before = 'a' * 40, 'b' * 40
+        self.version = 'v0.10.6'
         self.env = {'GITHUB_ACTIONS': 'true', 'GITHUB_REPOSITORY': publisher.REPO,
-                    'GITHUB_EVENT_NAME': 'create', 'GITHUB_SHA': self.source,
-                    'GITHUB_REF': 'refs/heads/' + self.branch, 'GITHUB_RUN_ID': '123'}
-        self.event = {'ref_type': 'branch', 'ref': self.branch}
+                    'GITHUB_EVENT_NAME': 'push', 'GITHUB_SHA': self.source,
+                    'GITHUB_REF': 'refs/heads/main', 'GITHUB_RUN_ID': '123'}
+        self.event = {'ref': 'refs/heads/main', 'before': self.before, 'after': self.source,
+                      'deleted': False, 'forced': False, 'created': False,
+                      'head_commit': {'id': self.source, 'message': candidate.request_message(self.version)}}
 
-    def test_only_exact_explicit_create_request_selects_immutable_source(self):
-        self.assertEqual(candidate.event_source(self.env, self.event, self.version), (self.source, self.branch))
+    def test_only_explicit_main_push_selects_immutable_source(self):
+        self.assertEqual(candidate.event_source(self.env, self.event, self.version), (self.source, self.before))
         for field, value in [('GITHUB_ACTIONS', 'false'), ('GITHUB_REPOSITORY', 'someone/boiler_room'),
-                             ('GITHUB_EVENT_NAME', 'push'), ('GITHUB_EVENT_NAME', 'pull_request'),
-                             ('GITHUB_EVENT_NAME', 'workflow_dispatch'), ('GITHUB_REF', 'refs/heads/main'),
-                             ('GITHUB_SHA', 'main'), ('GITHUB_SHA', 'A' * 40), ('GITHUB_RUN_ID', '')]:
+                             ('GITHUB_EVENT_NAME', 'create'), ('GITHUB_EVENT_NAME', 'pull_request'),
+                             ('GITHUB_EVENT_NAME', 'workflow_dispatch'), ('GITHUB_REF', 'refs/heads/release/ota-v0.10.6'),
+                             ('GITHUB_REF', 'refs/tags/v0.10.6'), ('GITHUB_SHA', 'main'),
+                             ('GITHUB_SHA', 'A' * 40), ('GITHUB_SHA', '0' * 40), ('GITHUB_RUN_ID', '')]:
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 candidate.event_source(dict(self.env, **{field: value}), self.event, self.version)
-        for event in ({'ref_type': 'tag', 'ref': self.branch}, {'ref_type': 'branch', 'ref': 'main'},
-                      {'ref_type': 'branch', 'ref': 'release/ota-v0.10.2'}, {}):
-            with self.subTest(event=event), self.assertRaises(ValueError):
+        for field, value in [('ref', 'refs/heads/other'), ('before', '0' * 40), ('before', self.source),
+                             ('before', 'main'), ('after', self.before), ('deleted', True), ('forced', True),
+                             ('created', True), ('forced', None), ('head_commit', None),
+                             ('head_commit', {'id': self.before, 'message': candidate.request_message(self.version)}),
+                             ('head_commit', {'id': self.source, 'message': 'fix: ordinary version update'}),
+                             ('head_commit', {'id': self.source, 'message': candidate.request_message('v0.10.5')}),
+                             ('head_commit', {'id': self.source, 'message': candidate.request_message(self.version) + '\nextra'})]:
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                candidate.event_source(self.env, dict(self.event, **{field: value}), self.version)
+        for key in self.event:
+            event = copy.deepcopy(self.event);del event[key]
+            with self.subTest(missing=key), self.assertRaises(ValueError):
                 candidate.event_source(self.env, event, self.version)
 
-    def test_noncanonical_version_and_branch_suffix_are_refused(self):
-        for version in ('v00.10.3', 'v0.10.3-rc1', '0.10.3', 'v0.10.3/extra', 'v0.10.3\nPOST'):
+    def test_noncanonical_or_unsupported_version_is_refused(self):
+        for version in ('v00.10.6', 'v0.10.6-rc1', '0.10.6', 'v0.10.6/extra', 'v0.10.6\nPOST',
+                        'v4294967296.0.0', 'v4294967295.4294967295.0'):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 candidate.event_source(self.env, self.event, version)
 
@@ -55,23 +69,120 @@ class RequestTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 candidate.artifact_ids(dict(valid, RELEASE_CHECKS_ARTIFACT_ID=value))
 
-    def test_fresh_main_ancestry_is_checked_and_moved_branch_is_rejected(self):
-        commands = []
-        def fake_git(root, *args):
-            if args == ('rev-parse', 'HEAD'): return self.source
-            if args == ('remote', 'get-url', 'origin'): return 'https://github.com/' + publisher.REPO + '.git'
-            return self.source + '\trefs/heads/' + self.branch
-        with patch.object(candidate, 'git', side_effect=fake_git), patch.object(candidate.subprocess, 'run', side_effect=lambda argv, **kw: commands.append(argv)), patch.object(publisher, 'candidate_inputs_match') as inputs:
-            candidate.check_source(ROOT, self.source, self.branch)
+    def git_values(self):
+        return {('rev-parse', 'HEAD'): self.source,
+                ('remote', 'get-url', 'origin'): 'https://github.com/' + publisher.REPO + '.git',
+                ('ls-remote', 'origin', 'refs/heads/main'): self.source + '\trefs/heads/main',
+                ('rev-list', '--parents', '-n', '1', self.source): self.source + ' ' + self.before,
+                ('show', '-s', '--format=%B', self.source): candidate.request_message(self.version),
+                ('show', self.source + ':VERSION'): self.version,
+                ('show', self.before + ':VERSION'): 'v0.10.5'}
+
+    def test_fresh_main_and_exact_parent_version_message_are_checked(self):
+        commands, values = [], self.git_values()
+        with patch.object(candidate, 'git', side_effect=lambda root, *args: values[args]), patch.object(candidate.subprocess, 'run', side_effect=lambda argv, **kw: commands.append(argv)), patch.object(publisher, 'candidate_inputs_match') as inputs:
+            candidate.check_source(ROOT, self.source, self.before, self.version)
             self.assertEqual(commands[0], ['git', 'fetch', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main'])
             self.assertEqual(commands[1], ['git', 'merge-base', '--is-ancestor', self.source, 'origin/main'])
             inputs.assert_called_once_with(ROOT, self.source)
-        def moved(root, *args):
-            return 'b' * 40 + '\trefs/heads/' + self.branch if args[0] == 'ls-remote' else fake_git(root, *args)
-        with patch.object(candidate, 'git', side_effect=moved), patch.object(candidate.subprocess, 'run'), self.assertRaises(ValueError):
-            candidate.check_source(ROOT, self.source, self.branch)
-        with patch.object(candidate, 'git', side_effect=fake_git), patch.object(candidate.subprocess, 'run', side_effect=subprocess.CalledProcessError(1, 'merge-base')), self.assertRaises(subprocess.CalledProcessError):
-            candidate.check_source(ROOT, self.source, self.branch)
+        wrong = [(("rev-parse", "HEAD"), self.before),
+                 (("remote", "get-url", "origin"), 'https://github.com/other/repo'),
+                 (("ls-remote", "origin", "refs/heads/main"), self.before + '\trefs/heads/main'),
+                 (("ls-remote", "origin", "refs/heads/main"), self.source + '\trefs/tags/main'),
+                 (("rev-list", "--parents", "-n", "1", self.source), self.source + ' ' + 'c' * 40),
+                 (("rev-list", "--parents", "-n", "1", self.source), self.source + ' ' + self.before + ' ' + 'c' * 40),
+                 (("show", "-s", "--format=%B", self.source), 'fix: ordinary commit'),
+                 (("show", self.source + ':VERSION'), 'v0.10.7'),
+                 (("show", self.before + ':VERSION'), self.version),
+                 (("show", self.before + ':VERSION'), 'v0.11.0'),
+                 (("show", self.before + ':VERSION'), 'v00.10.5')]
+        for key, value in wrong:
+            changed = dict(values);changed[key] = value
+            with self.subTest(key=key, value=value), patch.object(candidate, 'git', side_effect=lambda root, *args: changed[args]), patch.object(candidate.subprocess, 'run'), patch.object(publisher, 'candidate_inputs_match') as inputs, self.assertRaises(ValueError):
+                candidate.check_source(ROOT, self.source, self.before, self.version)
+            inputs.assert_not_called()
+        with patch.object(candidate, 'git', side_effect=lambda root, *args: values[args]), patch.object(candidate.subprocess, 'run', side_effect=subprocess.CalledProcessError(1, 'merge-base')), self.assertRaises(subprocess.CalledProcessError):
+            candidate.check_source(ROOT, self.source, self.before, self.version)
+
+    def test_workflow_is_main_version_scoped_without_new_permissions(self):
+        workflow = (ROOT / '.github/workflows/release-candidate.yml').read_text()
+        self.assertIn('branches: [main]', workflow)
+        self.assertIn('paths: [VERSION]', workflow)
+        self.assertIn("github.event_name == 'push'", workflow)
+        self.assertIn("github.ref == 'refs/heads/main'", workflow)
+        self.assertNotIn('on: create', workflow)
+        self.assertNotIn('workflow_dispatch:', workflow)
+        self.assertIn('cancel-in-progress: false', workflow)
+        before_publish, publish = workflow.split('  publish:', 1)
+        self.assertNotIn('contents: write', before_publish)
+        self.assertNotIn('GITHUB_TOKEN:', before_publish)
+        self.assertIn('contents: write', publish)
+        self.assertIn('needs: [request, ota, native]', publish)
+        self.assertIn('ref: ${{ github.sha }}', workflow)
+
+
+class RealGitRequestTests(unittest.TestCase):
+    """Real local commit graphs; only remote fetch/ref reads are replaced."""
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.git_cmd('init', '--initial-branch=main')
+        self.git_cmd('config', 'user.name', 'Release fixture')
+        self.git_cmd('config', 'user.email', 'fixture@example.invalid')
+        self.git_cmd('remote', 'add', 'origin', 'https://github.com/' + publisher.REPO + '.git')
+        self.before = self.commit('v0.10.5', 'fixture base')
+        self.source = self.commit('v0.10.6', candidate.request_message('v0.10.6'))
+        self.remote_head = self.source
+        self.git_cmd('update-ref', 'refs/remotes/origin/main', self.source)
+
+    def git_cmd(self, *args):
+        return subprocess.check_output(['git', *args], cwd=self.root, text=True, stderr=subprocess.DEVNULL).strip()
+
+    def commit(self, version, message):
+        (self.root / 'VERSION').write_text(version + '\n')
+        self.git_cmd('add', 'VERSION')
+        self.git_cmd('commit', '--allow-empty', '-m', message)
+        return self.git_cmd('rev-parse', 'HEAD')
+
+    def check(self, source, before, version):
+        original_git, original_run = candidate.git, subprocess.run
+        def git(root, *args):
+            if args == ('ls-remote', 'origin', 'refs/heads/main'):
+                return self.remote_head + '\trefs/heads/main'
+            return original_git(root, *args)
+        def execute(argv, **kwargs):
+            if argv[:2] == ['git', 'fetch']:
+                return subprocess.CompletedProcess(argv, 0)
+            return original_run(argv, **kwargs)
+        with patch.object(candidate, 'git', side_effect=git), patch.object(candidate.subprocess, 'run', side_effect=execute):
+            candidate.check_source(self.root, source, before, version)
+
+    def test_exact_local_history_passes_and_remote_advance_stops(self):
+        self.check(self.source, self.before, 'v0.10.6')
+        self.remote_head = self.commit('v0.10.6', 'docs: later work')
+        self.git_cmd('update-ref', 'refs/remotes/origin/main', self.remote_head)
+        self.git_cmd('checkout', '--detach', self.source)
+        with self.assertRaisesRegex(ValueError, 'Main changed'):
+            self.check(self.source, self.before, 'v0.10.6')
+
+    def test_real_multicommit_unchanged_version_and_dirty_input_refuse(self):
+        next_source = self.commit('v0.10.7', candidate.request_message('v0.10.7'))
+        self.remote_head = next_source
+        self.git_cmd('update-ref', 'refs/remotes/origin/main', next_source)
+        with self.assertRaisesRegex(ValueError, 'one direct commit'):
+            self.check(next_source, self.before, 'v0.10.7')
+        unchanged = self.commit('v0.10.7', candidate.request_message('v0.10.7'))
+        self.remote_head = unchanged
+        self.git_cmd('update-ref', 'refs/remotes/origin/main', unchanged)
+        with self.assertRaisesRegex(ValueError, 'increase VERSION'):
+            self.check(unchanged, next_source, 'v0.10.7')
+        self.git_cmd('checkout', '--detach', self.source)
+        self.remote_head = self.source
+        self.git_cmd('update-ref', 'refs/remotes/origin/main', self.source)
+        (self.root / 'VERSION').write_text('v0.10.99\n')
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.check(self.source, self.before, 'v0.10.6')
 
 
 class TokenTests(unittest.TestCase):
