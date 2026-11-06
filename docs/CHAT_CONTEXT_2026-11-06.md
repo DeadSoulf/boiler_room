@@ -7,9 +7,13 @@
 в веб-интерфейсе, без дополнительных пунктов на физической панели.
 
 Реализовано в feature commit `790585f702081a8309b20a00f27cf0cb2a99ccff`.
-Все восемь GitHub workflow этого исходника завершились SUCCESS. Готовится
-отдельный release commit v0.10.6 с повторной сборкой и проверками; публикация
-ещё должна быть подтверждена release-run. Начальная база main `d5c2b6d1444de6cfbf08f8d070974c32c1146a3f`.
+Все восемь GitHub workflow feature source завершились SUCCESS. Затем опубликована
+[v0.10.6](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.6), ID 436105654,
+source/tag `7aa23f7e7f62fc070c93a60b019c8b2a502748f7`, 2026-11-06T04:39:56Z.
+[Release run 42162883153](https://github.com/DeadSoulf/boiler_room/actions/runs/42162883153) и все 9 workflow
+release source — SUCCESS; public download всех 4 assets PASS, без авторизации.
+Независимые code/browser/release review — PASS; установка остаётся pending.
+Начальная база main `d5c2b6d1444de6cfbf08f8d070974c32c1146a3f`.
 Во время работы обнаружено продвижение main до
 `a439e0d40ccb0aa9cceb77a3f7e503b058003eb2`; все его Wi-Fi, native и документационные
 изменения сохранены. Разработка и явный запуск выпуска идут из main, без новой ветки.
@@ -28,7 +32,7 @@ revision относится к окну пина. Занятость отобр�
 Для выпуска без отдельной ветки сохранён новый штатный процесс из
 `00d0e64169e00ea1ac0e71a7cd1283a409912bb7`: один прямой release-коммит main
 повышает VERSION и имеет точное сообщение `release: vX.Y.Z GitHub OTA candidate`.
-Feature-код прошёл GitHub CI с v0.10.5; отдельный release commit поднимает версию до v0.10.6.
+Feature-код прошёл GitHub CI с v0.10.5; отдельный release commit поднял версию до v0.10.6 и успешно завершил публикацию.
 Проверки source, parent, artifacts, publisher и публичного SHA сохранены.
 До конца публикации и verify-public main не продвигать.
 

@@ -1,0 +1,30 @@
+{
+  "result": "PASS",
+  "version": "v0.10.6",
+  "source_commit": "7aa23f7e7f62fc070c93a60b019c8b2a502748f7",
+  "hardware_acceptance": "pending",
+  "verified_at_utc": "2026-11-06T04:39:58Z",
+  "authentication_sent": false,
+  "assets": {
+    "BoilerPanel-v0.10.6-COM3.zip": {
+      "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.6/BoilerPanel-v0.10.6-COM3.zip",
+      "size": 1220064,
+      "sha256": "e35d6fc1b41a7982046738a5d613bdef9218a3a899562d5c58b5dec07ba63072"
+    },
+    "BoilerPanel-v0.10.6-firmware.bin": {
+      "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.6/BoilerPanel-v0.10.6-firmware.bin",
+      "size": 2087120,
+      "sha256": "2361897f646243fcc4be96d2784d052163c1b19469cf38b1267426b91181bd6f"
+    },
+    "boiler-panel-ota.json": {
+      "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.6/boiler-panel-ota.json",
+      "size": 609,
+      "sha256": "3cf4248cf146004af781851a6e37f27cb220345c6fa18da6c499c3e43babf48d"
+    },
+    "SHA256SUMS.txt": {
+      "url": "https://github.com/DeadSoulf/boiler_room/releases/download/v0.10.6/SHA256SUMS.txt",
+      "size": 282,
+      "sha256": "77394266bb16687d4ad63df9398b96b2c97e4b40b978bb4c581cf65760592821"
+    }
+  }
+}
