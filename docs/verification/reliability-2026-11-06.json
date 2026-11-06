@@ -1,0 +1,124 @@
+{
+  "date": "2026-11-06",
+  "base_commit": "a31c8abd9244055348d47b419e39355cd4ee668b",
+  "source_commit": "9e0d85ddd4983ac8385006b57469f656d76e87ac",
+  "branch": "fix/reliability-regressions-2026-11-06",
+  "workflow_runs": [
+    {
+      "id": 42152023456,
+      "name": "microSD and web safety checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023456",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    },
+    {
+      "id": 42152023480,
+      "name": "v0.6.1 real sensor safety",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023480",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    },
+    {
+      "id": 42152023517,
+      "name": "Home Assistant MQTT safety",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023517",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    },
+    {
+      "id": 42152023497,
+      "name": "v0.6.0 connection config safety",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023497",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    },
+    {
+      "id": 42152023598,
+      "name": "Calm physical menu",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023598",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    },
+    {
+      "id": 42152023441,
+      "name": "Boiler panel build and tests",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023441",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    },
+    {
+      "id": 42152023548,
+      "name": "Pairing and web v0.9",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023548",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    },
+    {
+      "id": 42152023439,
+      "name": "GitHub OTA checks and ESP32-P4 build",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/DeadSoulf/boiler_room/actions/runs/42152023439",
+      "head_sha": "9e0d85ddd4983ac8385006b57469f656d76e87ac"
+    }
+  ],
+  "native": {
+    "model_assertions": 40069,
+    "legacy_updater_tests": 54,
+    "lvgl_partial": {
+      "checks": 408,
+      "clipped": 0
+    },
+    "lvgl_full_refresh": {
+      "checks": 408,
+      "clipped": 0
+    }
+  },
+  "browser": {
+    "widths": [
+      320,
+      390,
+      768,
+      1280
+    ],
+    "pairing": "PASS",
+    "ota": "PASS",
+    "equipment": "PASS",
+    "physical_panel_contacted": false
+  },
+  "target_artifact": {
+    "id": 13473401377,
+    "zip_sha256": "a480c0d79e4562f4b200be0650d204ac9f7b1f47bc1a19c65154b9afd0b37917",
+    "downloaded_and_verified": true,
+    "local_src_files_checked": 28,
+    "output_hashes_checked": 18,
+    "firmware_bytes": 2066832,
+    "firmware_sha256": "fc35d107b08c59fd83d24e630ef090a46a3b3e1a895b20544ae416f8de1892be",
+    "version_string": "v0.10.5",
+    "published_release": false,
+    "note": "Branch test build only; no release/tag replacement or device installation."
+  },
+  "review": {
+    "followup_findings_closed": true,
+    "published_ha_and_web_files_independently_compared": true
+  },
+  "hardware_verified": false,
+  "device_flashed": false,
+  "installed_json_changed": false,
+  "pull_request_created": false,
+  "merged": false,
+  "limitations": [
+    "Windows-only launcher execution skipped locally.",
+    "Sticky measurement expiry relies on existing regular model polling; session expiry does not require requests.",
+    "Real sensor electrical faults/power reset, C6/RF and SD hot-plug not tested.",
+    "SD remount recovery not implemented.",
+    "Unchanged JP1 JPEG not downloaded locally; Git blob unchanged and browser fixture verifies embedded bytes."
+  ]
+}
