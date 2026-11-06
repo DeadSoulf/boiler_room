@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <sdkconfig.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
@@ -53,15 +54,12 @@ SemaphoreHandle_t guard=nullptr;
 TaskHandle_t httpTask=nullptr;
 panel_pairing::State pairing;
 char sessionToken[33]="";
-uint32_t sessionExpires=0;
-
-bool future(uint32_t deadline) {
-  return deadline && int32_t(deadline-millis())>0;
-}
+// Use monotonic 64-bit uptime: a bearer must not revive after millis() wraps.
+int64_t sessionExpiresUs=0;
 void clearPairingLocked() { pairing.revoke(); }
 
 void clearSessionLocked() {
-  memset(sessionToken,0,sizeof(sessionToken));sessionExpires=0;
+  memset(sessionToken,0,sizeof(sessionToken));sessionExpiresUs=0;
 }
 void jsonQuote(String& j,const char* s) {
   j+='"';
@@ -117,7 +115,7 @@ bool authorized() {
   const String h=server.header("Authorization");
   if(!h.startsWith("Bearer ")||h.length()!=39||!guard)return false;
   if(xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE)return false;
-  const bool active=sessionToken[0] && future(sessionExpires);
+  const bool active=sessionToken[0] && esp_timer_get_time()<sessionExpiresUs;
   unsigned char diff=0;
   for(unsigned i=0;i<32;i++)diff|=uint8_t(h[7+i])^uint8_t(sessionToken[i]);
   const bool result=active && diff==0;
@@ -168,7 +166,7 @@ void pairRequest() {
   uint8_t secret[16];esp_fill_random(secret,sizeof(secret));
   for(unsigned i=0;i<sizeof(secret);i++){sessionToken[i*2]=HEX_CHARS[secret[i]>>4];sessionToken[i*2+1]=HEX_CHARS[secret[i]&15];}
   sessionToken[32]=0;panel_pairing::wipe(secret,sizeof(secret));
-  sessionExpires=millis()+3600000U;
+  sessionExpiresUs=esp_timer_get_time()+3600000000LL;
   const String token(sessionToken);
   xSemaphoreGive(guard);
   String j="{\"ok\":true,\"token\":";jsonQuote(j,token.c_str());j+=",\"expires_in_s\":3600}";

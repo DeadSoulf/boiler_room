@@ -12,6 +12,10 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 source = (root / "src/panel_web.cpp").read_text(encoding="utf-8")
 backend = (root / "src/panel_update.cpp").read_text(encoding="utf-8")
+session = source[source.index("panel_pairing::State pairing;"):source.index("void jsonQuote(")]
+pair = source[source.index("void pairRequest() {"):source.index("void statusRequest() {")]
+logout = source[source.index("void logoutRequest() {"):source.index("void notFound() {")]
+digits = source[source.index("bool allDigits("):source.index("uint32_t asUint(")]
 auth = source[source.index("bool authorized() {"):source.index("void pairStartRequest() {")]
 command_start = source.index("void commandRequest() {")
 commands = source[command_start:source.index('  if(kind=="ha_discover"){', command_start)]
@@ -24,6 +28,7 @@ template = r'''
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <map>
 #include <string>
 #include <type_traits>
@@ -48,12 +53,15 @@ struct Wifi{IP localIP()const{return {};}}WiFi;
 bool guard=true,lockAllowed=true;constexpr int pdTRUE=1;
 int pdMS_TO_TICKS(int n){return n;}int xSemaphoreTake(bool,int){return lockAllowed?pdTRUE:0;}
 void xSemaphoreGive(bool){}
-uint32_t now=1000,sessionExpires=2000;char sessionToken[33]="ffffffffffffffffffffffffffffffff";
-uint32_t millis(){return now;}
-bool future(uint32_t deadline){return deadline&&int32_t(deadline-millis())>0;}
+// Independent 64-bit simulated uptime; millis() intentionally wraps like Arduino.
+int64_t nowUs=1000000;
+uint32_t millis(){return uint32_t(nowUs/1000);}
+int64_t esp_timer_get_time(){return nowUs;}
+void esp_fill_random(void* out,size_t size){memset(out,0xff,size);}
+SESSION_SOURCE
 int response=0,otherMutations=0;std::string errorCode;
 void errorResponse(int status,const char* error){response=status;errorCode=error;}
-void jsonResponse(int status,const char*){response=status;errorCode.clear();}
+void jsonResponse(int status,const String&){response=status;errorCode.clear();}
 namespace panel_update{
  Snapshot fixture;bool stateAvailable=true,accept=true,installRace=false;
  unsigned called=0,accepted=0;std::string requested;
@@ -73,26 +81,41 @@ namespace panel_update{
 }
 QUOTE_SOURCE
 AUTH_SOURCE
+DIGITS_SOURCE
+PAIR_SOURCE
+LOGOUT_SOURCE
 COMMAND_SOURCE
 String serialized(){
  String j="{\"ok\":true";
  STATUS_SOURCE
  j+='}';return j;
 }
-void reset(const char* action){
+void reset(const char* action,int64_t issuedUs=1000000){
  server.args.clear();server.headers.clear();
  server.args["action"]=action;
  server.headers["Authorization"]="Bearer ffffffffffffffffffffffffffffffff";
  server.headers["X-Boiler-Pairing"]="1";
  server.headers["Origin"]="http://192.0.2.10";
  server.headers["Sec-Fetch-Site"]="same-origin";
- response=0;errorCode.clear();otherMutations=0;guard=lockAllowed=true;sessionExpires=2000;
+ response=0;errorCode.clear();otherMutations=0;guard=lockAllowed=true;
+ nowUs=issuedUs;pairing={};clearSessionLocked();
+ // Create sessions through the real pairing handler, not a copied deadline formula.
+ const char* ticket="0123456789abcdef0123456789abcdef";
+ assert(pairing.request(ticket,"123456",millis())==panel_pairing::Request::Started);
+ server.args["request_id"]=ticket;server.args["code"]="123456";
+ pairRequest();assert(response==200);assert(sessionToken[0]);
+ response=0;errorCode.clear();
  using namespace panel_update;
  fixture={};fixture.started=fixture.supported=fixture.available=fixture.rollbackAvailable=true;
  strcpy(fixture.latestVersion,"v1.1.0");strcpy(fixture.previousVersion,"v0.9.0");
  stateAvailable=accept=true;installRace=false;called=accepted=0;requested.clear();
 }
-void expectStatus(int code){commandRequest();assert(response==code);}
+void expectStatus(int code){
+ commandRequest();
+ if(response!=code)fprintf(stderr,"uptime=%lld us: expected HTTP %d, got %d\n",
+                          static_cast<long long>(nowUs),code,response);
+ assert(response==code);
+}
 int main(){
  using namespace panel_update;
  // Actual token and Origin validation, including expired/contended sessions.
@@ -103,7 +126,29 @@ int main(){
   reset(action);server.headers["Sec-Fetch-Site"]="cross-site";expectStatus(403);assert(!called);
   reset(action);server.headers.erase("X-Boiler-Pairing");expectStatus(403);assert(!called);
  }
- reset("update_check");sessionExpires=900;expectStatus(401);
+ // Exact one-hour boundary and no intervening requests over multiple millis wraps.
+ const int64_t issuedUs=1000000, hourUs=3600000000LL, dayUs=86400000000LL;
+ reset("update_check");nowUs=issuedUs+hourUs-1;expectStatus(202);assert(accepted==1);
+ reset("update_check");nowUs=issuedUs+hourUs;expectStatus(401);assert(!called);
+ for(const int64_t elapsed:std::initializer_list<int64_t>{hourUs+1, hourUs+(0x80000001LL*1000),
+                            25*dayUs,50*dayUs,100*dayUs}){
+  reset("update_check");nowUs=issuedUs+elapsed;expectStatus(401);assert(!called);
+ }
+ // Fresh sessions still last a full hour when issued after long uptime or near wrap.
+ for(const int64_t start:std::initializer_list<int64_t>{
+       25*dayUs,50*dayUs,100*dayUs,0xffffffffLL*1000-1000000}){
+  reset("update_check",start);expectStatus(202);assert(accepted==1);
+  nowUs=start+hourUs-1;expectStatus(202);assert(accepted==2);
+  nowUs=start+hourUs;expectStatus(401);assert(called==2);
+ }
+ // An already observed expiration must not later revive either.
+ reset("update_check");nowUs=issuedUs+hourUs;expectStatus(401);
+ nowUs=issuedUs+hourUs+(0x80000001LL*1000);expectStatus(401);assert(!called);
+ // Logout removes the bearer permanently, without affecting fresh pairing.
+ reset("update_check");logoutRequest();assert(response==200&&!sessionToken[0]);
+ expectStatus(401);assert(!called);
+ nowUs=issuedUs+100*dayUs;expectStatus(401);assert(!called);
+ reset("update_check");expectStatus(202);assert(accepted==1);
  reset("update_check");lockAllowed=false;expectStatus(401);
  reset("update_check");stateAvailable=false;expectStatus(503);assert(!called);
  reset("update_check");fixture.supported=false;expectStatus(503);assert(!called);
@@ -140,7 +185,8 @@ int main(){
  const auto json=serialized();puts(json.c_str());
 }
 '''
-for key, value in {"PHASE_SOURCE": phase, "QUOTE_SOURCE": quote, "AUTH_SOURCE": auth,
+for key, value in {"SESSION_SOURCE": session, "DIGITS_SOURCE": digits, "PAIR_SOURCE": pair,
+                   "LOGOUT_SOURCE": logout, "PHASE_SOURCE": phase, "QUOTE_SOURCE": quote, "AUTH_SOURCE": auth,
                    "COMMAND_SOURCE": commands, "STATUS_SOURCE": status}.items():
     template = template.replace(key, value)
 with tempfile.TemporaryDirectory(prefix="boiler-update-web-") as temporary:
@@ -162,4 +208,4 @@ assert data["message"] == 'Сбой "файла"\nПовторите'
 assert data["done"] == 3700 and data["total"] == 10000 and data["percent"] == 37
 assert data["latest_version"] == "v1.1.0" and data["previous_version"] == "v0.9.0"
 assert data["automatic_rollback"] and data["boot_pending"] and data["error_code"] == 19
-print("PASS: actual HTTP auth/Origin, precise confirmation and version, backend race rejection, busy/cancel/rollback guards, complete escaped update status")
+print("PASS: actual pairing/auth/logout with expiry boundary and 25/50/100-day idle sessions, HTTP Origin, precise confirmation and version, backend race rejection, busy/cancel/rollback guards, complete escaped update status")

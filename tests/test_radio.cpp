@@ -6,7 +6,8 @@ using namespace panel;using namespace panel_radio;
 void reset(){
  state=RadioState{};state.ready=true;pendingCommand=false;urgent=Job::None;
  wipe(&pending,sizeof(pending));WiFi=Wifi{};prefs=Preferences{};nvsOK=true;screenPrefs=Preferences{};screenNvsOK=true;
- Serial.output.clear();wifiStarted=false;haveCredentials=false;fakeMillis=0;lastDisconnectReason=0;delayHook=nullptr;
+ Serial.output.clear();wifiStarted=false;haveCredentials=false;fakeMillis=0;disconnectReason.store(0);observeConnect.store(false);associated.store(false);
+ wifiDriver=WifiDriver{};eventInstalled=false;driverStoppedForRecovery=false;staStartEvents.store(0);staStopEvents.store(0);delayHook=nullptr;
 }
 Command connection(){Command c;c.job=Job::Connect;strcpy(c.ssid,"test");strcpy(c.password,"12345678");return c;}
 int main(){
@@ -18,10 +19,10 @@ int main(){
  assert(takeCommand(received));assert(received.job==Job::Forget);assert(!pendingCommand);
  for(const auto byte:pending.password){assert(byte==0);}assert(!takeCommand(received));
  reset();memset(c.ssid,'x',sizeof(c.ssid));assert(!submit(c));c=connection();memset(c.password,'x',sizeof(c.password));assert(!submit(c));
- reset();c=connection();connectWifi(c,true);assert(fakeMillis==20000);assert(prefs.credentialWrites==0);assert(!haveCredentials);assert(strstr(state.wifiMessage,"20"));
+ reset();c=connection();connectWifi(c,true);assert(fakeMillis==20200);assert(prefs.credentialWrites==0);assert(!haveCredentials);assert(strstr(state.wifiMessage,"20"));
  reset();delayHook=[](){arduino_event_info_t info{};info.wifi_sta_disconnected.reason=WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT;wifiEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,info);};
  connectWifi(c,true);assert(strstr(state.wifiMessage,"4WAY_HANDSHAKE_TIMEOUT"));assert(prefs.credentialWrites==0);
- reset();delayHook=[](){cancel();};connectWifi(c,true);assert(fakeMillis==100);assert(!WiFi.connected);assert(prefs.credentialWrites==0);
+ reset();delayHook=[](){cancel();};connectWifi(c,true);assert(fakeMillis==200);assert(!WiFi.connected);assert(prefs.credentialWrites==0);
  reset();WiFi.connectSuccess=true;connectWifi(c,true);assert(prefs.credentialWrites==1);assert(haveCredentials&&state.autoConnect&&WiFi.reconnect);
  updateConnection();assert(strstr(state.wifiMessage,"синхронизируется"));
  reset();WiFi.connectSuccess=true;prefs.writes=false;connectWifi(c,true);assert(!state.autoConnect&&!haveCredentials);updateConnection();assert(strstr(state.wifiMessage,"не сохранены"));
@@ -38,11 +39,12 @@ int main(){
  screenPrefs.writes=false;setDisplayTimeout(120);assert(screenPrefs.displayWrites==2&&state.displayTimeoutSec==60);assert(strstr(state.displayMessage,"Ошибка NVS"));
  reset();Command screen;screen.job=Job::SetDisplayTimeout;screen.displayTimeoutSec=31;assert(!submit(screen));screen.displayTimeoutSec=300;assert(submit(screen));assert(cancel());
  assert(takeCommand(received)&&received.job==Job::Disconnect);assert(takeCommand(received)&&received.job==Job::SetDisplayTimeout&&received.displayTimeoutSec==300);
- reset();fakeMillis=0xffffff00U;WiFi.scanResult=-2;WiFi.scanElapsed=15000;state.apCount=4;
- scanWifi();assert(WiFi.scanCount==1&&state.apCount==0);assert(strstr(state.wifiMessage,"код -2, 15000 мс"));
- assert(Serial.output=="[BoilerPanel][WiFiScan] result=-2 elapsed_ms=15000\n");
- reset();WiFi.scanResult=-1;WiFi.scanElapsed=10;scanWifi();assert(strstr(state.wifiMessage,"код -1, 10 мс"));assert(WiFi.scanCount==1);
- reset();scanWifi();assert(state.apCount==0&&strstr(state.wifiMessage,"Найдено сетей: 0"));
+ reset();fakeMillis=0xffffff00U;wifiDriver.scanResults={ESP_ERR_WIFI_TIMEOUT};wifiDriver.scanElapsed=15000;state.apCount=4;
+ scanWifi();assert(wifiDriver.scanCalls==1&&state.apCount==0);assert(strstr(state.wifiMessage,"ESP_ERR_WIFI_TIMEOUT"));
+ assert(wifiDriver.scanStopCalls==1&&wifiDriver.clearCalls==1);
+ assert(Serial.output.find("[BP-WIFI] scan_start: ESP_ERR_WIFI_TIMEOUT (0x300C), 15000 ms")!=std::string::npos);
+ reset();wifiDriver.scanResults={ESP_FAIL};wifiDriver.scanElapsed=10;scanWifi();assert(strstr(state.wifiMessage,"ESP_FAIL"));assert(wifiDriver.scanCalls==1);
+ reset();scanWifi();assert(state.apCount==0&&strstr(state.wifiMessage,"Найдено: 0. В списке: 0"));
  vSemaphoreDelete(stateMutex);stateMutex=nullptr;
  std::cout<<"PASS: radio admission, priority, secrets, timeout/reason, cancellation, persistence failures, display timeout commands, scan code/timing (host mocks only)\n";
 }

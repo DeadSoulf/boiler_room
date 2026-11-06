@@ -10,13 +10,16 @@ ESP32-P4. Он не посылает команды прошивки, не ст�
 - `src/` — текущие исходники приложения.
 - `tests/fixtures/` — исторические известные наборы и тестовые BSP-файлы.
   Они нужны для проверки миграции и не копируются в собираемую прошивку.
-- `tests/host/` — настоящий LVGL с заменами платы, касаний и радио.
+- `tests/calm_ui/` — актуальный стенд настоящего LVGL с заменами платы, касаний и радио.
+  Общие заглушки и конфигурация LVGL находятся в `tests/host/`.
 - `ci/prepare.py` — подготовка закреплённого BSP для чистой target-сборки.
 - `ci/verify_binary.py` — структурная проверка полученных образов.
 - `ci/manifest.py` — сведения о коммите, входных файлах и артефактах, копирование
   имеющихся текстов лицензий и рекурсивные контрольные суммы.
-- `src/equipment_demo.h` — локальная модель визуализации; отдельный C++-тест
-  проверяет переходы семи узлов, токены, таймер и ограниченный журнал.
+- `tests/sensors_run.sh` — настоящий адаптер DS18B20 с отказами reset/write/read,
+  подтверждением преобразования и восстановлением; это не испытание датчиков.
+- `tests/update_web_commands.py` — настоящие обработчики сопряжения/команд/выхода,
+  включая границу часа и простой сессии 25/50/100 суток.
 - `scripts/flash_panel.py` — отдельный локальный загрузчик приложения; CI
   проверяет его отказные условия на заменах устройства и не открывает COM-порт.
 - `tests/flash_launcher_tests.py` и workflow `Windows COM3 launcher` — запуск
@@ -53,8 +56,9 @@ GitHub-hosted Ubuntu и отдельный Windows runner запускаются
 блокировка конкурирующих действий и проверка результата после перезапуска.
 
 Отдельный workflow `GitHub OTA checks and ESP32-P4 build` запускает эти проверки
-и target-сборку. Историческая проблема общего native workflow #15 остаётся
-видимой; этот отдельный workflow её не отключает и не объявляет исправленной.
+и target-сборку. Общий native workflow использует тот же актуальный LVGL-стенд, исполняемые
+тесты датчиков/сессий и обновлённые ESP-IDF radio-mocks. Результат проверяйте
+по конкретному коммиту; наличие теста не заменяет успешный запуск.
 
 С v0.10.0 `ci/package_flash.py` также создаёт raw OTA BIN и
 `boiler-panel-ota.json`. Их публикация описана в [GitHub OTA](../docs/github-ota.md).
@@ -85,6 +89,8 @@ g++ -std=c++17 -Wall -Wextra -Isrc tests/model_tests.cpp -o "$BOILER_CHECK_DIR/m
 g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/display_idle_tests.cpp -o "$BOILER_CHECK_DIR/display_tests"
 "$BOILER_CHECK_DIR/display_tests"
 bash tests/run_radio_tests.sh
+bash tests/sensors_run.sh
+python3 tests/update_web_commands.py
 python3 tests/updater_tests.py
 python3 tests/artifact_manifest_tests.py
 ```
@@ -95,9 +101,10 @@ python3 tests/artifact_manifest_tests.py
 ```sh
 : "${BOILER_LVGL_DIR:?Укажите путь к исходникам LVGL 8.3.11}"
 BOILER_UI_CHECK_DIR="$(mktemp -d /tmp/boiler-ui-check.XXXXXX)"
-cmake -S tests/host -B "$BOILER_UI_CHECK_DIR/host" -DLVGL_DIR="$BOILER_LVGL_DIR" -DBOILER_FONTS="$PWD/src/boiler_fonts.c"
+cmake -S tests/calm_ui -B "$BOILER_UI_CHECK_DIR/host" -DLVGL_DIR="$BOILER_LVGL_DIR"
 cmake --build "$BOILER_UI_CHECK_DIR/host" --parallel 2
-(cd "$BOILER_UI_CHECK_DIR" && ./host/panel_test)
+(cd "$BOILER_UI_CHECK_DIR" && ./host/calm_test)
+(cd "$BOILER_UI_CHECK_DIR" && ./host/calm_test --full-refresh)
 ```
 
 PPM-снимки сохраняются в выбранном временном каталоге. По умолчанию эта CMake-команда

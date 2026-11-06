@@ -16,6 +16,9 @@ constexpr uint32_t STALE_MS = 30000;
 constexpr unsigned HISTORY_POINTS=24;
 struct Measurement {
   bool valid = false;
+  // Once observed stale, only put() can restore freshness. Evaluated regularly
+  // by the UI; modulo millis subtraction alone revives data after a full wrap.
+  mutable bool expired = false;
   float value = 0, minimum = 0, maximum = 0;
   uint32_t updated=0, revision=0;
   float history[HISTORY_POINTS]={};uint32_t sampled[HISTORY_POINTS]={};
@@ -30,11 +33,14 @@ struct Measurement {
     if (!count) minimum = maximum = v;
     if (v < minimum) minimum = v;
     if (v > maximum) maximum = v;
-    value = v; updated = now; valid = true;
+    value = v; updated = now; valid = true; expired = false;
     history[next]=v;sampled[next]=now;next=(next+1)%HISTORY_POINTS;
     if(count<HISTORY_POINTS)++count;
   }
-  bool fresh(uint32_t now) const { return valid && uint32_t(now - updated) < STALE_MS; }
+  bool fresh(uint32_t now) const {
+    if(valid && uint32_t(now-updated)>=STALE_MS)expired=true;
+    return valid && !expired;
+  }
 };
 enum class FuelLevelStatus : uint8_t {
   NoData, Stale, BelowLower, Between, UpperReached, Inconsistent
@@ -44,12 +50,16 @@ enum class FuelLevelStatus : uint8_t {
 // polarity and debounce; a raw reed-contact state is not this logical value.
 struct ReedLevelReading {
   bool valid=false, reached=false;
+  mutable bool expired=false;
   uint32_t updated=0;
   void put(bool levelReached, uint32_t now) {
-    reached=levelReached;updated=now;valid=true;
+    reached=levelReached;updated=now;valid=true;expired=false;
   }
   void clear() { *this=ReedLevelReading{}; }
-  bool fresh(uint32_t now) const { return valid && uint32_t(now-updated)<STALE_MS; }
+  bool fresh(uint32_t now) const {
+    if(valid && uint32_t(now-updated)>=STALE_MS)expired=true;
+    return valid && !expired;
+  }
 };
 struct FuelLevel {
   ReedLevelReading upper,lower;
@@ -59,8 +69,10 @@ struct FuelLevel {
   }
   void clear() { lower.clear();upper.clear(); }
   FuelLevelStatus status(uint32_t now) const {
+    // Evaluate both, even if one is absent/expired, so neither revives on wrap.
+    const bool lowerFresh=lower.fresh(now),upperFresh=upper.fresh(now);
     if(!lower.valid || !upper.valid)return FuelLevelStatus::NoData;
-    if(!lower.fresh(now) || !upper.fresh(now))return FuelLevelStatus::Stale;
+    if(!lowerFresh || !upperFresh)return FuelLevelStatus::Stale;
     if(upper.reached)return lower.reached?FuelLevelStatus::UpperReached:FuelLevelStatus::Inconsistent;
     return lower.reached?FuelLevelStatus::Between:FuelLevelStatus::BelowLower;
   }

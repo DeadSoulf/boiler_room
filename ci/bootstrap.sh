@@ -19,17 +19,22 @@ host)
  g++ -std=c++17 -Wall -Wextra -Werror -pedantic -Isrc tests/equipment_inventory_tests.cpp -o .build/equipment_inventory_tests
  .build/equipment_inventory_tests | tee artifacts/equipment-inventory.log
  bash tests/run_radio_tests.sh | tee artifacts/radio.log
+ bash tests/sensors_run.sh | tee artifacts/sensors-adapter.log
+ python3 tests/update_web_commands.py | tee artifacts/web-commands.log
  g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/display_idle_tests.cpp -o .build/display_tests
  .build/display_tests | tee artifacts/display.log
  python3 tests/updater_tests.py 2>&1 | tee artifacts/updater.log
  python3 tests/artifact_manifest_tests.py 2>&1 | tee artifacts/artifact-manifest-tests.log
  python3 tests/flash_panel_tests.py 2>&1 | tee artifacts/flash-panel-tests.log
  python3 tests/flash_launcher_tests.py 2>&1 | tee artifacts/flash-launcher-tests.log
- cmake -S tests/host -B .build/host -DLVGL_DIR="$ROOT/.build/lvgl" -DBOILER_FONTS="$ROOT/src/boiler_fonts.c"
+ # Use the maintained real-LVGL harness for the current firmware, not v0.5 demo state.
+ cmake -S tests/calm_ui -B .build/host -DLVGL_DIR="$ROOT/.build/lvgl"
  cmake --build .build/host --parallel 2 2>&1 | tee artifacts/host-build.log
  # Preserve the exact official LVGL inputs for offline reproduction when local network is restricted.
  tar -czf artifacts/lvgl-native-source.tar.gz -C .build/lvgl src lvgl.h lv_conf_template.h LICENCE.txt
- (cd artifacts && ../.build/host/panel_test) 2>&1 | tee artifacts/host-ui.log
+ mkdir -p artifacts/host-ui artifacts/host-ui-full-refresh
+ (cd artifacts/host-ui && ../../.build/host/calm_test) 2>&1 | tee artifacts/host-ui.log
+ (cd artifacts/host-ui-full-refresh && ../../.build/host/calm_test --full-refresh) 2>&1 | tee artifacts/host-ui-full-refresh.log
  ;;
 firmware)
  checkout https://github.com/ultramcu/guition-jc4880p4-bsp.git 324970bade0d1f4e52880fe8016580368bc1e06e .build/bsp

@@ -51,6 +51,23 @@ int main(){
  CHECK(fuel.status(uint32_t(nearWrap+STALE_MS-1))==FuelLevelStatus::UpperReached);
  CHECK(fuel.status(uint32_t(nearWrap+STALE_MS))==FuelLevelStatus::Stale);
  fuel.put(true,false,40000);CHECK(fuel.status(40000)==FuelLevelStatus::Between);
+ // Expiration is sticky across a full millis() cycle; only a new sample revives it.
+ Measurement frozen;frozen.put(17.0f,1000);
+ CHECK(frozen.fresh(30999));CHECK(!frozen.fresh(31000));
+ const uint32_t fullWrap=uint32_t((1ULL<<32)+1001);
+ CHECK(!frozen.fresh(fullWrap)&&frozen.freshness(fullWrap)==0);
+ temperature(b,sizeof(b),frozen,fullWrap);CHECK(!strcmp(b,"--.-"));
+ CHECK(frozen.valid&&frozen.count==1&&frozen.updated==1000);
+ frozen.put(85.0f,fullWrap);CHECK(frozen.fresh(fullWrap));
+ ReedLevelReading oldReed;oldReed.put(true,1000);
+ CHECK(!oldReed.fresh(31000));CHECK(!oldReed.fresh(fullWrap));
+ CHECK(oldReed.valid);oldReed.put(false,fullWrap);CHECK(oldReed.fresh(fullWrap));
+ fuel.put(true,true,1000);CHECK(fuel.status(31000)==FuelLevelStatus::Stale);
+ CHECK(fuel.status(fullWrap)==FuelLevelStatus::Stale);
+ fuel.lower.put(true,fullWrap);CHECK(fuel.status(fullWrap)==FuelLevelStatus::Stale);
+ fuel.clear();fuel.upper.put(true,1000);
+ CHECK(fuel.status(31000)==FuelLevelStatus::NoData);
+ fuel.lower.put(true,fullWrap);CHECK(fuel.status(fullWrap)==FuelLevelStatus::Stale);
  setenv("TZ","UTC0",1);tzset();time_t t;
  CHECK(parseLocalTime("2026-10-27 18:40",t));CHECK(!parseLocalTime("2026-02-30 10:20",t));CHECK(!parseLocalTime("2026-10-27 24:00",t));
  CHECK(!parseLocalTime("2026-10-27 18:40x",t));CHECK(!parseLocalTime("1970-01-01 00:00",t));CHECK(parseLocalTime("2024-02-29 12:00",t));

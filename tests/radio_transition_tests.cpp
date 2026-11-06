@@ -7,7 +7,8 @@ void resetTransition(){
  state=RadioState{};state.ready=true;pendingCommand=false;urgent=Job::None;
  wipe(&pending,sizeof(pending));WiFi=Wifi{};prefs=Preferences{};nvsOK=true;
  Serial.output.clear();wifiStarted=false;haveCredentials=false;fakeMillis=0;
- lastDisconnectReason=0;delayHook=nullptr;recoveryPending=false;pinsReady=false;
+ disconnectReason.store(0);observeConnect.store(false);associated.store(false);
+ wifiDriver=WifiDriver{};eventInstalled=false;driverStoppedForRecovery=false;staStartEvents.store(0);staStopEvents.store(0);delayHook=nullptr;recoveryPending=false;pinsReady=false;
  bleScanPending=false;bleScanComplete=false;
  *BLEDevice::getScan()=BLEScan{};
 }
@@ -25,7 +26,7 @@ int main(){
  connectWifi(cmd,true);assert(prefs.credentialWrites==0&&WiFi.beginCount==0&&state.connected);
 
  resetTransition();WiFi.beginFailure=true;connectWifi(cmd,true);
- assert(fakeMillis==0&&prefs.credentialWrites==0);assert(strstr(state.wifiMessage,"запустить"));
+ assert(fakeMillis==200&&prefs.credentialWrites==0);assert(strstr(state.wifiMessage,"запустить"));
 
  resetTransition();oldConnection();WiFi.connectSuccess=true;WiFi.beginSsidOverride="unrelated-network";
  connectWifi(cmd,true);assert(prefs.credentialWrites==0&&haveCredentials&&prefs.autoValue);

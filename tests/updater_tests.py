@@ -3,10 +3,11 @@ import importlib.util
 from pathlib import Path
 import tempfile, unittest, shutil, subprocess, sys, json, errno, signal
 from unittest.mock import patch
-PACKAGE=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location('updater',PACKAGE/'apply_update.py')
+REPOSITORY=Path(__file__).resolve().parents[1]
+PACKAGE=REPOSITORY/'tests/fixtures/v05'
+spec=importlib.util.spec_from_file_location('updater',REPOSITORY/'apply_update.py')
 u=importlib.util.module_from_spec(spec);spec.loader.exec_module(u)
-F=PACKAGE/'tests/fixtures'
+F=REPOSITORY/'tests/fixtures'
 
 class Tests(unittest.TestCase):
  def setUp(self):
@@ -14,7 +15,10 @@ class Tests(unittest.TestCase):
   self.src=self.root/'examples/LvglUi/src';self.src.mkdir(parents=True)
   (self.root/'boards').mkdir();(self.root/'src').mkdir()
   for name,dest in [('jc4880p4.json','boards/jc4880p4.json'),('board_p4.h','src/board_p4.h'),('screen031.ini','examples/LvglUi/platformio.ini')]:shutil.copy2(F/'bsp'/name,self.root/dest)
-  shutil.copy2(PACKAGE/'src/boiler_fonts.c',self.src/'boiler_fonts.c')
+  # The large unchanged font is shared, but must match the historical hash.
+  font=REPOSITORY/'src/boiler_fonts.c'
+  self.assertEqual(u.normalized_sha(font),u.FONT_HASH)
+  shutil.copy2(font,self.src/'boiler_fonts.c')
   self.install('v031')
  def tearDown(self):self.temp.cleanup()
  def install(self,version):
@@ -24,7 +28,7 @@ class Tests(unittest.TestCase):
    # reconstructed baseline so future edits cannot silently change this fixture.
    for n in u.KNOWN_RELEASES[version]:
     source=F/version/n
-    if not source.exists():source=PACKAGE/'src'/n
+    if not source.exists():source=F/'v04_fuel'/n
     self.assertEqual(u.normalized_sha(source),u.KNOWN_RELEASES[version][n])
     shutil.copy2(source,self.src/n)
   else:
@@ -171,9 +175,33 @@ class Tests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,'File changed since update'):u.restore(self.root,backup)
   self.assertEqual(before,self.snapshot())
  def test_default_cli_read_only(self):
-  before=self.snapshot();result=subprocess.run([sys.executable,str(PACKAGE/'apply_update.py'),str(self.root)],capture_output=True,text=True)
+  before=self.snapshot()
+  with tempfile.TemporaryDirectory() as tmp:
+   pkg=Path(tmp)/'package';shutil.copytree(PACKAGE,pkg)
+   shutil.copy2(REPOSITORY/'apply_update.py',pkg/'apply_update.py')
+   result=subprocess.run([sys.executable,str(pkg/'apply_update.py'),str(self.root)],capture_output=True,text=True)
   self.assertEqual(result.returncode,0,result.stderr);self.assertIn('READ-ONLY',result.stdout)
   self.assertEqual(before,self.snapshot());self.assertFalse((self.root/'boiler_backups').exists())
+ def test_modern_repository_payload_fails_closed(self):
+  before=self.snapshot()
+  for args in ([],['--apply']):
+   result=subprocess.run([sys.executable,str(REPOSITORY/'apply_update.py'),str(self.root),*args],capture_output=True,text=True)
+   self.assertEqual(result.returncode,1,result.stderr)
+   self.assertIn('legacy source updater',result.stderr)
+   self.assertIn('GitHub OTA',result.stderr)
+   self.assertEqual(before,self.snapshot())
+   self.assertFalse((self.root/'boiler_backups').exists())
+ def test_modified_payload_without_manifest_fails_closed(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   pkg=Path(tmp);shutil.copytree(PACKAGE/'src',pkg/'src')
+   p=pkg/'src/main.cpp';p.write_bytes(p.read_bytes()+b'\n// not the pinned release\n')
+   before=self.snapshot()
+   with self.assertRaisesRegex(ValueError,'legacy source updater'):u.preflight(self.root,pkg)
+   self.assertEqual(before,self.snapshot())
+ def test_fixture_manifest_covers_exact_historical_files(self):
+  sums=json.loads((PACKAGE/'SHA256SUMS.json').read_text())
+  self.assertEqual(set(sums),{'src/'+n for n in u.FILES})
+  for name,expected in sums.items():self.assertEqual(u.sha(PACKAGE/name),expected,name)
  def test_modified_each_owned_source_rejected(self):
   for version in ('v031','current'):
    self.install('v031')

@@ -5,6 +5,9 @@ on:
       - 'src/**'
       - 'ci/prepare.py'
       - 'tests/sensors_static_tests.py'
+      - 'tests/sensors_adapter_tests.cpp'
+      - 'tests/sensors_run.sh'
+      - 'tests/sensors_stubs/**'
       - 'tests/pin_profile_tests.cpp'
       - '.github/workflows/sensor-061-safety.yml'
   pull_request:
@@ -12,6 +15,9 @@ on:
       - 'src/**'
       - 'ci/prepare.py'
       - 'tests/sensors_static_tests.py'
+      - 'tests/sensors_adapter_tests.cpp'
+      - 'tests/sensors_run.sh'
+      - 'tests/sensors_stubs/**'
       - 'tests/pin_profile_tests.cpp'
   workflow_dispatch:
 permissions:
@@ -30,5 +36,7 @@ jobs:
           /tmp/pin_profile_test
       - name: Validate sensor pipeline, web API and NVS safety
         run: python3 tests/sensors_static_tests.py
+      - name: Real sensor adapter fault injection
+        run: bash tests/sensors_run.sh
       - name: Verify touch settings and configurable UI unchanged
         run: python3 tests/config_060_static.py

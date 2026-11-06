@@ -163,6 +163,15 @@ void thermometer(unsigned i,uint32_t now){
   }
   if(!due(now,d.due))return;
   if(d.converting){
+    // A CRC-correct scratchpad alone can still contain the previous conversion.
+    // Poll before getTemp(), whose reset ends the conversion-poll transaction.
+    uint8_t complete=0;
+    if(!d.bus->read(complete,1) || complete!=1){
+      d.converting=false;
+      d.due=millis()+RETRY_MS;
+      fail(i,"DS18B20 conversion not confirmed");
+      return;
+    }
     float c=NAN;
     const uint8_t err=d.bus->getTemp(d.rom,c);
     d.converting=false;
@@ -193,7 +202,14 @@ void thermometer(unsigned i,uint32_t now){
   }
   d.rom=devices[0];
   setRom(i,d.rom);
-  d.bus->request();
+  // Pinned OneWire32::request() discards reset/write failures. Check every
+  // command instead. Search above guarantees one device and an initialized bus.
+  if(!d.bus->reset() || !d.bus->write(0xCC) || !d.bus->write(0x44)){
+    d.converting=false;
+    d.due=millis()+RETRY_MS;
+    fail(i,"DS18B20 conversion request failed");
+    return;
+  }
   d.converting=true;
   d.due=millis()+CONVERSION_MS;
 }
@@ -232,9 +248,9 @@ bool poll(Event& out){
 }
 bool snapshot(Snapshot& out){
   if(!guard||xSemaphoreTake(guard,0)!=pdTRUE)return false;
-  out=state;
   const uint32_t now=millis();
-  for(auto& c:out.channels)if(c.valid && uint32_t(now-c.lastGoodMs)>30000U)c.valid=false;
+  for(auto& c:state.channels)if(c.valid && uint32_t(now-c.lastGoodMs)>=30000U)c.valid=false;
+  out=state;
   xSemaphoreGive(guard);
   return true;
 }

@@ -13,6 +13,17 @@ from pathlib import Path
 FILES = ('main.cpp','panel_types.h','panel_radio.h','panel_radio.cpp',
          'screen_state.h','panel_screen.h','panel_screen.cpp','equipment_demo.h')
 RETIRED = ('display_idle.h',)
+# Immutable v0.5.0 payload from d9aea5fc289c6e922e85000606ec038373688607.
+V05_PAYLOAD = {'equipment_demo.h': '94dc6db2d3ec43c8d62c33404b94826d93fa092b6c59225b4adcbd561a311adf',
+ 'main.cpp': 'ec7841ef22f4d567bd3261d424d78c794736adf695253c86a9b4682d6304078b',
+ 'panel_radio.cpp': 'b8b23bb99256ada064cce45ea6a696d3504355614171b4f28d9db5ed7f96cfd2',
+ 'panel_radio.h': '85ab2b2c3b952c21e1728cc877e5a856901abde2d9e2c68bf7b2b2b57964cae7',
+ 'panel_screen.cpp': '7b528a618967616928df15cc71897e43258796e3902e085de01e4e206a9f4767',
+ 'panel_screen.h': '0d881c291fd1ecd9173a1825c378c4e17586e7e4f791661eb792c85cce259647',
+ 'panel_types.h': '0d16fd7800967a8640dcf48c0e2f8cb3d72df3e04b7e35d1ca78d40e305f7c53',
+ 'screen_state.h': 'ad8f6bb29b91027e2e279a7273336b2518120310c361051249962495887f09ba'}
+LEGACY_ONLY = ('This legacy source updater only supports the pinned v0.5.0 payload; '
+               'modern firmware must use the documented GitHub OTA workflow. No files changed.')
 MARKER='/* BOILER_SCREEN_031: deferred touch and wake filter. */'
 
 def digest(data): return hashlib.sha256(data).hexdigest()
@@ -199,12 +210,14 @@ def preflight(root, package):
     for n in protected:
         if not (root/n).is_file(): raise ValueError('Missing required project file: '+n)
     for n in FILES:
-        if not (package/'src'/n).is_file(): raise ValueError('Missing update payload: '+n)
+        if not (package/'src'/n).is_file(): raise ValueError('Missing update payload: '+n+'. '+LEGACY_ONLY)
     manifest = package/'SHA256SUMS.json'
     if manifest.exists():
         sums=json.loads(text(manifest))
         for n in FILES:
             if sums.get('src/'+n)!=sha(package/'src'/n): raise ValueError('Corrupt update payload: '+n)
+    if any(normalized_sha(package/'src'/n)!=V05_PAYLOAD[n] for n in FILES):
+        raise ValueError(LEGACY_ONLY)
     actual = {n:normalized_sha(src/n) for n in (*FILES,*RETIRED) if (src/n).exists()}
     current = {n:normalized_sha(package/'src'/n) for n in FILES}
     version = next((v for v,files in KNOWN_RELEASES.items() if actual==files),None)

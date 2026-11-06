@@ -10,7 +10,7 @@
 - `v04_before_fuel/`: exact `main.cpp`, `panel_types.h` and `panel_radio.cpp` from
   `DeadSoulf/boiler_room` commit `b700ef6f837f5fc1dbd0bad91a569159123c3851`,
   before adding the two reed-switch fuel-level inputs. The remaining four
-  managed files are unchanged and reused from `src/` when assembling this
+  managed files are unchanged and reused from `v04_fuel/` when assembling this
   fixture; their pinned hashes are checked before use. This snapshot requires
   an already-patched `screen031.c` or `ci_screen031.c` adapter, preserved as-is.
 - `v04_fuel/`: all seven managed source files from
@@ -40,3 +40,17 @@ Hashes in apply_update.py use UTF-8 without BOM and LF line endings. Source
 recognition requires a complete exact version set, never independent mixed files.
 Tests copy fixtures to temporary directories; no user's BSP or device is touched.
 The firmware package uses only src/, never these historical fixture files.
+
+- `v05/src/`: all eight managed v0.5.0 destination files from
+  [`d9aea5fc289c6e922e85000606ec038373688607`](https://github.com/DeadSoulf/boiler_room/commit/d9aea5fc289c6e922e85000606ec038373688607),
+  the commit which introduced this version of `apply_update.py`. Retrieved via
+  the GitHub connector and verified against each Git blob SHA. `v05/SHA256SUMS.json`
+  pins their exact bytes. These are historical test data, never current firmware.
+  Updater tests import the current updater but use this immutable destination,
+  not the evolving production `src/`. The unchanged large font is shared from
+  production only after checking the updater's pinned `FONT_HASH`; its historic
+  Git blob is `d97bf7b46a2e8bd1cb002e9ad05159dc1c1b29f0`.
+  The updater itself rejects non-pinned payloads, even without a manifest.
+  CLI dry-run tests copy the current script beside the fixture in a temporary
+  directory. Running the script with modern repository sources must fail closed,
+  with or without `--apply`; it is not a modern firmware installer.
