@@ -1,12 +1,12 @@
-# Boiler Room Touch Panel — v0.10.5
+# Boiler Room Touch Panel — v0.10.6
 
-## Planned v0.10.6: assign sensors by selecting a pin
+## v0.10.6: assign sensors by selecting a pin
 
 In web **Settings → Sensors**, select any of the 11 usable JP1 GPIOs to open its action menu. Choose a temperature channel or fuel-level reed input, review the affected assignments, then save. Occupied pins can be reassigned or released. A new reed input requires an explicit NO/NC choice. Moving a channel and releasing its former GPIO is one verified configuration change.
 
 The dialog keeps your draft during status polls and refuses to overwrite a configuration changed in another window. Lost connection, expired authorization and an update in progress block writes. A completed command is confirmed by reading the saved configuration again. The existing source configuration form, including remote descriptors, remains under **Additional source settings**. All sensor and GPIO configuration stays in the web interface; the physical panel menu is unchanged.
 
-The planned release includes the 6 November reliability fixes, the Home date and equal-size temperature readings, and previous OTA/equipment UI corrections. Publication and hardware acceptance are tracked separately in the [v0.10.6 verification report](docs/verification/v0.10.6-pin-actions-2026-11-06.md). Final builds and browser tests run only in GitHub Actions; do not use the user’s laptop. Release preparation uses a single explicit version-increasing release commit on `main`, without a development or release branch. The last accepted installation remains v0.10.1 until real OTA acceptance is recorded.
+This version includes the 6 November reliability fixes, the Home date and equal-size temperature readings, and previous OTA/equipment UI corrections. Publication and hardware acceptance are tracked separately in the [v0.10.6 verification report](docs/verification/v0.10.6-pin-actions-2026-11-06.md). Final builds and browser tests run only in GitHub Actions; do not use the user’s laptop. Release preparation uses a single explicit version-increasing release commit on `main`, without a development or release branch. The last accepted installation remains v0.10.1 until real OTA acceptance is recorded.
 
 ## v0.10.5: live connector diagram in web sensor settings
 
