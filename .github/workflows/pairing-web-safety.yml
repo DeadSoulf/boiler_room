@@ -22,6 +22,7 @@ jobs:
           python3 tests/home_assistant_tests.py
           python3 tests/storage_static_tests.py
           python3 tests/web_firmware_tests.py
+          python3 tests/web_telemetry_tests.py
           python3 tests/config_060_static.py
           python3 tests/sensors_static_tests.py
           python3 tests/flash_panel_tests.py

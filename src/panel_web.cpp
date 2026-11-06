@@ -621,10 +621,10 @@ void publish(const Measurement (&temps)[CHANNELS],const FuelLevel& fuel,uint32_t
   next.firstFrameMs=panel_screen::boot.firstFrameAt;
   next.touchMs=panel_screen::boot.touchMs;
   next.fuelStatus=uint8_t(fuel.status(now));
-  next.lowerValid=fuel.lower.valid;
+  next.lowerValid=fuel.lower.fresh(now);
   next.lowerReached=fuel.lower.reached;
   next.lowerAge=fuel.lower.valid?uint32_t(now-fuel.lower.updated)/1000U:0;
-  next.upperValid=fuel.upper.valid;
+  next.upperValid=fuel.upper.fresh(now);
   next.upperReached=fuel.upper.reached;
   next.upperAge=fuel.upper.valid?uint32_t(now-fuel.upper.updated)/1000U:0;
   for(unsigned i=0;i<CHANNELS;i++){

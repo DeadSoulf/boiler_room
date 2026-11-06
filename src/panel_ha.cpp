@@ -278,9 +278,10 @@ bool requestDiscovery(){
 void publish(const panel::Measurement (&temps)[panel::CHANNELS],const panel::FuelLevel& fuel,uint32_t now){
   if(!readings)return;
   Telemetry t;t.received=true;t.captured=now;
-  for(unsigned i=0;i<4;i++){t.input[i].valid=temps[i].valid;t.input[i].temperature=temps[i].value;t.input[i].updated=temps[i].updated;}
-  t.input[4].valid=fuel.lower.valid;t.input[4].reached=fuel.lower.reached;t.input[4].updated=fuel.lower.updated;
-  t.input[5].valid=fuel.upper.valid;t.input[5].reached=fuel.upper.reached;t.input[5].updated=fuel.upper.updated;
+  // Propagate sticky model expiration, not historical sample validity.
+  for(unsigned i=0;i<4;i++){t.input[i].valid=temps[i].fresh(now);t.input[i].temperature=temps[i].value;t.input[i].updated=temps[i].updated;}
+  t.input[4].valid=fuel.lower.fresh(now);t.input[4].reached=fuel.lower.reached;t.input[4].updated=fuel.lower.updated;
+  t.input[5].valid=fuel.upper.fresh(now);t.input[5].reached=fuel.upper.reached;t.input[5].updated=fuel.upper.updated;
   xQueueOverwrite(readings,&t);
 }
 } // namespace panel_ha

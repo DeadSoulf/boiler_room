@@ -33,6 +33,33 @@ int main(){
  assert(sendState(t,radio));assert(sent.back().qos==0&&sent.back().retain==0&&!sent.back().queued);assert(!strstr(sent.back().payload.c_str(),c.password));
  panel::Measurement values[4];panel::FuelLevel fuel;values[0].put(23.5f,1000);publish(values,fuel,1000);
  Telemetry captured;assert(xQueueReceive(readings,&captured,0)==pdTRUE&&captured.input[0].valid&&!captured.input[1].valid);
+ // Exercise actual publish -> queue -> MQTT JSON with original model objects.
+ // main.cpp invokes publish(measurements,fuelLevel,millis()) every second.
+ fuel.put(true,true,1000);
+ auto capture=[&](uint32_t now){
+   fakeMillis=now;publish(values,fuel,now);
+   assert(xQueueReceive(readings,&captured,0)==pdTRUE);
+   assert(sendState(captured,radio));
+ };
+ capture(1000);
+ assert(captured.input[0].valid&&captured.input[4].valid&&captured.input[5].valid);
+ capture(31000); // The adapter must propagate expiration, not just valid/history.
+ assert(!captured.input[0].valid&&!captured.input[4].valid&&!captured.input[5].valid);
+ assert(values[0].expired&&fuel.lower.expired&&fuel.upper.expired);
+ assert(values[0].valid&&values[0].updated==1000); // History still exists.
+ const uint32_t wrapped=uint32_t((1ULL<<32)+1001);
+ capture(wrapped);
+ assert(!captured.input[0].valid&&!captured.input[4].valid&&!captured.input[5].valid);
+ assert(sent.back().payload.find("\"room\":null,\"room_valid\":false")!=std::string::npos);
+ assert(sent.back().payload.find("\"fuel_level_valid\":false")!=std::string::npos);
+ values[0].put(85.0f,wrapped);fuel.lower.put(true,wrapped);
+ capture(wrapped);
+ assert(captured.input[0].valid&&captured.input[4].valid&&!captured.input[5].valid);
+ assert(sent.back().payload.find("\"room\":85.00,\"room_valid\":true")!=std::string::npos);
+ assert(sent.back().payload.find("\"fuel_level_valid\":false")!=std::string::npos);
+ fuel.upper.put(true,wrapped);capture(wrapped);
+ assert(captured.input[5].valid);
+ assert(sent.back().payload.find("\"fuel_level_valid\":true")!=std::string::npos);
  sent.clear();stopClient(c,true);assert(!client&&!connected.load()&&destroys==1);
  assert(sent.size()==ENTITY_COUNT+1&&sent[0].payload=="offline");
  for(unsigned i=1;i<sent.size();i++)assert(sent[i].payload.empty()&&sent[i].retain==1&&sent[i].topic.find("homeassistant/")==0);

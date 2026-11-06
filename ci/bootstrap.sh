@@ -21,6 +21,7 @@ host)
  bash tests/run_radio_tests.sh | tee artifacts/radio.log
  bash tests/sensors_run.sh | tee artifacts/sensors-adapter.log
  python3 tests/update_web_commands.py | tee artifacts/web-commands.log
+ python3 tests/web_telemetry_tests.py | tee artifacts/web-telemetry.log
  g++ -std=c++17 -Wall -Wextra -Werror -Isrc tests/display_idle_tests.cpp -o .build/display_tests
  .build/display_tests | tee artifacts/display.log
  python3 tests/updater_tests.py 2>&1 | tee artifacts/updater.log
