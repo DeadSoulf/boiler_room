@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.12
+# Boiler Room Touch Panel — v0.10.13
+
+## v0.10.13 — Relay assignments on the JP1 header map
+
+In the paired web UI open **Settings → Sensors → JP1 pin map** and select a GPIO. The assignment menu now includes **«Реле ТЭНов электрокотла»** (electric-boiler heating elements) and **«Реле бойлера»** (domestic hot-water tank). Choose a separate GPIO for each relay and save. The map shows the saved owner. Moving a relay frees its previous pin. Existing sensor assignments survive the update.
+
+Saving a relay assignment reserves its GPIO. Heater actuation and relay feedback are pending hardware integration. [Assignment dialog](docs/verification/assets/v0.10.13-jp1-relay.png) · [Example JP1 map with both relay roles](docs/verification/assets/v0.10.13-jp1-relay-map.png).
 
 ## v0.10.12 — Electric boiler heating-element thresholds
 
