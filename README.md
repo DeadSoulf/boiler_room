@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.11
+# Boiler Room Touch Panel — v0.10.12
+
+## v0.10.12 — Electric boiler heating-element thresholds
+
+Open **Equipment → Electric boiler**. On the panel, choose **Edit thresholds**. The paired browser shows the fields inside the expanded equipment card. Set the lower temperature for switching the elements on as the system cools and the higher temperature for switching them off as it warms up. Save both values together in whole °C. The electric boiler keeps its own pair across restarts, independently of the domestic hot-water tank.
+
+The **Enable heating elements** button stays disabled until the regulating temperature sensor and actuator controller are integrated. Saving the pair does not request heat. [Electric boiler screen](docs/verification/assets/v0.10.12-electric-boiler.png) · [Threshold editor](docs/verification/assets/v0.10.12-electric-thresholds.png).
 
 ## v0.10.11 — Fuel tank and outlet temperatures
 
