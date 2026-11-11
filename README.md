@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.14
+# Boiler Room Touch Panel — v0.10.15
+
+## v0.10.15 — Individual electric-boiler heater outputs
+
+**Equipment → Electric boiler** has three buttons, **ТЭН-1**, **ТЭН-2** and **ТЭН-3**. Each shows its assigned GPIO. The boiler’s low and high temperature thresholds apply to the electric boiler as a whole.
+
+In the paired web UI open **Settings → Sensors → JP1 pin map**, select a free GPIO, choose **Реле ТЭН-1**, **Реле ТЭН-2** or **Реле ТЭН-3** and save. The previous electric relay assignment carries over to heater 1. Heaters 2 and 3 start unassigned. The DHW relay keeps its own pin. No relay driver or control sensor has been selected for the installation, so the heater buttons currently show the bindings and remain disabled. The GPIO numbers in the screenshots are examples. [Panel example](docs/verification/assets/v0.10.15-three-heaters.png) · [JP1 assignments with test data](docs/verification/assets/v0.10.15-jp1-four-relays.png).
 
 ## v0.10.14 — Temperature target slider
 
