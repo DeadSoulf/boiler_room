@@ -73,7 +73,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 <template id="threshold-controls"><div>
  <div class="row"><span data-part="temperature"></span><strong>Нет данных</strong></div>
  <div data-part="outputs"></div>
- <p class="hint" data-part="hardware"></p>
+ <p class="hint" data-part="hardware"></p><button type="button" class="ghost" data-page="heating">Открыть автоматику</button>
  <form data-part="form" novalidate>
  <div class="field"><label data-label="on">Включать при температуре ≤ (°C)</label><input data-part="on" inputmode="numeric" maxlength="2" placeholder="Не задано" disabled></div>
  <div class="field"><label data-label="off">Выключать при температуре ≥ (°C)</label><input data-part="off" inputmode="numeric" maxlength="2" placeholder="Не задано" disabled></div>
@@ -629,7 +629,7 @@ function renderHeat(){
   heatRow(holder,"Режим сезона",["Не выбран","Лето","Зима"][cfg?.season]||"Нет данных");
   heatRow(holder,"Дизель / электрокотёл",health(c.diesel)+" / "+health(c.electric));
   heatRow(holder,"Тепло на змеевике",flag(c.plant_heat,"Источник работает","Источник остановлен"));
-  heatRow(holder,"Источник по расчёту",["Нет данных","Нет запроса","Дизель","Электрокотёл"][c.source]||"Нет данных");
+  heatRow(holder,"Источник по расчёту",["Нет данных",c.demand===1?"Нет запроса":"Нет источника","Дизель","Электрокотёл"][c.source]||"Нет данных");
   heatRow(holder,"Запрос помещений",flag(c.demand,"Нужен обогрев","Запрос снят"));
   heatRow(holder,"Авария источника",flag(c.alarm,"Авария","Нет аварии"));
   heatRow(holder,"Циркуляция",flag(c.circulation,"Подтверждена","Проток отсутствует"));
@@ -795,9 +795,9 @@ async function saveTarget(event){
 }
 const heatingSettings={
  boiler:{status:"boiler_settings",action:"boiler_thresholds",temperature:"Температура воды в баке",
-   hardware:"Не подключены датчик воды и контроллер нагрева.",unavailable:"Настройки бойлера недоступны."},
+   hardware:"Ручное включение бойлера недоступно. Эти пороги сохраняются для карточки. Показание бака и пороги змеевика доступны в автоматике.",unavailable:"Настройки бойлера недоступны."},
  electric:{status:"electric_settings",action:"electric_thresholds",temperature:"Температура электрокотла",
-   hardware:"Не подключены датчик температуры электрокотла и контроллер ТЭНов.",unavailable:"Настройки электрокотла недоступны."}
+   hardware:"Ручное включение ТЭНов недоступно. Эти пороги сохраняются для карточки. Подача, обратка и ступени нагрева доступны в автоматике.",unavailable:"Настройки электрокотла недоступны."}
 };
 // Each equipment card keeps its own draft, original revision and save/readback state.
 const thresholdViews=[];

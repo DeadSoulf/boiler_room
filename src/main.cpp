@@ -59,8 +59,9 @@ constexpr HeaterOutput ELECTRIC_HEATERS[]={
 };
 constexpr unsigned HEATER_COUNT=sizeof(ELECTRIC_HEATERS)/sizeof(ELECTRIC_HEATERS[0]);
 lv_obj_t* heaterPinLabels[HEATER_COUNT]={};
-lv_obj_t *autoValues[7]={},*waterReading=nullptr,*dhwRequests=nullptr,*electricValues[3]={};
+lv_obj_t *autoValues[8]={},*waterReading=nullptr,*dhwRequests=nullptr,*electricValues[3]={};
 lv_obj_t* roomFields[3]={};
+lv_obj_t *loopRooms[8]={},*loopRequests[8]={};
 panel_heating_settings::State roomDraft{};
 
 lv_obj_t *boilerOnField=nullptr,*boilerOffField=nullptr,*boilerSaveCaption=nullptr;
@@ -155,7 +156,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,FuelOverview=61,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES,BoilerEdit=200,BoilerSave,TargetLess,TargetMore,TargetSave,HeatingPage,RoomLimits,RoomSave,RoomCooler,RoomWarmer};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,FuelOverview=61,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES,BoilerEdit=200,BoilerSave,TargetLess,TargetMore,TargetSave,HeatingPage,RoomLimits,RoomSave,RoomCooler,RoomWarmer,ViewFloors,ViewRadiators};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
 void updateStorageLabel();
@@ -584,10 +585,12 @@ void action(lv_event_t* e){
   if(code>=Timeout0 && code<=Timeout6){cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=DISPLAY_TIMEOUTS[code-Timeout0];send(cmd);return;}
   switch(code){
     case Home:closeDialog=true;pendingPage=0;slideDirection=-1;view=0;break;
-    case Back:view=page==PAGE_SETTINGS?parentMenuView(view):Root;rebuild=true;break;
+    case Back:view=page==PAGE_SETTINGS?parentMenuView(view):page==1&&view>=6?5:Root;rebuild=true;break;
     case HeatingPage:closeDialog=true;pendingPage=1;view=5;break;
     case RoomLimits:editRoomLimits();break;
     case RoomSave:saveRoomLimits();break;
+    case ViewFloors:view=6;rebuild=true;break;
+    case ViewRadiators:view=7;rebuild=true;break;
     case RoomCooler:moveRoomLimits(-1);break;
     case RoomWarmer:moveRoomLimits(1);break;
     case BoilerEdit:editBoiler();break;
@@ -677,7 +680,7 @@ void updateClock(){
   if(dateLabel&&strcmp(lv_label_get_text(dateLabel),d))lv_label_set_text(dateLabel,d);
 }
 const char* currentTitle(){
-  if(page==1&&view>0)return view==1?"Бойлер":view==2?"Электрокотёл":view==3?"Отопитель":view==4?"Подогрев топлива":"Автоматика";
+  if(page==1&&view>0)return view==1?"Бойлер":view==2?"Электрокотёл":view==3?"Отопитель":view==4?"Подогрев топлива":view==5?"Автоматика":"Контуры";
   if(page==PAGE_SETTINGS)switch(view){
     case ConnectionsView:return "Подключения";case WifiView:return "Wi-Fi";case BleView:return "Bluetooth";
     case DisplayView:return "Экран";case HaView:return "Home Assistant";
@@ -916,7 +919,7 @@ void heatingTemperature(char* out,size_t capacity,float value){
   else snprintf(out,capacity,"Нет данных");
 }
 void showHeatingRequests(){
-  if(!autoValues[0]&&!waterReading&&!electricValues[0])return;
+  if(!autoValues[0]&&!waterReading&&!electricValues[0]&&!loopRooms[0])return;
   panel_heating_runtime::Snapshot s{};
   panel_heating_runtime::snapshot(s);
   using namespace panel_heating;
@@ -928,10 +931,24 @@ void showHeatingRequests(){
     setLabel(autoValues[0],in.presence==Presence::Home?"Дома":in.presence==Presence::Away?"Никого нет":"Нет данных");
     setLabel(autoValues[1],in.season==Season::Winter?"Зима":in.season==Season::Summer?"Лето":"Не задан");
     setLabel(autoValues[2],out.demand==Flag::Yes?"Нужен нагрев":out.demand==Flag::No?"Нет запроса":"Нет данных");
-    setLabel(autoValues[3],out.source==Source::Diesel?"Дизель":out.source==Source::Electric?"Электрокотёл":out.source==Source::None?"Нет запроса":"Нет данных");
+    setLabel(autoValues[3],out.source==Source::Diesel?"Дизель":out.source==Source::Electric?"Электрокотёл":out.source==Source::None?(out.demand==Flag::Yes?"Нет источника":"Нет запроса"):"Нет данных");
     setLabel(autoValues[4],power);
     setLabel(autoValues[5],requested(out.tankPower));
     setLabel(autoValues[6],requested(out.coilPump));
+    setLabel(autoValues[7],out.alarm==Flag::Yes?"Авария":out.alarm==Flag::No?"Нет аварии":"Нет данных");
+    lv_obj_set_style_text_color(autoValues[7],c(out.alarm==Flag::Yes?RED:TXT),0);
+  }
+  if(loopRooms[0]){
+    const unsigned first=view==6?0:8;
+    for(unsigned row=0;row<8 && loopRooms[row];row++){
+      const unsigned index=first+row,room=s.roomForLoop[index];
+      if(!room || room>ROOM_COUNT)snprintf(text,sizeof(text),"—");
+      else if(isfinite(in.roomC[room-1]))snprintf(text,sizeof(text),"%u  /  %.1f °C",room,double(in.roomC[room-1]));
+      else snprintf(text,sizeof(text),"%u  /  нет данных",room);
+      setLabel(loopRooms[row],text);
+      const auto request=out.loop[index];
+      setLabel(loopRequests[row],!room?"—":request==Flag::Yes?"Открыть":request==Flag::No?"Закрыть":"Нет данных");
+    }
   }
   if(waterReading){
     heatingTemperature(text,sizeof(text),in.tankC);setLabel(waterReading,text);
@@ -947,16 +964,35 @@ void showHeatingRequests(){
 void heatingPage(){
   label(body,"Расчётные запросы",24,12,430,&boiler_font_25);
   label(body,"Состояние нагрузок не подтверждено",24,52,432,&boiler_font_14,MUTED);
-  auto* card=box(body,24,91,432,390);
-  const char* names[]={"Переключатель","Сезон","Помещения","Источник","Мощность ТЭНов","Питание бойлера","Насос змеевика"};
-  for(unsigned i=0;i<7;i++){
-    const int y=18+int(i)*52;
+  auto* card=box(body,24,91,432,402);
+  const char* names[]={"Переключатель","Сезон","Помещения","Источник","Мощность ТЭНов","Питание бойлера","Насос змеевика","Авария источника"};
+  for(unsigned i=0;i<8;i++){
+    const int y=18+int(i)*48;
     label(card,names[i],15,y,204,&boiler_font_19,MUTED);
     autoValues[i]=label(card,"Нет данных",219,y,199,&boiler_font_19);
     lv_obj_set_style_text_align(autoValues[i],LV_TEXT_ALIGN_RIGHT,0);
   }
-  button(body,"Пороги отопления",24,511,432,62,RoomLimits);
+  button(body,"Пороги отопления",24,511,238,62,RoomLimits);
+  button(body,"Контуры",272,511,184,62,ViewFloors);
   label(body,"Назначение контуров и параметры воды доступны в веб-интерфейсе.",24,593,432,&boiler_font_14,MUTED);
+}
+void heatingLoopsPage(){
+  const bool floors=view==6;
+  button(body,"Тёплый пол",24,14,210,58,ViewFloors,floors?0x245D55:0x26373B);
+  button(body,"Батареи",246,14,210,58,ViewRadiators,floors?0x26373B:0x245D55);
+  label(body,"Контур",32,96,88,&boiler_font_14,MUTED);
+  label(body,"Комната / °C",126,96,174,&boiler_font_14,MUTED);
+  label(body,"Запрос",316,96,134,&boiler_font_14,MUTED);
+  const unsigned count=floors?8:6;
+  for(unsigned row=0;row<count;row++){
+    const int y=128+int(row)*59;
+    auto* line=box(body,24,y,432,53);
+    char number[8];snprintf(number,sizeof(number),"%u",row+1);
+    label(line,number,10,13,82,&boiler_font_19);
+    loopRooms[row]=label(line,"—",102,13,185,&boiler_font_19);
+    loopRequests[row]=label(line,"—",292,13,132,&boiler_font_19);
+  }
+  label(body,"Назначения комнат и контуров — в веб-разделе «Автоматика».",24,617,432,&boiler_font_14,MUTED);
 }
 void updateEquipmentReadings(){
   showHeatingRequests();
@@ -1349,6 +1385,8 @@ void render(){
   boilerOnLabel=boilerOffLabel=waterReading=dhwRequests=nullptr;
   for(auto& value:autoValues)value=nullptr;
   for(auto& value:electricValues)value=nullptr;
+  for(auto& value:loopRooms)value=nullptr;
+  for(auto& value:loopRequests)value=nullptr;
   for(auto& pin:heaterPinLabels)pin=nullptr;
   fuelCardLabels={};fuelCanister={};
   for(auto& icon:tempIcon)icon=nullptr;
@@ -1358,7 +1396,7 @@ void render(){
   makeHeader();makeFooter();
   switch(page){
     case 0:home();break;
-    case 1:if(view==5)heatingPage();else if(view>=1&&view<=4)equipmentPage();else control();break;
+    case 1:if(view==6||view==7)heatingLoopsPage();else if(view==5)heatingPage();else if(view>=1&&view<=4)equipmentPage();else control();break;
     case 2:fuelPage();break;
     default:
       switch(view){

@@ -8,6 +8,7 @@ struct Snapshot {
   bool configured=false;
   bool settingsAvailable=false;
   uint32_t settingsRevision=0,sampledAtMs=0;
+  uint8_t roomForLoop[panel_heating::LOOP_COUNT]={};
   panel_heating::Inputs input{};
   panel_heating::Output output{};
 };

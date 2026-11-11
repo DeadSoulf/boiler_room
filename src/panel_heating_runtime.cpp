@@ -19,7 +19,8 @@ Freshness ages[panel_config::COUNT];
 panel_heating::Controller controller;
 std::mutex resultMutex;
 Snapshot published;
-bool haveResult=false;
+bool haveResult=false,haveCompleteTick=false;
+uint32_t lastCompleteTick=0;
 
 float readSample(Channel channel,uint32_t now,bool known,const panel_sensors::Readings& readings,bool contactValue=false){
   const unsigned id=unsigned(channel);
@@ -45,14 +46,15 @@ Health health(Flag fault){
 void resetSensors(){
   for(auto& age:ages)age=Freshness{};
   controller=Controller{};
+  haveCompleteTick=false;
   std::lock_guard<std::mutex> lock(resultMutex);
   haveResult=false;
 }
 void tick(bool pinConfigKnown,uint32_t pinRevision){
   Snapshot next{};
   panel_sensors::Readings readings{};
-  const bool validDrivers=pinConfigKnown && panel_sensors::readings(readings) &&
-    readings.started && readings.configRevision==pinRevision;
+  const bool copied=pinConfigKnown && panel_sensors::readings(readings);
+  const bool validDrivers=copied && readings.started && readings.configRevision==pinRevision;
   const uint32_t now=millis();
   next.sampledAtMs=now;
   auto& in=next.input;
@@ -77,8 +79,23 @@ void tick(bool pinConfigKnown,uint32_t pinRevision){
     next.settingsRevision=settings.revision;
     next.configured=settings.revision!=0;
     in.season=settings.season;
+    for(unsigned i=0;i<LOOP_COUNT;i++)next.roomForLoop[i]=settings.config.roomForLoop[i];
   }
-  next.output=controller.tick(now,settings.config,in);
+  // A missed lock is not a new measurement. Withhold requests during the
+  // missed sample, while retaining a recent, legitimate hysteresis state.
+  if(haveCompleteTick && uint32_t(now-lastCompleteTick)>=panel::STALE_MS){
+    controller=Controller{};
+    haveCompleteTick=false;
+  }
+  if(copied && next.settingsAvailable){
+    next.output=controller.tick(now,settings.config,in);
+    lastCompleteTick=now;haveCompleteTick=true;
+  }else if(validDrivers && !next.settingsAvailable){
+    // The physical presence switch alone determines DHW supply. Use a fresh
+    // controller for this independent decision without altering plant history.
+    Inputs presenceOnly;presenceOnly.presence=in.presence;
+    next.output=Controller{}.tick(now,Config{},presenceOnly);
+  }
   std::lock_guard<std::mutex> lock(resultMutex);
   published=next;
   haveResult=true;

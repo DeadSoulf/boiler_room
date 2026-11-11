@@ -74,7 +74,8 @@ namespace panel_heating_settings {
 }
 namespace panel_sensors {
  Readings fixture{};
- bool readings(Readings& out){out=fixture;return true;}
+ bool readAvailable=true;
+ bool readings(Readings& out){if(!readAvailable)return false;out=fixture;return true;}
  std::deque<Event> queue;bool begin(){return true;}bool poll(Event& e){if(queue.empty())return false;e=queue.front();queue.pop_front();return true;}}
 namespace panel_storage {
  Snapshot fixture;unsigned accepted=0,cancelled=0;
