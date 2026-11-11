@@ -1,5 +1,7 @@
 # Boiler Room Touch Panel — v0.10.15
 
+[Карта проекта / Project map](docs/project-map.md) · [Алгоритмы отопления и горячей воды](docs/heating-control.md) · [Руководство на русском](README_RU.md)
+
 ## v0.10.15 — Individual electric-boiler heater outputs
 
 **Equipment → Electric boiler** has three buttons, **ТЭН-1**, **ТЭН-2** and **ТЭН-3**. Each shows its assigned GPIO. The boiler’s low and high temperature thresholds apply to the electric boiler as a whole.
