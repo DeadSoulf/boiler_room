@@ -8,7 +8,7 @@
 #include <time.h>
 
 namespace panel {
-constexpr const char* VERSION = "v0.10.15";
+constexpr const char* VERSION = "v0.11.0";
 constexpr unsigned CHANNELS = 6;
 constexpr unsigned MAX_AP = 16;
 constexpr unsigned MAX_WIFI_PROFILES = 8;

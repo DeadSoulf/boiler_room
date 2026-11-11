@@ -1,6 +1,16 @@
-# Boiler Room Touch Panel — v0.10.15
+# Boiler Room Touch Panel — v0.11.0
 
 [Карта проекта / Project map](docs/project-map.md) · [Алгоритмы отопления и горячей воды](docs/heating-control.md) · [Руководство на русском](README_RU.md)
+
+## v0.11.0 — Heating and domestic hot water control
+
+Open **Equipment → Автоматика** to view room demand, the selected heat source, the requested number of electric stages, DHW power and the coil pump request. In the paired browser, assign each of the eight floor loops and six radiator loops to its room, set the season and configure water temperatures. Open the **В доме** card and drag the house-temperature slider. Saving shifts all three room thresholds together while preserving their differences.
+
+At a room target of 22 °C, the default air thresholds are 19 / 22 / 23 °C. The electric boiler requests three 3 kW stages on a cold start. A hot supply sheds one stage at a time, five minutes between reductions. A satisfied return cuts all remaining stages immediately. The physical presence switch selects the primary source and controls the DHW power request.
+
+The controller reads assigned JP1 inputs and displays calculated requests. Existing pin assignments survive the upgrade. Driving external relays and the diesel controller requires their hardware interface. See the [setup guide and commissioning details](docs/heating-control.md#как-пользоваться-автоматикой-панели).
+
+Panel screenshots (480×800) with test readings. [House-temperature slider](docs/verification/assets/v0.11.0-room-target.png) · [Heating requests](docs/verification/assets/v0.11.0-automation.png)
 
 ## v0.10.15 — Individual electric-boiler heater outputs
 

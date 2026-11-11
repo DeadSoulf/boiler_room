@@ -999,6 +999,11 @@ void showHeatingRequests(){
   if(loopRooms[0]){
     const unsigned first=view==6?0:8;
     for(unsigned row=0;row<8 && loopRooms[row];row++){
+      if(!s.settingsAvailable){
+        setLabel(loopRooms[row],"Нет данных");
+        setLabel(loopRequests[row],"Нет данных");
+        continue;
+      }
       const unsigned index=first+row,room=s.roomForLoop[index];
       if(!room || room>ROOM_COUNT)snprintf(text,sizeof(text),"Без комнаты");
       else if(isfinite(in.roomC[room-1]))snprintf(text,sizeof(text),"%u  /  %.1f °C",room,double(in.roomC[room-1]));

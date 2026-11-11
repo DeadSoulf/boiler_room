@@ -368,7 +368,14 @@ int main(int argc,char** argv){
    assert(find(body,"9 кВт"));save("heating-automation-fixture");
    touch("Контуры");assert(view==6&&find(body,"1  /  18.0 °C")&&find(body,"2  /  24.0 °C"));
    assert(!strcmp(lv_label_get_text(loopRequests[0]),"Открыть")&&!strcmp(lv_label_get_text(loopRequests[1]),"Закрыть"));
-   save("heating-floors-fixture");touch("Батареи");assert(view==7&&find(body,"1  /  18.0 °C")&&find(body,"Открыть"));
+   save("heating-floors-fixture");
+   panel_heating_settings::available=false;step(1100);
+   assert(!strcmp(lv_label_get_text(loopRooms[0]),"Нет данных"));
+   assert(!strcmp(lv_label_get_text(loopRooms[2]),"Нет данных"));
+   assert(!strcmp(lv_label_get_text(loopRequests[0]),"Нет данных"));
+   panel_heating_settings::available=true;step(1100);
+   assert(!strcmp(lv_label_get_text(loopRooms[2]),"Без комнаты"));
+   touch("Батареи");assert(view==7&&find(body,"1  /  18.0 °C")&&find(body,"Открыть"));
    save("heating-radiators-fixture");touch("<");assert(view==5);
    reading(Channel::Room,22);reading(Channel::Presence,0,true);reading(Channel::DieselFault,0,true);
    reading(Channel::Coolant,56);step(1100);
