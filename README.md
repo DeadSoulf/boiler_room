@@ -1,4 +1,8 @@
-# Boiler Room Touch Panel — v0.10.7
+# Boiler Room Touch Panel — v0.10.8
+
+## v0.10.8: Indirect hot-water tank thresholds
+
+Open **Equipment → Hot-water tank** on the panel or in a paired browser. Enter the lower switch-on and upper switch-off temperature, then save both together. They are stored on the panel and survive a restart. Neither value is preset. The heat button remains unavailable until the dedicated water sensor and output controller are connected and verified. Saving a pair does not operate any equipment or queue a future start.
 
 ## v0.10.7: saved Wi-Fi networks
 

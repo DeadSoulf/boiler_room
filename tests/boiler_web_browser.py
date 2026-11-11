@@ -62,6 +62,7 @@ with sync_playwright() as p:
         off.focus()
     expect(off).to_be_focused();assert node.evaluate("el=>el.isConnected");expect(off).to_have_value("65")
     expect(card).to_have_js_property("open",True)
+    expect(info).to_contain_text("Изменения не сохранены")
     page.screenshot(path=str(out/"boiler-320.png"))
     snap.update(configured=True,revision=1,on_c=10,off_c=50)
     expect(info).to_contain_text("изменились",timeout=10000);expect(save).to_be_disabled()
