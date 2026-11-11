@@ -60,7 +60,8 @@ constexpr HeaterOutput ELECTRIC_HEATERS[]={
 constexpr unsigned HEATER_COUNT=sizeof(ELECTRIC_HEATERS)/sizeof(ELECTRIC_HEATERS[0]);
 lv_obj_t* heaterPinLabels[HEATER_COUNT]={};
 lv_obj_t *autoValues[8]={},*waterReading=nullptr,*dhwRequests=nullptr,*electricValues[3]={};
-lv_obj_t* roomFields[3]={};
+lv_obj_t *roomFields[3]={},*roomGoal=nullptr,*roomGoalLabel=nullptr,*roomNowLabel=nullptr;
+bool adjustingRooms=false;
 lv_obj_t *loopRooms[8]={},*loopRequests[8]={};
 panel_heating_settings::State roomDraft{};
 
@@ -182,6 +183,7 @@ void dismiss(){
   boilerOnField=boilerOffField=boilerSaveCaption=nullptr;boilerConfirm=false;
   targetEditor=TemperatureEditor{};fuelDetailLabels={};
   for(auto& f:roomFields)f=nullptr;
+  roomGoal=roomGoalLabel=roomNowLabel=nullptr;adjustingRooms=false;
   fuelDetailHint=nullptr;
   if(overlay){clearSecretFields();lv_obj_del(overlay);}overlay=nullptr;dialogKind=0;closeDialog=false;
   confirmedForget={};memset(confirmedUpdateVersion,0,sizeof(confirmedUpdateVersion));
@@ -305,6 +307,39 @@ void saveBoiler(){
   else if(r==panel_boiler::Result::Invalid)error("Проверьте значения обеих температур.");
   else error("Не удалось подтвердить запись. Проверьте настройки и повторите.");
 }
+bool readRoomFields(float (&degrees)[3],bool report=true);
+void moveRoomLimits(float change,bool recenter=true);
+void updateRoomGoal(bool recenter){
+  if(!roomGoal || adjustingRooms)return;
+  float t[3];if(!readRoomFields(t,false))return;
+  if(recenter){
+    // A twenty-degree touch range keeps tenths selectable on the 480px screen.
+    // Direct entry still covers the full sensor range.
+    const float lowest=fminf(t[0],fminf(t[1],t[2])),highest=fmaxf(t[0],fmaxf(t[1],t[2]));
+    const int low=int(lroundf((t[1]+fmaxf(-10.0f,-55.0f-lowest))*10));
+    const int high=int(lroundf((t[1]+fminf(10.0f,125.0f-highest))*10));
+    if(low>=high)lv_obj_add_state(roomGoal,LV_STATE_DISABLED);
+    else{lv_obj_clear_state(roomGoal,LV_STATE_DISABLED);lv_slider_set_range(roomGoal,low,high);}
+  }
+  adjustingRooms=true;
+  lv_slider_set_value(roomGoal,int(lroundf(t[1]*10)),LV_ANIM_OFF);
+  adjustingRooms=false;
+  char caption[96];snprintf(caption,sizeof(caption),"Температура в доме: %.1f °C",double(t[1]));
+  lv_label_set_text(roomGoalLabel,caption);
+}
+void roomSliderChanged(lv_event_t*){
+  if(adjustingRooms || !roomGoal)return;
+  float t[3];if(!readRoomFields(t))return;
+  moveRoomLimits(lv_slider_get_value(roomGoal)/10.f-t[1],false);
+}
+void roomFieldChanged(lv_event_t*){updateRoomGoal(true);}
+void updateRoomObservation(){
+  if(!roomNowLabel)return;
+  const auto& measured=measurements[0];char caption[80];
+  if(measured.fresh(millis()))snprintf(caption,sizeof(caption),"В доме: %.1f °C",double(measured.value));
+  else snprintf(caption,sizeof(caption),"%s",measured.count?"В доме: устарело":"В доме: нет данных");
+  if(strcmp(lv_label_get_text(roomNowLabel),caption))lv_label_set_text(roomNowLabel,caption);
+}
 void editRoomLimits(){
   panel_heating_settings::State saved{};
   if(!panel_heating_settings::snapshot(saved)){
@@ -312,45 +347,67 @@ void editRoomLimits(){
   }
   dismiss();roomDraft=saved;
   overlay=box(lv_layer_top(),0,0,480,800,BG,0);
-  label(overlay,"Пороги комнат",18,22,430,&boiler_font_25);
+  if(page==0){
+    roomNowLabel=label(overlay,"",18,20,254,&boiler_font_19);
+    button(overlay,"Справочная уставка",278,7,184,47,Temp0);
+    updateRoomObservation();
+  }else label(overlay,"Пороги комнат",18,22,430,&boiler_font_25);
   const char* captions[]={"Открыть контуры, °C","Закрыть батарею*, °C","Закрыть все контуры, °C"};
   const float values[]={saved.config.roomOnC,saved.config.roomRadiatorOffC,saved.config.roomOffC};
   for(unsigned i=0;i<3;i++){
-    const int y=67+int(i)*64;
+    const int y=62+int(i)*60;
     label(overlay,captions[i],18,y+15,278,&boiler_font_19);
     auto* f=field(overlay,"°C",302,y,160,7);roomFields[i]=f;
     lv_textarea_set_accepted_chars(f,"-0123456789.,");
     char value[16];snprintf(value,sizeof(value),"%.1f",double(values[i]));
     lv_textarea_set_text(f,value);
   }
-  label(overlay,"* В комнате с полом и батареей.",18,258,444,&boiler_font_14,MUTED);
-  button(overlay,"Все −1 °C",18,289,215,48,RoomCooler);
-  button(overlay,"Все +1 °C",247,289,215,48,RoomWarmer);
-  dialogError=label(overlay,"Порог открытия < батарея < закрытие всех.",18,343,444,&boiler_font_14,MUTED);
-  button(overlay,"Назад",18,390,144,56,Cancel);
-  button(overlay,"Сохранить",174,390,288,56,RoomSave,0x245D55);
+  label(overlay,"* В комнате с полом и батареей.",18,242,444,&boiler_font_14,MUTED);
+  roomGoalLabel=label(overlay,"",18,275,444,&boiler_font_19,SKY);
+  button(overlay,"-1 °C",18,314,72,52,RoomCooler);
+  button(overlay,"+1 °C",390,314,72,52,RoomWarmer);
+  roomGoal=lv_slider_create(overlay);
+  lv_obj_set_pos(roomGoal,115,335);lv_obj_set_size(roomGoal,250,16);
+  lv_obj_set_ext_click_area(roomGoal,18);
+  lv_obj_set_style_bg_color(roomGoal,c(LINE),LV_PART_MAIN);
+  lv_obj_set_style_bg_color(roomGoal,c(SKY),LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(roomGoal,c(TXT),LV_PART_KNOB);
+  lv_obj_set_style_pad_all(roomGoal,9,LV_PART_KNOB);
+  lv_obj_clear_flag(roomGoal,LV_OBJ_FLAG_GESTURE_BUBBLE);
+  updateRoomGoal(true);
+  lv_obj_add_event_cb(roomGoal,roomSliderChanged,LV_EVENT_VALUE_CHANGED,nullptr);
+  for(auto* f:roomFields)lv_obj_add_event_cb(f,roomFieldChanged,LV_EVENT_VALUE_CHANGED,nullptr);
+  dialogError=label(overlay,"Порог открытия < цель < закрытие всех.",18,379,444,&boiler_font_14,MUTED);
+  button(overlay,"Назад",18,427,144,56,Cancel);
+  button(overlay,"Сохранить",174,427,288,56,RoomSave,0x245D55);
   static const char* keys[]={"1","2","3","\n","4","5","6","\n","7","8","9","\n","-","0",",","<-",""};
-  makeKeyboard(468);setKeyboardMap(keys);activeField=roomFields[0];
+  makeKeyboard(499);setKeyboardMap(keys);activeField=roomFields[0];
 }
-bool readRoomFields(float (&degrees)[3]){
+bool readRoomFields(float (&degrees)[3],bool report){
   for(unsigned i=0;i<3;i++){
     char text[12];snprintf(text,sizeof(text),"%s",lv_textarea_get_text(roomFields[i]));
     if(auto* comma=strchr(text,','))*comma='.';
     char* end=nullptr;degrees[i]=strtof(text,&end);
-    if(end==text || *end || !isfinite(degrees[i])){error("Введите три температуры в градусах.");return false;}
+    if(end==text || *end || !isfinite(degrees[i]) || degrees[i]<-55 || degrees[i]>125){
+      if(report)error("Введите три температуры от -55 до 125 °C.");
+      return false;
+    }
   }
   return true;
 }
-void moveRoomLimits(float change){
+void moveRoomLimits(float change,bool recenter){
   float degrees[3];
   if(!roomFields[0]||!readRoomFields(degrees))return;
   for(const float value:degrees){
-    if(value+change < -55 || value+change > 125){error("Диапазон датчика: от −55 до 125 °C.");return;}
+    if(value+change < -55.001f || value+change > 125.001f){error("Диапазон датчика: от -55 до 125 °C.");return;}
   }
+  adjustingRooms=true;
   for(unsigned i=0;i<3;i++){
     char text[16];snprintf(text,sizeof(text),"%.1f",double(degrees[i]+change));
     lv_textarea_set_text(roomFields[i],text);
   }
+  adjustingRooms=false;
+  updateRoomGoal(recenter);
   error("Сохраните выбранные пороги.");
 }
 void saveRoomLimits(){
@@ -856,7 +913,7 @@ void updateCanister(){
   lv_label_set_text(fuelCanister.status,status);lv_obj_set_style_text_color(fuelCanister.status,c(ink),0);
 }
 void bindReading(lv_obj_t* object,unsigned channel){
-  lv_obj_add_event_cb(object,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(Temp0+channel)));
+  lv_obj_add_event_cb(object,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(channel==0?uintptr_t(RoomLimits):uintptr_t(Temp0+channel))));
 }
 void pairedReading(lv_obj_t* card,unsigned channel,int x,int y){
   auto* row=box(card,x,y,206,125,CARD,0);
@@ -1356,7 +1413,7 @@ void aboutPage(){
 }
 
 void updateLive(){
-  updateFuel();updateTargetEditor();updateEquipmentReadings();updateUpdateLabels();const uint32_t now=millis();char text[120];
+  updateFuel();updateTargetEditor();updateRoomObservation();updateEquipmentReadings();updateUpdateLabels();const uint32_t now=millis();char text[120];
   for(unsigned i=0;i<CHANNELS;i++)if(tempValue[i]){
     const auto& m=measurements[i];temperature(text,sizeof(text),m,now);lv_label_set_text(tempValue[i],text);
     lv_obj_set_style_text_font(tempValue[i],strlen(text)>5?&boiler_font_25:&boiler_font_55,0);

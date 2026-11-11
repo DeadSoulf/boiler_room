@@ -41,7 +41,11 @@ void bounds(lv_obj_t* obj,bool scrolling=false){
 void check(){++checks;lv_obj_update_layout(lv_scr_act());bounds(lv_scr_act());bounds(lv_layer_top());}
 lv_obj_t* find(lv_obj_t* obj,const char* name){if(lv_obj_has_flag(obj,LV_OBJ_FLAG_HIDDEN))return nullptr;if(lv_obj_check_type(obj,&lv_label_class)&&!strcmp(lv_label_get_text(obj),name))return obj;for(unsigned i=0;i<lv_obj_get_child_cnt(obj);i++)if(auto* found=find(lv_obj_get_child(obj,i),name))return found;return nullptr;}
 void clickAt(int x,int y){mx=x;my=y;down=true;step(80);down=false;step(240);}
-void touch(const char* name){auto* n=find(overlay?lv_layer_top():lv_scr_act(),name);if(!n){fprintf(stderr,"MISSING CLICK [%s] page=%d view=%d overlay=%d\n",name,page,view,int(overlay!=nullptr));abort();}auto* o=lv_obj_get_parent(n);assert(!lv_obj_has_state(o,LV_STATE_DISABLED));lv_obj_update_layout(o);lv_area_t a;lv_obj_get_coords(o,&a);if(a.x1<0||a.y1<0||a.x2>=480||a.y2>=800)fprintf(stderr,"OUTSIDE [%s] page=%d view=%d overlay=%d at (%d,%d)-(%d,%d)\n",name,page,view,int(overlay!=nullptr),a.x1,a.y1,a.x2,a.y2);assert(a.x1>=0&&a.y1>=0&&a.x2<480&&a.y2<800);int x=(a.x1+a.x2)/2,y=(a.y1+a.y2)/2;lv_point_t p={lv_coord_t(x),lv_coord_t(y)};auto* hit=lv_indev_search_obj(overlay?lv_layer_top():lv_scr_act(),&p);while(hit&&hit!=o)hit=lv_obj_get_parent(hit);assert(hit==o);clickAt(x,y);check();}
+void touch(const char* name){
+ // A release can schedule a new screen on the following LVGL timer. Wait for
+ // its actual slide to finish before aiming a second physical pointer action.
+ for(unsigned elapsed=0;body&&lv_anim_get(body,animX)&&elapsed<400;elapsed+=10)step(10);
+ auto* n=find(overlay?lv_layer_top():lv_scr_act(),name);if(!n){fprintf(stderr,"MISSING CLICK [%s] page=%d view=%d overlay=%d\n",name,page,view,int(overlay!=nullptr));abort();}auto* o=lv_obj_get_parent(n);assert(!lv_obj_has_state(o,LV_STATE_DISABLED));lv_obj_update_layout(o);lv_area_t a;lv_obj_get_coords(o,&a);if(a.x1<0||a.y1<0||a.x2>=480||a.y2>=800)fprintf(stderr,"OUTSIDE [%s] page=%d view=%d overlay=%d at (%d,%d)-(%d,%d)\n",name,page,view,int(overlay!=nullptr),a.x1,a.y1,a.x2,a.y2);assert(a.x1>=0&&a.y1>=0&&a.x2<480&&a.y2<800);int x=(a.x1+a.x2)/2,y=(a.y1+a.y2)/2;lv_point_t p={lv_coord_t(x),lv_coord_t(y)};auto* hit=lv_indev_search_obj(overlay?lv_layer_top():lv_scr_act(),&p);while(hit&&hit!=o)hit=lv_obj_get_parent(hit);assert(hit==o);clickAt(x,y);check();}
 void swipe(bool left=true){mx=left?420:60;my=85;down=true;step(60);for(int i=0;i<8;i++){mx+=left?-42:42;step(40);}down=false;step(320);check();}
 void go(int p,int v=0){dismiss();page=p;view=v;pendingPage=-1;rebuild=false;render();step();check();}
 void homeTemperatureChecks(){
@@ -247,9 +251,11 @@ int main(int argc,char** argv){
      assert(a.x1>=pict.x1&&a.x2<=pict.x2&&a.y1>=pict.y1&&a.y2<=pict.y2);
      for(unsigned k=0;k<lv_obj_get_child_cnt(nodes[n]);k++)nodes.push_back(lv_obj_get_child(nodes[n],k));
    }
-   clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);assert(overlay&&targetEditor.channel==int(i));
+   clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);
+   if(i==0){assert(roomGoal&&find(overlay,"В доме: нет данных"));save("room-no-data");touch("Справочная уставка");}
+   assert(overlay&&targetEditor.channel==int(i));
    assert(find(overlay,SENSOR_NAMES[i])&&find(overlay,"Не задана")&&find(overlay,"Нет данных"));
-   save(i==0?"room-no-data":"outside-no-data");touch("Назад");assert(!overlay&&page==0);
+   save(i==0?"room-reference":"outside-no-data");touch("Назад");assert(!overlay&&page==0);
  }
  const char* emptyTemperatureScreens[]={"","","supply-no-data","tank-no-data","return-no-data","outlet-no-data"};
  for(unsigned i=2;i<CHANNELS;i++){
@@ -330,7 +336,7 @@ int main(int argc,char** argv){
  assert(!strcmp(lv_label_get_text(tempValue[3]),"--.-"));
  assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
  touch("Топливо");assert(page==2&&!overlay);touch("В баке");assert(overlay&&targetEditor.channel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);
- touch("В доме");touch("Пороги отопления");assert(overlay&&roomFields[0]);touch("Назад");
+ touch("В доме");assert(overlay&&roomGoal&&roomFields[0]);touch("Назад");
  swipe();assert(page==1&&view==0);save("equipment");
  touch("Автоматика");assert(page==1&&view==5);save("heating-automation");
  {
@@ -385,14 +391,21 @@ int main(int argc,char** argv){
    ++sensor.configRevision;step(1100);
    assert(panel_heating_runtime::snapshot(calc)&&calc.input.presence==Presence::Unknown&&isnan(calc.input.tankC));
    touch("Пороги отопления");assert(roomFields[0]&&roomFields[2]);save("room-heating-thresholds");
-   touch("Все +1 °C");assert(!strcmp(lv_textarea_get_text(roomFields[0]),"20.0")&&!strcmp(lv_textarea_get_text(roomFields[2]),"24.0"));
-   touch("Все −1 °C");assert(!strcmp(lv_textarea_get_text(roomFields[1]),"22.0")&&spec.config.roomOnC==19);
+   touch("+1 °C");save("room-heating-warmer");assert(!strcmp(lv_textarea_get_text(roomFields[0]),"20.0")&&!strcmp(lv_textarea_get_text(roomFields[2]),"24.0"));
+   touch("-1 °C");touch("-1 °C");save("room-heating-cooler");touch("+1 °C");assert(!strcmp(lv_textarea_get_text(roomFields[1]),"22.0")&&spec.config.roomOnC==19);
    lv_textarea_set_text(roomFields[0],"23");touch("Сохранить");
    assert(overlay&&spec.config.roomOnC==19);
    lv_textarea_set_text(roomFields[0],"19,5");++spec.revision;touch("Сохранить");
    assert(overlay&&strstr(lv_label_get_text(dialogError),"изменились"));touch("Назад");
-   touch("Пороги отопления");lv_textarea_set_text(roomFields[0],"19,5");touch("Сохранить");
-   assert(!overlay&&spec.config.roomOnC==19.5f&&spec.config.roomForLoop[8]==1);
+   touch("Пороги отопления");lv_textarea_set_text(roomFields[0],"19,5");
+   lv_area_t track;lv_obj_get_coords(roomGoal,&track);
+   mx=(track.x1+track.x2)/2;my=(track.y1+track.y2)/2;down=true;step(80);
+   for(int i=0;i<4;i++){mx+=10;step(40);}down=false;step(220);
+   const float chosen=lv_slider_get_value(roomGoal)/10.f;
+   assert(chosen>22 && fabsf(atof(lv_textarea_get_text(roomFields[0]))-(chosen-2.5f))<0.02f);
+   assert(fabsf(atof(lv_textarea_get_text(roomFields[2]))-(chosen+1.f))<0.02f && spec.config.roomOnC==19);
+   touch("Сохранить");
+   assert(!overlay&&fabsf(spec.config.roomOnC-(chosen-2.5f))<0.02f&&spec.config.roomForLoop[8]==1);
    sensor={};spec=oldSettings;step(1100);
  }
  touch("<");assert(page==1&&view==0);
@@ -604,7 +617,8 @@ int main(int argc,char** argv){
  assert(!strcmp(lv_label_get_text(tempValue[3]),"34.8")&&!strcmp(lv_label_get_text(tempValue[5]),"41.5"));homeTemperatureChecks();
  const char* sampleScreens[]={"room-values-fixture","outside-values-fixture","supply-values-fixture","tank-values-fixture","return-values-fixture","outlet-values-fixture"};
  for(unsigned i=0;i<CHANNELS;i++){
-   touch(SENSOR_NAMES[i]);assert(overlay&&targetEditor.channel==int(i));
+   touch(SENSOR_NAMES[i]);assert(overlay);
+   if(i==0)assert(roomGoal&&find(overlay,"В доме: 22.4 °C"));else assert(targetEditor.channel==int(i));
    save(sampleScreens[i]);touch("Назад");
  }
  go(2);assert(find(body,"34.8")&&find(body,"41.5"));save("fuel-values-fixture");go(0);step(31000);assert(!strcmp(lv_label_get_text(tempState[0]),"Устарело"));save("home-stale-fixture");

@@ -53,6 +53,42 @@ static void rooms() {
   assert(p.tick().demand == Flag::No && p.tick().stages == 0);
 }
 
+static void retuneRooms() {
+  Plant p;
+  assert(p.tick().loop[0] == Flag::Yes); // Cold at 19.
+  p.in.roomC[0] = 21.5f;
+  auto out = p.tick();
+  assert(out.loop[0] == Flag::Yes && out.loop[8] == Flag::Yes);
+  p.config.roomOnC = 20; p.config.roomRadiatorOffC = 23; p.config.roomOffC = 24;
+  out = p.tick();
+  assert(out.loop[0] == Flag::Yes && out.loop[8] == Flag::Yes && out.demand == Flag::Yes);
+  p.in.roomC[0] = 23;
+  out = p.tick();
+  assert(out.loop[0] == Flag::Yes && out.loop[8] == Flag::No);
+  p.in.roomC[0] = 24;
+  out = p.tick();
+  assert(out.loop[0] == Flag::No && out.loop[8] == Flag::No);
+
+  p.in.roomC[0] = 20; p.tick();
+  p.in.roomC[0] = 22.5f;
+  assert(p.tick().loop[8] == Flag::Yes);
+  p.config.roomOnC = 19; p.config.roomRadiatorOffC = 22; p.config.roomOffC = 23;
+  out = p.tick(); // Crosses the new middle threshold without a change of reading.
+  assert(out.loop[0] == Flag::Yes && out.loop[8] == Flag::No);
+  p.config.roomOnC = 18; p.config.roomRadiatorOffC = 21; p.config.roomOffC = 22;
+  out = p.tick();
+  assert(out.loop[0] == Flag::No && out.loop[8] == Flag::No);
+
+  p.in.roomC[0] = p.in.roomC[1] = 18; p.tick();
+  p.in.roomC[0] = p.in.roomC[1] = 20;
+  p.config.roomForLoop[7] = 1; // Added another floor loop, same set of emitter types.
+  out = p.tick();
+  assert(out.loop[0] == Flag::Unknown && out.loop[7] == Flag::Unknown && out.loop[8] == Flag::Unknown);
+  assert(out.loop[1] == Flag::Yes);
+  p.in.roomC[1] = NAN; assert(p.tick().loop[1] == Flag::Unknown);
+  p.in.roomC[1] = 20; assert(p.tick().loop[1] == Flag::Unknown);
+}
+
 static void sources() {
   Plant p;
   p.in.presence = Presence::Home;
@@ -183,6 +219,6 @@ static void tank() {
 }
 
 int main() {
-  rooms(); sources(); electric(); partialRecovery(); tank();
+  rooms(); retuneRooms(); sources(); electric(); partialRecovery(); tank();
   std::puts("Rooms, source selection, electric stages and DHW decisions passed.");
 }

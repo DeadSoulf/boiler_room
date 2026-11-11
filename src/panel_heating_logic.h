@@ -61,13 +61,12 @@ class Controller {
   }
 
  private:
-  enum { Floor = 1, Radiator = 2 };
+  static constexpr uint16_t FLOOR_LOOPS = (1U << FLOOR_COUNT) - 1U;
   struct Room {
-    uint8_t circuits = 0;
+    uint16_t loops = 0;
     Flag floor = Flag::Unknown, radiator = Flag::Unknown;
   };
   Room rooms_[ROOM_COUNT] = {};
-  float roomOn_ = NAN, roomMiddle_ = NAN, roomOff_ = NAN;
   Presence lastPresence_ = Presence::Unknown;
   bool onBackup_ = false;
 
@@ -85,24 +84,22 @@ class Controller {
   }
 
   void evaluateRooms(const Config& c, const Inputs& in, Output& out) {
-    uint8_t circuits[ROOM_COUNT] = {};
+    uint16_t loops[ROOM_COUNT] = {};
     bool assigned = false, invalidMap = false;
     for (unsigned i = 0; i < LOOP_COUNT; ++i) {
       const unsigned id = c.roomForLoop[i];
       if (!id) continue;
       if (id > ROOM_COUNT) { invalidMap = true; continue; }
       assigned = true;
-      circuits[id - 1] |= i < FLOOR_COUNT ? Floor : Radiator;
+      loops[id - 1] |= uint16_t(1U << i);
     }
     const bool validThresholds = ordered(c.roomOnC, c.roomRadiatorOffC) &&
                                  ordered(c.roomRadiatorOffC, c.roomOffC);
-    const bool retuned = c.roomOnC != roomOn_ || c.roomRadiatorOffC != roomMiddle_ ||
-                         c.roomOffC != roomOff_;
-    roomOn_ = c.roomOnC; roomMiddle_ = c.roomRadiatorOffC; roomOff_ = c.roomOffC;
     for (unsigned n = 0; n < ROOM_COUNT; ++n) {
       Room& room = rooms_[n];
-      if (room.circuits != circuits[n] || retuned) room = Room{};
-      room.circuits = circuits[n];
+      // A new setpoint applies immediately; only a changed circuit assignment invalidates this room's history.
+      if (room.loops != loops[n]) room = Room{};
+      room.loops = loops[n];
       if (in.season == Season::Summer) {
         room.floor = room.radiator = Flag::No;
       } else if (in.season != Season::Winter || !validThresholds || !isfinite(in.roomC[n])) {
@@ -111,7 +108,8 @@ class Controller {
         room.floor = room.radiator = Flag::No;
       } else if (in.roomC[n] <= c.roomOnC) {
         room.floor = room.radiator = Flag::Yes;
-      } else if (room.circuits == (Floor | Radiator) && in.roomC[n] >= c.roomRadiatorOffC) {
+      } else if ((room.loops & FLOOR_LOOPS) && (room.loops >> FLOOR_COUNT) &&
+                 in.roomC[n] >= c.roomRadiatorOffC) {
         room.radiator = Flag::No;
       }
     }
