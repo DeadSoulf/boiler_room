@@ -45,7 +45,7 @@ firmware)
  python3 -m venv .build/venv
  .build/venv/bin/pip install platformio==6.1.18 2>&1 | tee artifacts/pip.log
  python3 ci/prepare.py
- bash tests/onewire_lifetime.sh .build/bsp/examples/LvglUi/lib/esp32-ds18b20
+ bash tests/onewire_lifetime.sh .build/bsp/examples/LvglUi/src
  .build/venv/bin/pio run -d .build/bsp/examples/LvglUi -e jc4880p4 2>&1 | tee artifacts/firmware-build.log
  .build/venv/bin/pio pkg list -d .build/bsp/examples/LvglUi > artifacts/packages.txt
  cp .build/bsp/examples/LvglUi/.pio/build/jc4880p4/{firmware.bin,firmware.elf,bootloader.bin,partitions.bin} artifacts/
