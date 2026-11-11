@@ -545,6 +545,9 @@ try:
                 # Mouse opens the first card. Native Tab/Enter/Space open the others.
                 summaries.nth(0).click()
                 for index, key in ((1, "Enter"), (2, "Space"), (3, "Enter")):
+                    if index <= 2:
+                        page.keyboard.press("Tab")
+                        expect(cards.nth(index - 1).get_by_role("button", name="Открыть автоматику", exact=True)).to_be_focused()
                     page.keyboard.press("Tab")
                     expect(summaries.nth(index)).to_be_focused()
                     page.keyboard.press(key)
@@ -565,6 +568,9 @@ try:
                 # Explicit close wins and must survive the next incoming status too.
                 page.keyboard.press("Enter")
                 for index, key in ((2, "Space"), (1, "Enter"), (0, "Space")):
+                    if index < 2:
+                        page.keyboard.press("Shift+Tab")
+                        expect(cards.nth(index).get_by_role("button", name="Открыть автоматику", exact=True)).to_be_focused()
                     page.keyboard.press("Shift+Tab")
                     expect(summaries.nth(index)).to_be_focused()
                     page.keyboard.press(key)

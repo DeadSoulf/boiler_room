@@ -59,8 +59,10 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <details class="card" id="heat-config"><summary>Настройки автоматики</summary>
  <form id="heat-form" novalidate>
  <fieldset id="heat-fields" disabled><legend>Пороги и оборудование</legend>
- <h3>Температура в доме</h3><div class="actions"><button type="button" id="heat-colder" aria-label="Снизить все три комнатных порога на 1 °C">−1 °C</button><button type="button" id="heat-warmer" aria-label="Поднять все три комнатных порога на 1 °C">+1 °C</button></div>
- <p class="hint">Обе кнопки сдвигают три комнатных порога вместе. После изменения сохраните настройки.</p>
+ <div class="target-control"><label for="heat-room-target">Температура в доме</label><output id="heat-room-target-value" for="heat-room-target">Нет данных</output>
+ <input id="heat-room-target" type="range" min="-55" max="125" step="0.1" aria-describedby="heat-room-target-hint" disabled></div>
+ <div class="actions"><button type="button" id="heat-colder" aria-label="Снизить все три комнатных порога на 1 °C">−1 °C</button><button type="button" id="heat-warmer" aria-label="Поднять все три комнатных порога на 1 °C">+1 °C</button></div>
+ <p class="hint" id="heat-room-target-hint">Цель совпадает с порогом отключения батарей. Бегунок и кнопки сдвигают все три порога вместе. Изменения применятся после сохранения.</p>
  <div id="heat-room-parameters"></div><h3>Теплоноситель и бойлер</h3><div id="heat-parameters"></div>
  <div class="field"><label for="heat-season">Сезон</label><select id="heat-season"><option value="0">Не выбран</option><option value="1">Лето</option><option value="2">Зима</option></select></div>
  <div class="field"><label for="heat-reheat">Повторный нагрев при остывании обратки</label><select id="heat-reheat"><option value="0">Не задан</option><option value="1">Включать все три ТЭНа</option><option value="2">Добавлять по одному</option></select></div>
@@ -193,7 +195,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
    <input type="range" id="target-range" min="-55" max="125" step="1" value="0" aria-describedby="target-status" disabled>
    <div class="target-limits" aria-hidden="true"><span>−55 °C</span><span>125 °C</span></div>
   </div>
-  <div id="target-heating-link" class="hidden"><p class="hint">Бегунок сохраняет значение для карточки. Пороги управления отоплением задаются в автоматике.</p><button type="button" class="ghost" id="target-heating-open">Открыть пороги автоматики</button></div>
+  <div id="target-heating-link" class="hidden"><p class="hint">Бегунок сохраняет значение для карточки. Пороги управления отоплением задаются в автоматике.</p><button type="button" class="primary" id="target-heating-open">Настроить отопление</button></div>
   <p id="target-status" class="hint" role="status"></p>
   <div class="actions"><button type="button" id="target-close" class="ghost">Закрыть</button><button type="submit" class="primary" id="target-save" disabled>Сохранить</button><button type="button" class="ghost hidden" id="target-reload">Перечитать с панели</button></div>
  </form>
@@ -583,15 +585,29 @@ function heatBlock(){
  return !serverOnline||!token||!current?.authorized||!u?.started||u.busy||u.boot_pending||pendingUpdate||updateRequestInFlight;
 }
 const roomThresholds=Array.from($("heat-room-parameters").querySelectorAll("input"));
-function canShiftRoom(step){
- return roomThresholds.every(input=>input.validity.valid&&input.valueAsNumber+step>=Number(input.min)&&input.valueAsNumber+step<=Number(input.max));
+function roomTargetRange(){
+ if(!roomThresholds.every(input=>input.validity.valid&&Number.isFinite(input.valueAsNumber)))return null;
+ const [on,center,off]=roomThresholds.map(input=>Math.round(input.valueAsNumber*10));
+ if(!(on<center&&center<off))return null;
+ return {center,min:Math.round(Number(roomThresholds[0].min)*10)+center-on,max:Math.round(Number(roomThresholds[2].max)*10)+center-off};
+}
+function shiftRoomThresholds(delta){
+ const range=roomTargetRange();
+ if(!range||!delta||range.center+delta<range.min||range.center+delta>range.max)return;
+ for(const input of roomThresholds)input.value=String((Math.round(input.valueAsNumber*10)+delta)/10);
+ heatDirty=true;heatControls();
 }
 function heatControls(){
  const cfg=heatData?.settings,stale=!!cfg&&heatDirty&&heatRevision!==cfg.revision;
  const locked=!cfg||heatBlock()||heatSaving||heatProblem||stale;
  $("heat-fields").disabled=!!locked;
- $("heat-colder").disabled=!!locked||!canShiftRoom(-1);
- $("heat-warmer").disabled=!!locked||!canShiftRoom(1);
+ const range=roomTargetRange(),slider=$("heat-room-target");
+ slider.disabled=!!locked||!range||range.min===range.max;
+ if(range){slider.min=String(range.min/10);slider.max=String(range.max/10);slider.value=String(range.center/10);}
+ const targetText=range?(range.center/10).toLocaleString("ru-RU")+" °C":"Нет данных";
+ text("heat-room-target-value",targetText);slider.setAttribute("aria-valuetext",targetText);
+ $("heat-colder").disabled=!!locked||!range||range.center-10<range.min;
+ $("heat-warmer").disabled=!!locked||!range||range.center+10>range.max;
  $("heat-reheat-seconds").disabled=$("heat-reheat").value!=="2";
  $("heat-save").disabled=!!locked||!heatDirty;
  $("heat-reload").disabled=!!heatBlock()||heatFetching||heatSaving;
@@ -676,10 +692,12 @@ function heatCompare(cfg,p){
   cfg.away_diesel===(p.away_diesel==="1")&&cfg.reheat_step_s===Number(p.reheat_step_s)&&
   heatParams.every(([k])=>p[k]===""?cfg[k]===null:Math.abs(cfg[k]-Number(p[k]))<0.0001&&cfg[k]!==null);
 }
-for(const [id,step] of [["heat-colder",-1],["heat-warmer",1]])$(id).addEventListener("click",()=>{
- if($(id).disabled||!canShiftRoom(step))return;
- for(const input of roomThresholds)input.value=String(Math.round((input.valueAsNumber+step)*10)/10);
- heatDirty=true;heatControls();
+for(const [id,delta] of [["heat-colder",-10],["heat-warmer",10]])$(id).addEventListener("click",()=>{
+ if(!$(id).disabled)shiftRoomThresholds(delta);
+});
+$("heat-room-target").addEventListener("input",event=>{
+ const range=roomTargetRange();
+ if(range&&!event.target.disabled)shiftRoomThresholds(Math.round(event.target.valueAsNumber*10)-range.center);
 });
 $("heat-form").addEventListener("input",()=>{heatDirty=true;heatControls();});
 $("heat-form").addEventListener("change",()=>{heatDirty=true;heatControls();});
