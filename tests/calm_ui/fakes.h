@@ -9,6 +9,7 @@
 #include "panel_storage.h"
 #include "panel_update.h"
 #include "panel_config.h"
+#include "panel_boiler.h"
 #include "panel_sensors.h"
 #include "panel_ha.h"
 uint32_t fakeMillis=1000;SerialStub Serial;ESPStub ESP;
@@ -20,6 +21,18 @@ namespace panel_radio {
  const char* zoneName(uint8_t){return "UTC";}
 }
 namespace panel_config {State fixture;bool begin(){return true;}bool snapshot(State& s){s=fixture;return true;}}
+namespace panel_boiler {
+ Settings fixture;bool available=true;unsigned attempts=0;
+ bool begin(){return true;}
+ bool snapshot(Settings& s){if(!available)return false;s=fixture;return true;}
+ Result save(uint32_t revision,int on,int off){
+   ++attempts;if(!available)return Result::Unavailable;
+   if(revision!=fixture.revision)return Result::Conflict;
+   if(on<0||off>99||on>=off)return Result::Invalid;
+   fixture.configured=true;fixture.onC=uint8_t(on);fixture.offC=uint8_t(off);++fixture.revision;
+   return Result::Saved;
+ }
+}
 namespace panel_sensors {std::deque<Event> queue;bool begin(){return true;}bool poll(Event& e){if(queue.empty())return false;e=queue.front();queue.pop_front();return true;}}
 namespace panel_storage {
  Snapshot fixture;unsigned accepted=0,cancelled=0;

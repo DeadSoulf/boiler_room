@@ -19,6 +19,7 @@ host)
  g++ -std=c++17 -Wall -Wextra -Werror -pedantic -Isrc tests/equipment_inventory_tests.cpp -o .build/equipment_inventory_tests
  .build/equipment_inventory_tests | tee artifacts/equipment-inventory.log
  bash tests/run_radio_tests.sh | tee artifacts/radio.log
+ python3 tests/boiler_settings_tests.py | tee artifacts/boiler-settings.log
  bash tests/sensors_run.sh | tee artifacts/sensors-adapter.log
  python3 tests/update_web_commands.py | tee artifacts/web-commands.log
  python3 tests/web_telemetry_tests.py | tee artifacts/web-telemetry.log

@@ -15,6 +15,7 @@
 #include "panel_ha.h"
 #include "panel_radio.h"
 #include "panel_equipment.h"
+#include "panel_boiler.h"
 #include "panel_screen.h"
 #include "panel_storage.h"
 #include "panel_update.h"
@@ -281,6 +282,17 @@ void statusRequest() {
     j+=",\"connected\":false,\"state\":\"not_connected\"}";
   }
   j+="]";
+  panel_boiler::Settings boiler;
+  j+=",\"boiler_settings\":";
+  if(!panel_boiler::snapshot(boiler))j+="null";
+  else {
+    j+="{\"revision\":";j+=String(boiler.revision);
+    j+=",\"configured\":";j+=boiler.configured?"true":"false";
+    if(boiler.configured){
+      j+=",\"on_c\":";j+=String(unsigned(boiler.onC));j+=",\"off_c\":";j+=String(unsigned(boiler.offC));
+    }else j+=",\"on_c\":null,\"off_c\":null";
+    j+='}';
+  }
   panel_storage::Snapshot storage;
   const bool storageOK=panel_storage::snapshot(storage);
   j+=",\"storage\":{\"started\":";j+=(storageOK&&storage.started)?"true":"false";
@@ -448,6 +460,24 @@ void commandRequest() {
     jsonResponse(200,"{\"ok\":true,\"saved\":true}");return;
   }
 
+  if(kind=="boiler_thresholds"){
+    if(!update.started){errorResponse(503,"update_state_unavailable");return;}
+    const String on=server.arg("on_c"),off=server.arg("off_c"),revision=server.arg("revision");
+    if(!allDigits(on,1,2)||!allDigits(off,1,2)||asUint(on)>=asUint(off)||
+       !allDigits(revision,1,10)||strtoull(revision.c_str(),nullptr,10)>0xffffffffULL){
+      errorResponse(400,"invalid_boiler_thresholds");return;
+    }
+    const auto result=panel_boiler::save(asUint(revision),int(asUint(on)),int(asUint(off)));
+    if(result==panel_boiler::Result::Invalid){errorResponse(400,"invalid_boiler_thresholds");return;}
+    if(result==panel_boiler::Result::Conflict){errorResponse(409,"stale_revision");return;}
+    if(result!=panel_boiler::Result::Saved){errorResponse(503,"boiler_settings_unavailable");return;}
+    panel_boiler::Settings confirmed;
+    if(!panel_boiler::snapshot(confirmed)||!confirmed.configured||
+       unsigned(confirmed.onC)!=asUint(on)||unsigned(confirmed.offC)!=asUint(off)){
+      errorResponse(409,"boiler_save_unconfirmed");return;
+    }
+    jsonResponse(200,String("{\"ok\":true,\"saved\":true,\"revision\":")+String(confirmed.revision)+"}");return;
+  }
   if(kind=="sd_format_prepare"){
     // Strict exact phrase from browser + existing physical pairing.
     // This ONLY arms a temporary request; no SD API may be called here.

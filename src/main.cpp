@@ -19,6 +19,7 @@
 #include "panel_sensors.h"
 #include "panel_screen.h"
 #include "panel_equipment.h"
+#include "panel_boiler.h"
 #if !LV_USE_BTNMATRIX || !LV_USE_TEXTAREA
 #error "BoilerPanel requires LV_USE_BTNMATRIX=1 and LV_USE_TEXTAREA=1 in the existing lv_conf.h"
 #endif
@@ -42,6 +43,10 @@ const uint32_t ACCENT[]={SKY,SKY,SKY,SKY};
 Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sensor events.
 FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
 lv_obj_t *equipmentFuelTemp=nullptr,*equipmentFuelLevel=nullptr;
+lv_obj_t *boilerOnLabel=nullptr,*boilerOffLabel=nullptr;
+lv_obj_t *boilerOnField=nullptr,*boilerOffField=nullptr,*boilerSaveCaption=nullptr;
+uint32_t boilerDraftRevision=0;
+bool boilerConfirm=false;
 lv_obj_t *haStatusLabel=nullptr,*detailValue=nullptr;
 struct FuelCanister {
   lv_obj_t *root=nullptr,*body=nullptr,*fill=nullptr,*handle=nullptr,*cap=nullptr;
@@ -84,7 +89,7 @@ lv_obj_t *header=nullptr,*body=nullptr,*clockLabel=nullptr,*dateLabel=nullptr,*f
 lv_obj_t *headerTitle=nullptr,*pairBadge=nullptr,*pairDigits=nullptr;
 uint32_t shownPairingGeneration=0;
 lv_obj_t *overlay=nullptr,*dialogError=nullptr,*ssidField=nullptr,*passwordField=nullptr,*timeField=nullptr,*activeField=nullptr,*keyboard=nullptr;
-int dialogKind=0; // 0 none, 1 Wi-Fi credentials, 2 manual clock, 3 information, 4 fuel.
+int dialogKind=0; // 0 none, 1 Wi-Fi, 2 clock, 3 information, 4 fuel, 5 update, 6 boiler settings.
 bool openNetwork=false, upper=false, symbols=false;
 char selectedSsid[33]={};
 bool ssidLocked=false;
@@ -122,7 +127,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES,BoilerEdit=200,BoilerSave};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
 void updateStorageLabel();
@@ -145,6 +150,7 @@ void clearSecretFields(){
   memset(selectedSsid,0,sizeof(selectedSsid));
 }
 void dismiss(){
+  boilerOnField=boilerOffField=boilerSaveCaption=nullptr;boilerConfirm=false;
   detailChannel=-1;detailText=detailGraph=detailValue=nullptr;fuelDetailLabels={};
   fuelDetailHint=fuelTemperatureValue=fuelTemperatureState=nullptr;
   if(overlay){clearSecretFields();lv_obj_del(overlay);}overlay=nullptr;dialogKind=0;closeDialog=false;
@@ -213,6 +219,57 @@ void makeKeyboard(int y){
   lv_obj_set_style_border_width(keyboard,0,LV_PART_ITEMS);lv_obj_set_style_radius(keyboard,6,LV_PART_ITEMS);
   setKeyboardMap(LOWER);upper=false;symbols=false;
   lv_obj_clear_flag(keyboard,LV_OBJ_FLAG_GESTURE_BUBBLE);lv_obj_add_event_cb(keyboard,keyboardEvent,LV_EVENT_VALUE_CHANGED,nullptr);
+}
+void boilerSettingsChanged(lv_event_t*){
+  if(!boilerConfirm)return;
+  boilerConfirm=false;lv_label_set_text(boilerSaveCaption,"Сохранить");
+  error("Проверьте оба порога и сохраните их вместе.");
+}
+void editBoiler(){
+  panel_boiler::Settings current;
+  if(!panel_boiler::snapshot(current)){info("Пороги недоступны","Не удалось прочитать настройки. Повторите позже.");return;}
+  dismiss();dialogKind=6;boilerDraftRevision=current.revision;
+  overlay=box(lv_layer_top(),0,0,480,800,BG,0);
+  label(overlay,"Пороги бойлера",18,24,435,&boiler_font_25);
+  label(overlay,"Включение при охлаждении, °C",18,92,444,&boiler_font_19);
+  boilerOnField=field(overlay,"Не задано",18,133,444,2);
+  label(overlay,"Выключение при нагреве, °C",18,210,444,&boiler_font_19);
+  boilerOffField=field(overlay,"Не задано",18,251,444,2);
+  for(auto* f:{boilerOnField,boilerOffField})lv_textarea_set_accepted_chars(f,"0123456789");
+  if(current.configured){
+    char value[6];snprintf(value,sizeof(value),"%u",unsigned(current.onC));lv_textarea_set_text(boilerOnField,value);
+    snprintf(value,sizeof(value),"%u",unsigned(current.offC));lv_textarea_set_text(boilerOffField,value);
+  }
+  dialogError=label(overlay,"Введите целые градусы. Порог включения должен быть ниже порога выключения.",18,321,444,&boiler_font_14,MUTED);
+  button(overlay,"Назад",18,390,144,56,Cancel);
+  auto* save=button(overlay,"Сохранить",174,390,288,56,BoilerSave,0x245D55);
+  boilerSaveCaption=lv_obj_get_child(save,0);
+  for(auto* f:{boilerOnField,boilerOffField})lv_obj_add_event_cb(f,boilerSettingsChanged,LV_EVENT_VALUE_CHANGED,nullptr);
+  static const char* digits[]={"1","2","3","\n","4","5","6","\n","7","8","9","\n","0","<-",""};
+  makeKeyboard(468);setKeyboardMap(digits);activeField=boilerOnField;
+}
+int boilerDegrees(lv_obj_t* fieldObj){
+  const char* p=lv_textarea_get_text(fieldObj);const size_t n=strlen(p);if(!n||n>2)return -1;
+  int value=0;for(size_t i=0;i<n;++i){if(p[i]<'0'||p[i]>'9')return -1;value=value*10+p[i]-'0';}return value;
+}
+void saveBoiler(){
+  if(!boilerOnField||!boilerOffField)return;
+  int on=boilerDegrees(boilerOnField),off=boilerDegrees(boilerOffField);
+  if(on<0||off<0){error("Введите обе температуры целыми числами от 0 до 99.");return;}
+  if(on>=off){error("Температура выключения должна быть выше температуры включения.");return;}
+  panel_update::Snapshot ota;
+  if(!panel_update::snapshot(ota)||!ota.started||ota.busy||ota.bootPending){error("Сохранение недоступно. Проверьте состояние обновления.");return;}
+  if(!boilerConfirm){
+    char review[160];snprintf(review,sizeof(review),"Включение: %d °C. Выключение: %d °C. Подтвердите сохранение.",on,off);
+    error(review);boilerConfirm=true;lv_label_set_text(boilerSaveCaption,"Подтвердить");return;
+  }
+  const auto r=panel_boiler::save(boilerDraftRevision,on,off);
+  if(r==panel_boiler::Result::Saved){
+    closeDialog=true;rebuild=true;return;
+  }
+  if(r==panel_boiler::Result::Conflict)error("Настройки уже изменились. Закройте и откройте редактор снова.");
+  else if(r==panel_boiler::Result::Invalid)error("Проверьте значения обеих температур.");
+  else error("Не удалось подтвердить запись. Проверьте настройки и повторите.");
 }
 void credentialsFor(const char* ssid,bool isOpen){
   dismiss();dialogKind=1;ssidLocked=ssid!=nullptr;openNetwork=isOpen;
@@ -368,6 +425,8 @@ void action(lv_event_t* e){
   switch(code){
     case Home:closeDialog=true;pendingPage=0;slideDirection=-1;view=0;break;
     case Back:view=page==PAGE_SETTINGS?parentMenuView(view):Root;rebuild=true;break;
+    case BoilerEdit:editBoiler();break;
+    case BoilerSave:saveBoiler();break;
     case Connections:view=ConnectionsView;rebuild=true;break;
     case HaStatus:view=HaView;rebuild=true;break;
     case ServiceMenu:view=ServiceView;rebuild=true;break;
@@ -644,6 +703,14 @@ void home(){
 }
 
 void updateEquipmentReadings(){
+  if(boilerOnLabel&&boilerOffLabel){
+    panel_boiler::Settings settings;const bool ok=panel_boiler::snapshot(settings);
+    char on[80],off[80];
+    if(ok&&settings.configured){snprintf(on,sizeof(on),"%u °C и ниже",unsigned(settings.onC));snprintf(off,sizeof(off),"%u °C и выше",unsigned(settings.offC));}
+    else{snprintf(on,sizeof(on),"%s",ok?"Не задано":"Нет данных");snprintf(off,sizeof(off),"%s",on);}
+    if(strcmp(lv_label_get_text(boilerOnLabel),on))lv_label_set_text(boilerOnLabel,on);
+    if(strcmp(lv_label_get_text(boilerOffLabel),off))lv_label_set_text(boilerOffLabel,off);
+  }
   if(equipmentFuelTemp){
     char value[24],text[48];
     temperature(value,sizeof(value),measurements[3],millis());
@@ -663,6 +730,20 @@ void control(){
   for(unsigned i=0;i<4;i++)menuRow(body,names[i],"Не подключён",16+int(i)*143,EquipmentDhw+i,122);
 }
 void equipmentPage(){
+  if(view==1){
+    auto* water=box(body,24,16,432,120);
+    label(water,"Температура воды в бойлере",20,18,390,&boiler_font_19,MUTED);
+    label(water,"Нет данных",20,58,390,&boiler_font_25);
+    button(body,"Включить бойлер",24,160,432,58,0,0x245D55,false);
+    label(body,"Не подключены датчик воды и контроллер.",24,236,432,&boiler_font_19,MUTED);
+    auto* limits=box(body,24,307,432,210);
+    label(limits,"Включать при",20,16,390,&boiler_font_19,MUTED);
+    boilerOnLabel=label(limits,"",20,52,390,&boiler_font_25);
+    label(limits,"Выключать при",20,112,390,&boiler_font_19,MUTED);
+    boilerOffLabel=label(limits,"",20,148,390,&boiler_font_25);
+    button(body,"Изменить пороги",24,552,432,64,BoilerEdit);
+    return;
+  }
   auto* state=box(body,24,16,432,168);
   label(state,"Контроллер",20,22,390,&boiler_font_19,MUTED);
   label(state,"Не подключён",20,68,390,&boiler_font_25);
@@ -676,7 +757,7 @@ void equipmentPage(){
     label(body,"До 80 °C — требование проекта,\nне действующая уставка.",24,420,432,&boiler_font_19,MUTED);
     menuRow(body,"Уровень топлива","Открыть показания",532,FuelOverview,112);
   }else{
-    label(body,view==1?"Бойлер косвенного нагрева":"Дизельный отопитель",24,224,432,&boiler_font_19,MUTED);
+    label(body,"Дизельный отопитель",24,224,432,&boiler_font_19,MUTED);
     label(body,"Данные появятся после подключения\nисполнительного контроллера.",24,282,432,&boiler_font_19,MUTED);
   }
 }
@@ -973,7 +1054,7 @@ void render(){
   updateLatest=updateStatus=updateMessage=updateProgress=updateProgressFill=updateError=nullptr;
   updateCheckButton=updateInstallButton=updateCancelButton=updateRollbackButton=nullptr;
   homeUpdateNotice=homeUpdateText=nullptr;
-  equipmentFuelTemp=equipmentFuelLevel=nullptr;
+  equipmentFuelTemp=equipmentFuelLevel=boilerOnLabel=boilerOffLabel=nullptr;
   fuelCardLabels={};fuelCanister={};
   for(auto& icon:tempIcon)icon=nullptr;
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;
@@ -1097,6 +1178,7 @@ void setup(){
   if(lvgl_glue_lock(0)){panel_screen::boot.touchMs=touchMs;panel_screen::begin(touchOK);lvgl_glue_unlock();}
   Serial.begin(115200);
   const bool configReady=panel_config::begin(),sensorsReady=panel_sensors::begin(),radioReady=panel_radio::begin();
+  panel_boiler::begin(); // Optional local preferences. A read fault disables editing, not the rest of the panel.
   const bool storageReady=panel_storage::begin(),haReady=panel_ha::begin(),webReady=panel_web::begin();
   const bool updateReady=panel_update::begin();
   if(lvgl_glue_lock(0)){
