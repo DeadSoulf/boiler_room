@@ -57,7 +57,12 @@ void homeTemperatureChecks(){
    lv_obj_get_coords(i==3?fuelCanister.status:tempState[i],&statusBox);
    assert(titleBox.y2<valueBox.y1&&valueBox.x1>=cardBox.x1&&valueBox.x2<=cardBox.x2&&statusBox.y2<cardBox.y2);
    if(i==2||i==4){
-     assert(titleBox.x2<unitBox.x1&&unitBox.y2<valueBox.y1&&valueBox.y2<statusBox.y1);
+     lv_area_t radiator;lv_obj_get_coords(tempIcon[i],&radiator);
+     auto* title=find(tile,SENSOR_NAMES[i]);const auto* font=lv_obj_get_style_text_font(title,0);
+     lv_point_t size;lv_txt_get_size(&size,lv_label_get_text(title),font,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+     assert(size.x<=lv_obj_get_width(title)&&lv_obj_get_height(title)==font->line_height);
+     assert(titleBox.x2<radiator.x1&&radiator.x2<unitBox.x1&&radiator.y2<valueBox.y1);
+     assert(unitBox.y2<valueBox.y1&&valueBox.y2<statusBox.y1);
    }else{
      lv_area_t iconBox;lv_obj_get_coords(i==3?fuelCanister.root:tempIcon[i],&iconBox);
      assert(valueBox.y2<unitBox.y1&&unitBox.y2<iconBox.y1&&iconBox.y2<statusBox.y1);
@@ -236,8 +241,13 @@ int main(int argc,char** argv){
  assert(!strcmp(lv_label_get_text(tempValue[2]),"60.5")&&!strcmp(lv_label_get_text(tempValue[4]),"--.-"));
  sensorReading(6,40.0f);sensorReading(6,44.5f);step(1100);
  assert(measurements[2].count==1&&measurements[4].count==2&&!measurements[3].count);
- touch("Подача");assert(detailChannel==2&&find(overlay,"60.5 °C")&&find(overlay,"Пока нет истории"));touch("Назад");
- touch("Обратка");assert(detailChannel==4&&find(overlay,"44.5 °C")&&find(overlay,"Последние измерения"));touch("Назад");
+ for(unsigned i:{2U,4U}){
+   lv_area_t icon;lv_obj_get_coords(tempIcon[i],&icon);
+   clickAt((icon.x1+icon.x2)/2,(icon.y1+icon.y2)/2);
+   assert(detailChannel==int(i)&&find(overlay,SENSOR_NAMES[i]));
+   assert(find(overlay,i==2?"60.5 °C":"44.5 °C")&&find(overlay,i==2?"Пока нет истории":"Последние измерения"));
+   touch("Назад");
+ }
  step(31000);sensorReading(2,61.5f);step(1100);
  assert(!strcmp(lv_label_get_text(tempState[2]),"")&&!strcmp(lv_label_get_text(tempState[4]),"Устарело"));
  for(float value:{-55.0f,0.0f,125.0f}){

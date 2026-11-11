@@ -53,7 +53,7 @@ struct FuelCanister {
   lv_obj_t *crossA=nullptr,*crossB=nullptr,*glyph=nullptr,*temperature=nullptr,*status=nullptr;
 };
 FuelCanister fuelCanister;
-lv_obj_t* tempIcon[2]={};
+lv_obj_t* tempIcon[CHANNELS]={};
 constexpr int CANISTER_FILL_HEIGHT=74;
 void updateCanister();
 struct FuelLevelLabels {
@@ -620,6 +620,19 @@ void temperatureIcon(lv_obj_t* tile,unsigned channel){
     iconLine(root,cloud,sizeof(cloud)/sizeof(cloud[0]));
   }
 }
+void coolantIcon(lv_obj_t* tile,unsigned channel){
+  auto* root=box(tile,117,9,32,24,CARD,0);tempIcon[channel]=root;
+  lv_obj_set_style_border_width(root,0,0);passive(root);
+  auto* radiator=iconRect(root,4,4,24,15,3);
+  lv_obj_set_style_border_width(radiator,2,0);
+  for(int x:{10,15,20}){
+    auto* fin=box(root,x,7,2,9,SKY,1);
+    lv_obj_set_style_border_width(fin,0,0);passive(fin);
+  }
+  static const lv_point_t inlet[]={{2,2},{2,7},{4,7}};
+  static const lv_point_t outlet[]={{27,15},{30,15},{30,21}};
+  iconLine(root,inlet,3);iconLine(root,outlet,3);
+}
 void canister(lv_obj_t* tile){
   fuelCanister.temperature=tempValue[3]; // Fuel stays at telemetry index 3.
   fuelCanister.root=box(tile,64,156,80,108,CARD,0);
@@ -694,7 +707,8 @@ void home(){
   // Two separate touch targets occupy the former coolant tile.
   for(unsigned i:{2U,4U}){
     auto* tile=homeTile(i,24,i==2?334:488,146);
-    label(tile,SENSOR_NAMES[i],16,8,136,&boiler_font_19,MUTED);
+    label(tile,SENSOR_NAMES[i],16,8,96,&boiler_font_19,MUTED);
+    coolantIcon(tile,i);
     label(tile,"°C",158,8,36,&boiler_font_19,MUTED);
     tempValue[i]=label(tile,"--.-",16,37,178,&boiler_font_55);
     tempState[i]=label(tile,"Нет данных",16,117,178,&boiler_font_14,MUTED);
