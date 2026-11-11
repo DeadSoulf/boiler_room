@@ -16,6 +16,7 @@ namespace panel_sensors {
 namespace {
 constexpr uint32_t PERIOD_MS=5000,CONVERSION_MS=850,RETRY_MS=6000;
 Snapshot state;
+Reading values[panel_config::COUNT];
 SemaphoreHandle_t guard=nullptr;
 QueueHandle_t samples=nullptr;
 TaskHandle_t task=nullptr;
@@ -26,7 +27,7 @@ struct Driver {
   uint32_t rawChangedAt=0;
   bool raw=false,debounced=false,haveRaw=false,haveStable=false;
 };
-Driver driver[panel_config::INPUT_COUNT];
+Driver driver[panel_config::COUNT];
 // All temperature sensor pins share one RMT TX/RX pair. Keep the same bus from the
 // conversion request to its completion poll, then advance to the next due pin.
 std::optional<OneWire32> wire;
@@ -63,10 +64,11 @@ void fail(unsigned i,const char* label,uint8_t found=0){
   snprintf(c.status,sizeof(c.status),"%s",label);
   xSemaphoreGive(guard);
 }
-void success(unsigned i,const char* label,uint32_t now,uint8_t found=1){
+void success(unsigned i,const char* label,uint32_t now,float temperature,bool reached){
   if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(8))!=pdTRUE)return;
   auto& c=state.channels[i];
-  c.active=true;c.valid=true;c.found=found;c.lastGoodMs=now;
+  c.active=true;c.valid=true;c.found=1;c.lastGoodMs=now;
+  values[i]={true,reached,temperature,now};
   snprintf(c.status,sizeof(c.status),"%s",label);
   xSemaphoreGive(guard);
 }
@@ -93,16 +95,18 @@ void destroy(unsigned i){
   d=Driver{};
 }
 void reconfigure(const panel_config::State& config){
+  // An old sample must never be attributed to a new pin assignment.
+  if(!guard || xSemaphoreTake(guard,pdMS_TO_TICKS(30))!=pdTRUE)return;
+  state=Snapshot{};state.started=true;state.configRevision=config.revision;
+  for(auto& value:values)value=Reading{};
+  xSemaphoreGive(guard);
   releaseWire();
   probe=0;
-  for(unsigned i=0;i<panel_config::INPUT_COUNT;i++)destroy(i);
+  for(unsigned i=0;i<panel_config::COUNT;i++)destroy(i);
   if(samples)xQueueReset(samples);
-  if(guard&&xSemaphoreTake(guard,pdMS_TO_TICKS(30))==pdTRUE){
-    state=Snapshot{};state.started=true;state.configRevision=config.revision;
-    xSemaphoreGive(guard);
-  }
   activeRevision=config.revision;
-  for(unsigned i=0;i<panel_config::INPUT_COUNT;i++){
+  for(unsigned i=0;i<panel_config::COUNT;i++){
+    if(!panel_config::isInputChannel(i))continue;
     const auto a=config.item[i];
     if(!panel_config::isValid(static_cast<panel_config::Channel>(i),a)){
       status(i,"Invalid GPIO assignment ignored",false);continue;
@@ -148,7 +152,7 @@ void reed(unsigned i,uint32_t now){
   d.due=now+PERIOD_MS; // Refresh stable level within the model's 30s stale window.
   const bool reached=panel_config::reedLevelReached(d.setting.type,inputHigh);
   publish(i,now,0,reached);
-  success(i,"Reed stable; wiring not fault-supervised",now);
+  success(i,"Reed stable; wiring not fault-supervised",now,0,reached);
 }
 void setRom(unsigned i,uint64_t rom){
   if(!guard||xSemaphoreTake(guard,pdMS_TO_TICKS(8))!=pdTRUE)return;
@@ -196,7 +200,7 @@ void finishConversion(unsigned i){
   d.due=sampled+PERIOD_MS;
   if(err==0 && isfinite(c)&&c>=-55.0f&&c<=125.0f){
     publish(i,sampled,c,false);
-    success(i,"DS18B20 temperature CRC verified",sampled);
+    success(i,"DS18B20 temperature CRC verified",sampled,c,false);
   }else{
     fail(i,err==1?"DS18B20 scratchpad CRC failure":
            err==3?"DS18B20 no response":
@@ -208,11 +212,11 @@ void pollThermometers(uint32_t now){
     if(!due(now,driver[probe].due))return;
     finishConversion(probe);
     releaseWire();
-    probe=(probe+1)%panel_config::INPUT_COUNT;
+    probe=(probe+1)%panel_config::COUNT;
     return;
   }
-  for(unsigned offset=0;offset<panel_config::INPUT_COUNT;offset++){
-    const unsigned i=(probe+offset)%panel_config::INPUT_COUNT;
+  for(unsigned offset=0;offset<panel_config::COUNT;offset++){
+    const unsigned i=(probe+offset)%panel_config::COUNT;
     Driver& d=driver[i];
     if(d.setting.type!=panel_config::Type::DS18B20 || !due(now,d.due))continue;
     probe=i;
@@ -220,16 +224,17 @@ void pollThermometers(uint32_t now){
     if(!startConversion(i)){
       d.due=millis()+RETRY_MS;
       releaseWire();
-      probe=(i+1)%panel_config::INPUT_COUNT;
+      probe=(i+1)%panel_config::COUNT;
     }
     return;
   }
 }
 void pollInputs(const panel_config::State& config){
   if(config.revision!=activeRevision)reconfigure(config);
+  if(config.revision!=activeRevision)return;
   pollThermometers(millis());
   const uint32_t now=millis();
-  for(unsigned i=0;i<panel_config::INPUT_COUNT;i++){
+  for(unsigned i=0;i<panel_config::COUNT;i++){
     const auto type=driver[i].setting.type;
     if(type==panel_config::Type::ReedNO||
        type==panel_config::Type::ReedNC)reed(i,now);
@@ -258,10 +263,26 @@ bool begin(){
 bool poll(Event& out){
   return samples&&xQueueReceive(samples,&out,0)==pdTRUE;
 }
-bool snapshot(Snapshot& out){
-  if(!guard||xSemaphoreTake(guard,0)!=pdTRUE)return false;
+// Expiry is latched into the canonical state; a millis wrap must not revive a sample.
+void expireReadings(){
   const uint32_t now=millis();
   for(auto& c:state.channels)if(c.valid && uint32_t(now-c.lastGoodMs)>=30000U)c.valid=false;
+}
+bool readings(Readings& out){
+  if(!guard || xSemaphoreTake(guard,0)!=pdTRUE)return false;
+  expireReadings();
+  out.started=state.started;
+  out.configRevision=state.configRevision;
+  for(unsigned i=0;i<panel_config::COUNT;i++){
+    out.channels[i]=values[i];
+    out.channels[i].valid=state.channels[i].valid && values[i].valid;
+  }
+  xSemaphoreGive(guard);
+  return true;
+}
+bool snapshot(Snapshot& out){
+  if(!guard||xSemaphoreTake(guard,0)!=pdTRUE)return false;
+  expireReadings();
   out=state;
   xSemaphoreGive(guard);
   return true;

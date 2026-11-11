@@ -27,7 +27,9 @@ void validationAndAvailability(){
     assert(setPin(52,Channel::Room,type,50,0,saved)==PinResult::Invalid);
   for(unsigned channel=0;channel<COUNT;channel++){
     const auto ch=static_cast<Channel>(channel);
-    if(ch!=Channel::FuelLower&&ch!=Channel::FuelUpper){
+    const bool contact=ch==Channel::FuelLower || ch==Channel::FuelUpper || ch==Channel::Presence ||
+                       (channel>=unsigned(Channel::Circulation) && channel<=unsigned(Channel::PlantHeat));
+    if(!contact){
       for(const Type type:{Type::ReedNO,Type::ReedNC})
         assert(setPin(52,ch,type,50,0,saved)==PinResult::Invalid);
     }else assert(setPin(52,ch,Type::DS18B20,50,0,saved)==PinResult::Invalid);
@@ -240,7 +242,7 @@ void migrateEightInputsAndReserveRelays(){
     3,0,29,0,0,0,75,0, 2,0,30,0,0,0,80,0,
     1,0,28,0,0,0,50,0, 1,0,49,0,0,0,50,0, 0,0,0,0
   };
-  static_assert(sizeof(bytes)==80 && INPUT_COUNT==8 && COUNT==12);
+  static_assert(sizeof(bytes)==80 && INPUT_COUNT==8 && COUNT==32);
   const uint32_t hash=fnv(bytes,76);memcpy(bytes+76,&hash,4);
   fresh();config_host::nvs["bp_cfg_a"]={bytes,bytes+sizeof(bytes)};
   const auto originals=config_host::nvs;
@@ -313,7 +315,34 @@ void migrateTenChannelSlots(){
   assert(state().item[8].gpio==32 && state().item[9].gpio==31);
 }
 
+void migrateTwelveChannelSlots(){
+  fresh();
+  StoredConfig<12> legacy{};
+  legacy.magic=MAGIC;legacy.schema=5;legacy.revision=91;
+  legacy.item[0]={Type::DS18B20,52,0,50};
+  legacy.item[8]={Type::Relay,31,0,50};legacy.item[9]={Type::Relay,32,0,50};
+  legacy.item[10]={Type::Relay,33,0,50};legacy.item[11]={Type::Relay,34,0,50};
+  auto* bytes=reinterpret_cast<const uint8_t*>(&legacy);
+  legacy.hash=fnv(bytes,sizeof(legacy)-sizeof(legacy.hash));
+  static_assert(sizeof(legacy)==112,"v0.10.15 storage layout");
+  config_host::nvs["bp_cfg_a"]={bytes,bytes+sizeof(legacy)};
+  reboot();
+  auto s=state();
+  assert(s.revision==91 && config_host::writes==0);
+  for(unsigned i=0;i<12;i++)assert(!memcmp(&s.item[i],&legacy.item[i],sizeof(Assignment)));
+  for(unsigned i=12;i<COUNT;i++)assert(s.item[i].type==Type::None);
+  uint32_t rev=s.revision;
+  assert(setPin(50,Channel::TankWater,Type::DS18B20,50,rev,rev)==PinResult::Saved);
+  assert(setPin(51,Channel::Presence,Type::ReedNC,100,rev,rev)==PinResult::Saved);
+  assert(setPin(30,Channel::Room14,Type::DS18B20,50,rev,rev)==PinResult::Saved);
+  assert(setPin(29,Channel::Circulation,Type::ReedNO,50,rev,rev)==PinResult::Saved);
+  assert(setPin(28,Channel::DieselFault,Type::Relay,50,rev,rev)==PinResult::Invalid);
+  s=state();reboot();unchanged(s);
+  assert(s.item[8].gpio==31 && s.item[9].gpio==32 && s.item[10].gpio==33 && s.item[11].gpio==34);
+  assert(rollback());reboot();assert(state().item[unsigned(Channel::Circulation)].gpio==-1);
+}
 int main(){
+  migrateTwelveChannelSlots();
   validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();migrateSevenChannelSlots();migrateEightInputsAndReserveRelays();migrateTenChannelSlots();
   powerOff();
   puts("PASS: real config/NVS 11-pin validation, atomic owner replacement/move, remote replacement, clear/no-op, mutex revision race, write/read-back recovery, repeated rollback, transient-fault reboot and revision wrap; persistent cleanup failure boundary demonstrated");

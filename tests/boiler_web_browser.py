@@ -13,7 +13,7 @@ out.mkdir(parents=True,exist_ok=True)
 version=(root/"VERSION").read_text().strip()
 snap=dict(revision=0,configured=False,on_c=None,off_c=None)
 electric_snap=snap.copy()
-pin_items=[dict(channel=i,type="none",gpio=-1,jp1_pin=0,debounce_ms=50,address=0) for i in range(12)]
+pin_items=[dict(channel=i,type="none",gpio=-1,jp1_pin=0,debounce_ms=50,address=0) for i in range(32)]
 fixture={"version":version,"authorized":True,"equipment":[],"screen":{},"service":{},
          "time":{},"wifi":{"ready":True,"supported":True},"ble":{},"storage":{},
          "connections":{"available":True,"revision":0,"items":pin_items},

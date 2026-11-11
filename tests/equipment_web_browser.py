@@ -51,7 +51,7 @@ inventory = [{"name": name, "connected": False, "state": "not_connected"} for na
 def empty_connections(revision=0):
     return {"available": True, "revision": revision, "drivers_active": False,
             "items": [{"channel": channel, "type": "none", "gpio": -1, "jp1_pin": 0,
-                       "active": False, "online": False} for channel in range(12)]}
+                       "active": False, "online": False} for channel in range(32)]}
 
 
 def local_assignment(channel, kind, gpio):

@@ -5,11 +5,20 @@ namespace panel_config {
 enum class Type:uint8_t { None=0,DS18B20=1,ReedNO=2,ReedNC=3,RemoteModbus=4,RemoteMQTT=5,Relay=6 };
 enum class Channel:uint8_t {
   Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5,CoolantReturn=6,FuelOutlet=7,
-  ElectricRelay=8,DhwRelay=9,ElectricRelay2=10,ElectricRelay3=11
+  ElectricRelay=8,DhwRelay=9,ElectricRelay2=10,ElectricRelay3=11,
+  Presence=12,TankWater=13,Room2=14,Room14=26,Circulation=27,
+  DieselFault=28,ElectricFault=29,PlantHeat=30,CoilSupply=31
 };
 // Channel 8 is the first heating element, including on boards upgraded from schema 4.
 constexpr unsigned INPUT_COUNT=unsigned(Channel::ElectricRelay);
-constexpr unsigned COUNT=unsigned(Channel::ElectricRelay3)+1;
+constexpr unsigned COUNT=unsigned(Channel::CoilSupply)+1;
+constexpr bool isInputChannel(unsigned id) {
+  return id<INPUT_COUNT || (id>=unsigned(Channel::Presence) && id<COUNT);
+}
+constexpr bool isHeatingTemperature(unsigned id) {
+  return (id>=unsigned(Channel::TankWater) && id<=unsigned(Channel::Room14)) ||
+         id==unsigned(Channel::CoilSupply);
+}
 // Temperature samples are consecutive in the UI; persisted reed slots keep IDs 4/5.
 constexpr int temperatureIndex(unsigned channel) {
   if(channel<=unsigned(Channel::FuelTemp))return int(channel);

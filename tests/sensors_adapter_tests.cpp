@@ -131,5 +131,24 @@ int main(){
     const int gpio=relays[n];
     assert(OneWire32::opens[gpio]==opens[n] && !pulls[gpio] && !reads[gpio]);
   }
+  config=panel_config::State{};
+  config.revision=80;
+  config.item[12]={panel_config::Type::ReedNO,31,0,50};
+  config.item[13]={panel_config::Type::DS18B20,50,0,50};
+  config.item[26]={panel_config::Type::DS18B20,51,0,50};
+  config.item[31]={panel_config::Type::DS18B20,52,0,50};
+  pollInputs(config);
+  Readings latest;
+  assert(readings(latest) && latest.configRevision==80 && !latest.channels[0].valid);
+  for(unsigned n=0;n<220;n++){
+    mock_now+=45;
+    if(wire)OneWire32::scratchpad=float(wire->pin);
+    pollInputs(config);
+  }
+  assert(readings(latest) && latest.channels[12].valid);
+  for(unsigned i:{13U,26U,31U})assert(latest.channels[i].valid && latest.channels[i].temperature==config.item[i].gpio);
+  for(unsigned i=8;i<=11;i++)assert(!latest.channels[i].valid);
+  mock_now+=30000;
+  assert(readings(latest) && !latest.channels[12].valid && !latest.channels[26].valid);
   puts("PASS: real sensor adapter rejects request/poll/scratchpad faults; preserves timestamps; recovers incl. 85C; stale data does not revive");
 }

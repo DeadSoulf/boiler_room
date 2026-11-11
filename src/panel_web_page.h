@@ -10,6 +10,7 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 @media(max-width:680px){.container{padding:22px 16px}header{align-items:flex-start;gap:16px;margin-bottom:24px}h1{font-size:27px}.toolbar{justify-content:flex-end;gap:8px}.toolbar .tag{display:none}.toolbar button{padding:10px 13px;min-height:44px}.topnav{gap:3px;justify-content:space-between;margin-bottom:24px;padding-bottom:16px}.topnav button{font-size:13px;padding:10px 9px;min-height:44px}.grid{gap:12px}.temp{padding:18px;min-height:245px}.temp-value{font-size:32px}.temp-name{font-size:13px}.canister{height:137px;width:112px}.two,.equip-list,.menu-grid{grid-template-columns:1fr}.card{padding:20px}.temp.card{padding:18px}.menu-item{padding:20px}.subhead{gap:10px;flex-wrap:wrap}.subhead h2{font-size:22px;min-width:0;overflow-wrap:anywhere}.row{gap:12px}.row>:last-child{max-width:60%}.actions button{flex:1 1 auto}footer{font-size:11px}.notice{padding:14px}dialog{padding:24px}.header-time{font-size:13px}}
 @media(max-width:480px){header{flex-wrap:wrap;gap:12px}.toolbar{width:100%;justify-content:flex-start}.topnav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.topnav button{min-width:0}.temp-value{font-size:28px}}
 .heater-outputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.heater-outputs>div{display:grid;align-content:start;gap:5px;text-align:center}.heater-outputs button{min-width:0;padding-inline:4px}.heater-outputs small{color:var(--muted);overflow-wrap:anywhere}
+.page#heating{max-width:900px;margin-inline:auto}#heating .card{margin:12px 0}#heat-fields{min-width:0;border:0;margin:0;padding:0}#heat-fields legend{padding:16px 0 6px}#heat-room-parameters,#heat-parameters,#heat-loops{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr));gap:0 16px}#heat-readings .row{flex-wrap:wrap;gap:4px 12px}#heat-readings .row strong{overflow-wrap:anywhere}#heat-config summary{cursor:pointer}#heat-fields input[type=checkbox]{width:auto}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* Static location pictograms; not weather forecasts or heater status indicators. */
 .temp .temp-value{margin:18px 0 4px}
@@ -47,7 +48,28 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 </section>
 </div>
 </section>
-<section id="equipment" class="page hidden"><h2>Оборудование</h2><div class="equip-list" id="equipment-list"></div><p class="tiny">Управление появится после подключения и проверки исполнительных контроллеров.</p></section>
+<section id="equipment" class="page hidden"><h2>Оборудование</h2><div class="actions"><button data-page="heating" type="button">Автоматика отопления</button></div><div class="equip-list" id="equipment-list"></div><p class="tiny">Управление появится после подключения и проверки исполнительных контроллеров.</p></section>
+<section id="heating" class="page hidden" aria-labelledby="heating-title">
+ <div class="subhead"><button data-page="equipment">‹ Оборудование</button><h2 id="heating-title">Автоматика отопления</h2></div>
+ <p id="heat-status" role="status" class="hint">Ожидаем данные панели.</p>
+ <button data-action="show-pair" id="heat-pair" class="hidden">Сопряжение с панелью</button>
+ <div class="card"><h3>Расчёт по датчикам</h3>
+ <p class="tiny">Панель рассчитывает запросы по датчикам. Исполнительные выходы пока не подключены к автоматике.</p>
+ <div id="heat-readings"></div></div>
+ <details class="card" id="heat-config"><summary>Настройки автоматики</summary>
+ <form id="heat-form" novalidate>
+ <fieldset id="heat-fields" disabled><legend>Пороги и оборудование</legend>
+ <h3>Температура в доме</h3><div class="actions"><button type="button" id="heat-colder" aria-label="Снизить все три комнатных порога на 1 °C">−1 °C</button><button type="button" id="heat-warmer" aria-label="Поднять все три комнатных порога на 1 °C">+1 °C</button></div>
+ <p class="hint">Обе кнопки сдвигают три комнатных порога вместе. После изменения сохраните настройки.</p>
+ <div id="heat-room-parameters"></div><h3>Теплоноситель и бойлер</h3><div id="heat-parameters"></div>
+ <div class="field"><label for="heat-season">Сезон</label><select id="heat-season"><option value="0">Не выбран</option><option value="1">Лето</option><option value="2">Зима</option></select></div>
+ <div class="field"><label for="heat-reheat">Повторный нагрев при остывании обратки</label><select id="heat-reheat"><option value="0">Не задан</option><option value="1">Включать все три ТЭНа</option><option value="2">Добавлять по одному</option></select></div>
+ <div class="field"><label for="heat-reheat-seconds">Интервал добавления ТЭНов, с</label><input id="heat-reheat-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric"></div>
+ <label class="stack"><input id="heat-away" type="checkbox">Разрешить резервный дизель в режиме «Никого нет»</label>
+ <details class="details"><summary>Помещения и контуры</summary><p class="hint">Выберите помещение для каждого привода. Несколько контуров могут использовать один комнатный датчик.</p><div id="heat-loops"></div></details>
+ </fieldset><div class="actions"><button id="heat-save" type="submit" class="primary" disabled>Сохранить настройки</button><button id="heat-reload" type="button" disabled>Перечитать с панели</button></div>
+ <p id="heat-feedback" class="hint" role="status"></p></form></details>
+</section>
 <template id="threshold-controls"><div>
  <div class="row"><span data-part="temperature"></span><strong>Нет данных</strong></div>
  <div data-part="outputs"></div>
@@ -171,6 +193,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
    <input type="range" id="target-range" min="-55" max="125" step="1" value="0" aria-describedby="target-status" disabled>
    <div class="target-limits" aria-hidden="true"><span>−55 °C</span><span>125 °C</span></div>
   </div>
+  <div id="target-heating-link" class="hidden"><p class="hint">Бегунок сохраняет значение для карточки. Пороги управления отоплением задаются в автоматике.</p><button type="button" class="ghost" id="target-heating-open">Открыть пороги автоматики</button></div>
   <p id="target-status" class="hint" role="status"></p>
   <div class="actions"><button type="button" id="target-close" class="ghost">Закрыть</button><button type="submit" class="primary" id="target-save" disabled>Сохранить</button><button type="button" class="ghost hidden" id="target-reload">Перечитать с панели</button></div>
  </form>
@@ -185,7 +208,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
   </select></div>
   <p id="pin-temperature" class="tiny hidden">Датчик DS18B20 · отдельная линия OneWire.</p>
   <div id="pin-reed" class="hidden">
-   <div class="field"><label for="pin-type">Режим геркона</label><select id="pin-type"><option value="">Выберите NO или NC</option><option value="2">NO — замкнут = достигнут</option><option value="3">NC — разомкнут = достигнут</option></select></div>
+   <div class="field"><label for="pin-type">Режим контакта</label><select id="pin-type"><option value="">Выберите NO или NC</option><option value="2">NO — замкнут = достигнут</option><option value="3">NC — разомкнут = достигнут</option></select></div>
    <div class="field"><label for="pin-debounce">Подавление дребезга, мс</label><input id="pin-debounce" type="number" min="0" max="5000" step="1" value="50" inputmode="numeric"></div>
   </div>
   <p id="pin-wiring" class="tiny"></p><p id="pin-impact" class="notice hidden"></p>
@@ -288,8 +311,12 @@ const names=["Бойлер косвенного нагрева","Электро�
 const tnames=["В доме","На улице","Подача","Топливо в баке","Обратка","Топливо на выходе"];
 // Preserve saved channel numbers, including the reed inputs at 4 and 5.
 const channelNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",...tnames.slice(4),"Реле ТЭН-1","Реле бойлера","Реле ТЭН-2","Реле ТЭН-3"];
+channelNames.push("Переключатель «Дома»","Вода в бойлере","Температура помещения 2","Температура помещения 3","Температура помещения 4","Температура помещения 5","Температура помещения 6","Температура помещения 7","Температура помещения 8","Температура помещения 9","Температура помещения 10","Температура помещения 11","Температура помещения 12","Температура помещения 13","Температура помещения 14","Проток теплоносителя","Авария дизеля","Авария электрокотла","Источник греет теплоноситель","Подача к змеевику");
+for(const select of [$("cfg-channel"),$("pin-channel")]){
+ for(let i=12;i<channelNames.length;i++)select.add(new Option(channelNames[i],String(i)));
+}
 const connectionTypes=["none","ds18b20","reed_no","reed_nc","modbus","mqtt","relay"];
-const isReedInput=channel=>channel===4||channel===5;
+const isReedInput=channel=>channel===4||channel===5||channel===12||(channel>=27&&channel<=30);
 const electricRelayChannels=[8,10,11];
 const isRelayChannel=channel=>channel===9||electricRelayChannels.includes(channel);
 function matchesPinRole(channel,type){
@@ -351,7 +378,7 @@ function readPinSnapshot(cfg){
    if(!assigned.has(item.gpio))assigned.set(item.gpio,[]);
    assigned.get(item.gpio).push(item);
   }else{
-   const remote=!isRelayChannel(item.channel)&&(item.type==="modbus"||item.type==="mqtt");
+   const remote=item.channel<8&&(item.type==="modbus"||item.type==="mqtt");
    if((item.type!=="none"&&!remote)||item.gpio!==-1){valid=false;break;}
   }
  }
@@ -463,7 +490,7 @@ function renderPinEditor(){
  text("pin-current",editor.base?(owner?"Занят: "+channelNames[owner.channel]+" · "+pinTypeLabel(owner.type):"Свободен"):"Занятость не подтверждена");
  text("pin-base-revision",editor.base?"Снимок назначений · ревизия "+editor.base.revision:"");
  show("pin-temperature",channel>=0&&!reed&&!relay);show("pin-reed",reed);
- text("pin-wiring",channel<0?"Выберите функцию этого GPIO.":relay?"Выход для реле. Панель сохраняет назначение. GPIO не переключается.":reed?"Геркон подключается между выбранным GPIO и GND. Выберите NO/NC по схеме вашего датчика; обрыв провода отдельно не определяется.":"DS18B20: один датчик на GPIO, внешняя подтяжка 4,7 кОм к 3,3 В. Питание и GND — по схеме JP1.");
+ text("pin-wiring",channel<0?"Выберите функцию этого GPIO.":relay?"Выход для реле. Панель сохраняет назначение. GPIO не переключается.":reed?"Выберите NO/NC по схеме контакта. Для переключателя активное состояние означает «Дома», для входа аварии — наличие аварии.":"DS18B20: один датчик на GPIO, внешняя подтяжка 4,7 кОм к 3,3 В. Питание и GND — по схеме JP1.");
  const impact=[];
  if(channel>=0&&editor.base){
   const target=editor.base.items[channel];
@@ -529,13 +556,162 @@ async function savePin(clear=false){
   editor.pending=false;renderPinEditor();pollFreshStatus();
  }
 }
+const heatParams=[
+ ["room_on_c","Открыть контуры комнаты при, °C"],["room_radiator_off_c","Закрыть батарею при совместном обогреве, °C"],["room_off_c","Завершить обогрев помещения при, °C"],
+ ["supply_target_c","Целевая температура подачи, °C"],["return_target_c","Отключить все ТЭНы по обратке при, °C"],["return_restart_c","Возобновить нагрев по обратке при, °C"],
+ ["tank_on_c","Включить насос змеевика по баку при, °C"],["tank_off_c","Выключить насос змеевика по баку при, °C"],
+ ["coil_start_delta_c","Разница подачи змеевика и бака для пуска насоса, °C"],["coil_stop_delta_c","Разница подачи змеевика и бака для остановки, °C"]
+];
+let heatData=null,heatRevision=null,heatDirty=false,heatSaving=false,heatFetching=false,heatProblem=false,heatSerial=0;
+const heatLoopName=i=>i<8?"Тёплый пол "+(i+1):"Батарея "+(i-7);
+function heatField(holder,label,id,el){
+ const box=document.createElement("div"),tag=document.createElement("label");
+ box.className="field";tag.htmlFor=id;tag.textContent=label;el.id=id;
+ box.append(tag,el);holder.append(box);return el;
+}
+for(const [key,label] of heatParams){
+ const el=heatField($(key.startsWith("room_")?"heat-room-parameters":"heat-parameters"),label,"heat-"+key,document.createElement("input"));
+ el.type="number";el.step="0.1";el.min=key.startsWith("coil_")?"0":"-55";el.max=key.startsWith("coil_")?"180":"125";el.required=key.startsWith("room_");el.inputMode="decimal";el.placeholder="Не задано";
+}
+for(let i=0;i<14;i++){
+ const s=heatField($("heat-loops"),heatLoopName(i),"heat-loop-"+i,document.createElement("select"));
+ s.add(new Option("Не назначен","0"));
+ for(let room=1;room<=14;room++)s.add(new Option("Помещение "+room,String(room)));
+}
+function heatBlock(){
+ const u=current?.update;
+ return !serverOnline||!token||!current?.authorized||!u?.started||u.busy||u.boot_pending||pendingUpdate||updateRequestInFlight;
+}
+const roomThresholds=Array.from($("heat-room-parameters").querySelectorAll("input"));
+function canShiftRoom(step){
+ return roomThresholds.every(input=>input.validity.valid&&input.valueAsNumber+step>=Number(input.min)&&input.valueAsNumber+step<=Number(input.max));
+}
+function heatControls(){
+ const cfg=heatData?.settings,stale=!!cfg&&heatDirty&&heatRevision!==cfg.revision;
+ const locked=!cfg||heatBlock()||heatSaving||heatProblem||stale;
+ $("heat-fields").disabled=!!locked;
+ $("heat-colder").disabled=!!locked||!canShiftRoom(-1);
+ $("heat-warmer").disabled=!!locked||!canShiftRoom(1);
+ $("heat-reheat-seconds").disabled=$("heat-reheat").value!=="2";
+ $("heat-save").disabled=!!locked||!heatDirty;
+ $("heat-reload").disabled=!!heatBlock()||heatFetching||heatSaving;
+ if(stale)text("heat-feedback","Настройки изменились на другом экране. Перечитайте их перед сохранением.");
+}
+function loadHeatForm(cfg){
+ heatRevision=cfg.revision;heatDirty=false;heatProblem=false;
+ for(const [key] of heatParams)$("heat-"+key).value=cfg[key]??"";
+ for(let i=0;i<14;i++)$("heat-loop-"+i).value=String(cfg.rooms[i]);
+ $("heat-season").value=String(cfg.season);$("heat-reheat").value=String(cfg.reheat);
+ $("heat-away").checked=cfg.away_diesel===true;
+ $("heat-reheat-seconds").value=cfg.reheat_step_s||"";
+}
+function heatRow(holder,name,value){
+ const row=document.createElement("div"),label=document.createElement("span"),reading=document.createElement("strong");
+ row.className="row";label.textContent=name;reading.textContent=value;row.append(label,reading);holder.append(row);
+}
+function renderHeat(){
+ const holder=$("heat-readings");holder.replaceChildren();
+ show("heat-pair",serverOnline&&(!token||!current?.authorized));
+ if(!serverOnline||!token||!current?.authorized){
+  heatData=null;
+  if(!token||!current?.authorized){heatRevision=null;heatDirty=false;heatProblem=false;$("heat-form").reset();}
+  text("heat-status",serverOnline?"Для просмотра автоматики выполните сопряжение.":"Нет связи с панелью.");
+  text("heat-feedback","");heatControls();return;
+ }
+ if(!heatData){text("heat-status","Нет данных автоматики.");heatControls();return;}
+ const cfg=heatData.settings,c=heatData.calculation;
+ text("heat-status",c?"Результат расчёта панели.":"Текущий расчёт недоступен.");
+ if(c){
+  const flag=(v,yes,no)=>v===2?yes:v===1?no:"Нет данных";
+  const temp=v=>Number.isFinite(v)?v.toLocaleString("ru-RU",{maximumFractionDigits:1})+" °C":"Нет данных";
+  heatRow(holder,"Переключатель",["Нет данных","Дома","Никого нет"][c.presence]||"Нет данных");
+  const health=v=>["Нет данных","Готов","Авария"][v]||"Нет данных";
+  heatRow(holder,"Режим сезона",["Не выбран","Лето","Зима"][cfg?.season]||"Нет данных");
+  heatRow(holder,"Дизель / электрокотёл",health(c.diesel)+" / "+health(c.electric));
+  heatRow(holder,"Тепло на змеевике",flag(c.plant_heat,"Источник работает","Источник остановлен"));
+  heatRow(holder,"Источник по расчёту",["Нет данных","Нет запроса","Дизель","Электрокотёл"][c.source]||"Нет данных");
+  heatRow(holder,"Запрос помещений",flag(c.demand,"Нужен обогрев","Запрос снят"));
+  heatRow(holder,"Авария источника",flag(c.alarm,"Авария","Нет аварии"));
+  heatRow(holder,"Циркуляция",flag(c.circulation,"Подтверждена","Проток отсутствует"));
+  heatRow(holder,"Подача / обратка",temp(c.supply_c)+" / "+temp(c.return_c));
+  heatRow(holder,"Запрос электрокотлу",Number.isInteger(c.stages)&&c.stages>=0&&c.stages<=3?c.stages+" из 3 ТЭНов · "+c.stages*3+" кВт":"Нет данных");
+  heatRow(holder,"Вода в бойлере / подача змеевика",temp(c.tank_c)+" / "+temp(c.coil_supply_c));
+  heatRow(holder,"Питание бойлера",flag(c.tank_power,"Запрос питания","Запрос снят"));
+  heatRow(holder,"Насос змеевика",flag(c.coil_pump,"Запрос пуска","Запрос снят"));
+  const rooms=cfg?.rooms||[];
+  for(let i=0;i<14;i++){
+   if(!rooms.includes(i+1))continue;
+   heatRow(holder,"Помещение "+(i+1),temp(c.room_c?.[i]));
+   for(let l=0;l<rooms.length;l++)if(rooms[l]===i+1)heatRow(holder,heatLoopName(l),flag(c.loops?.[l],"Запрос открытия","Запрос закрытия"));
+  }
+ }
+ if(!cfg)text("heat-feedback","Хранилище настроек недоступно.");
+ else if(!heatDirty&&!heatSaving&&!heatProblem&&heatRevision!==cfg.revision)loadHeatForm(cfg);
+ heatControls();
+}
+async function readHeat(){
+ const {response,body}=await request("/api/heating",{cache:"no-store",headers:apiHeaders()});
+ if(!response.ok)throw Error("HTTP "+response.status);
+ const obj=JSON.parse(body),cfg=obj.settings;
+ if(!("settings" in obj)||!("calculation" in obj))throw Error("Неполный ответ панели");
+ if(cfg&&(!Number.isInteger(cfg.revision)||cfg.revision<0||cfg.revision>0xffffffff||heatParams.some(([k])=>!(k in cfg)||(cfg[k]!==null&&!Number.isFinite(cfg[k])))||!Array.isArray(cfg.rooms)||cfg.rooms.length!==14||cfg.rooms.some(v=>!Number.isInteger(v)||v<0||v>14)))throw Error("Неполная конфигурация");
+ return obj;
+}
+async function pollHeat(){
+ if(page!=="heating"||heatFetching||heatSaving)return;
+ if(!serverOnline||!token||!current?.authorized){renderHeat();return;}
+ heatFetching=true;const t=token,serial=heatSerial;
+ try{const obj=await readHeat();if(serial===heatSerial&&token===t&&serverOnline&&page==="heating")heatData=obj;}
+ catch(_){if(serial===heatSerial)heatData=null;}
+ finally{heatFetching=false;if(page==="heating")renderHeat();}
+}
+function heatDraft(){
+ const p={rooms:Array.from({length:14},(_,i)=>$("heat-loop-"+i).value).join(","),season:$("heat-season").value,reheat:$("heat-reheat").value,
+  away_diesel:$("heat-away").checked?"1":"0",reheat_step_s:$("heat-reheat").value==="2"?$("heat-reheat-seconds").value:"0"};
+ for(const [key] of heatParams)p[key]=$("heat-"+key).value.trim();
+ return p;
+}
+function heatCompare(cfg,p){
+ return !!cfg&&cfg.rooms.join(",")===p.rooms&&cfg.season===Number(p.season)&&cfg.reheat===Number(p.reheat)&&
+  cfg.away_diesel===(p.away_diesel==="1")&&cfg.reheat_step_s===Number(p.reheat_step_s)&&
+  heatParams.every(([k])=>p[k]===""?cfg[k]===null:Math.abs(cfg[k]-Number(p[k]))<0.0001&&cfg[k]!==null);
+}
+for(const [id,step] of [["heat-colder",-1],["heat-warmer",1]])$(id).addEventListener("click",()=>{
+ if($(id).disabled||!canShiftRoom(step))return;
+ for(const input of roomThresholds)input.value=String(Math.round((input.valueAsNumber+step)*10)/10);
+ heatDirty=true;heatControls();
+});
+$("heat-form").addEventListener("input",()=>{heatDirty=true;heatControls();});
+$("heat-form").addEventListener("change",()=>{heatDirty=true;heatControls();});
+$("heat-reload").addEventListener("click",async()=>{
+ if(heatFetching||heatSaving||heatBlock())return;
+ heatFetching=true;
+ try{const obj=await readHeat();heatData=obj;if(obj.settings){loadHeatForm(obj.settings);text("heat-feedback","Показаны сохранённые настройки.");}}
+ catch(_){heatData=null;text("heat-feedback","Не удалось перечитать настройки.");}
+ finally{heatFetching=false;renderHeat();}
+});
+$("heat-form").addEventListener("submit",async e=>{
+ e.preventDefault();if($("heat-save").disabled)return;
+ if(!$("heat-form").reportValidity())return;
+ const draft=heatDraft(),revision=heatRevision;++heatSerial;heatSaving=true;heatControls();
+ try{
+  const res=await sendPost("/api/command",{action:"heating_settings",revision:String(revision),...draft},true);
+  if(!res.saved||!Number.isInteger(res.revision))throw Error("Запись не подтверждена");
+  const obj=await readHeat();
+  if(obj.settings?.revision!==res.revision||!heatCompare(obj.settings,draft))throw Error("Панель вернула другие настройки");
+  heatData=obj;loadHeatForm(obj.settings);text("heat-feedback","Настройки подтверждены панелью.");
+ }catch(error){
+  if(error.httpStatus===400){text("heat-feedback","Проверьте значения порогов, их порядок и интервал.");}
+  else{heatProblem=true;text("heat-feedback","Запись не подтверждена. Перечитайте настройки с панели.");}
+ }finally{heatSaving=false;renderHeat();}
+});
 function drawPage(){
  for(const n of document.querySelectorAll(".page"))n.classList.toggle("hidden",n.id!==page);
- for(const n of document.querySelectorAll(".topnav [data-page]"))n.classList.toggle("active",n.dataset.page===(["connections","ha","service","update"].includes(page)?"settings":page));
+ for(const n of document.querySelectorAll(".topnav [data-page]"))n.classList.toggle("active",n.dataset.page===(["connections","ha","service","update"].includes(page)?"settings":page==="heating"?"equipment":page));
  show("settings-menu",!tab);show("settings-back",!!tab);
  for(const n of document.querySelectorAll(".tab"))n.classList.toggle("hidden",n.id!=="tab-"+tab);
  for(const n of document.querySelectorAll("[data-tab]"))n.classList.toggle("active",n.dataset.tab===tab);
- updateView();
+ updateView();if(page==="heating"){renderHeat();pollHeat();}
 }
 function setTab(newTab){tab=newTab;page="settings";drawPage()}
 function targetConfig(channel){
@@ -565,6 +741,7 @@ function closeTarget(){
 }
 function renderTarget(){
  const e=targetEditor;if(!e)return;
+ show("target-heating-link",[0,2,4].includes(e.channel));
  const b=targetConfig(e.channel),reading=current?.temperatures?.[e.channel];
  const actual=serverOnline&&reading?.valid&&Number.isFinite(reading.value)?reading.value:null;
  text("target-actual",!serverOnline?"Нет связи":actual!==null?actual.toFixed(1)+" °C":reading?.ever?"Устарело":"Нет данных");
@@ -876,6 +1053,7 @@ function markOffline(){
  text("fuel-temp","Нет связи");text("fuel-outlet-temp","Нет связи");text("lower-status","Нет связи");text("upper-status","Нет связи");updateCanister(null);
 }
 function updateView(){
+ if(page==="heating")heatControls();
  const d=current;renderPinout(d&&d.connections);if(!d){renderPinEditor();renderTarget();return;}
  text("version",d.version);text("service-version",d.version);
  text("clock",d.clock||"Нет времени");text("clock-current",d.clock||"Нет времени");
@@ -1218,6 +1396,10 @@ $("target-form").addEventListener("submit",saveTarget);
 $("target-range").addEventListener("input",selectTarget);
 $("target-range").addEventListener("pointerup",e=>{if(e.button===0)selectTarget();});
 $("target-close").addEventListener("click",closeTarget);
+$("target-heating-open").addEventListener("click",()=>{
+ closeTarget();page="heating";drawPage();$("heat-config").open=true;
+ const summary=$("heat-config").querySelector("summary");summary.focus();summary.scrollIntoView({block:"start"});
+});
 $("temperature-target").addEventListener("cancel",e=>{e.preventDefault();closeTarget();});
 $("target-reload").addEventListener("click",()=>{
  if(!targetEditor||$("target-reload").disabled)return;
@@ -1246,7 +1428,7 @@ function updateConfigTypes(){
  for(const option of select.options){
    const type=connectionTypes[Number(option.value)];
    const remote=type==="modbus"||type==="mqtt";
-   option.disabled=type!=="none"&&!matchesPinRole(channel,type)&&!(remote&&!isRelayChannel(channel));
+   option.disabled=type!=="none"&&!matchesPinRole(channel,type)&&!(remote&&channel<8);
  }
  if(isRelayChannel(channel))select.value="6";
  else if(select.selectedOptions[0]?.disabled)select.value="0";
@@ -1287,14 +1469,14 @@ async function poll(){
    if(!r.ok)throw Error("HTTP "+r.status);
    const d=JSON.parse(body);
    if(!d.authorized&&token){token="";sessionStorage.removeItem("boiler_panel_token");if(!pendingUpdate)notice("Сессия истекла. Повторите сопряжение.");}
-   reconcileUpdate(d);current=d;serverOnline=true;lastServerError="";pinPollSerial=serial;updateView();
+   reconcileUpdate(d);current=d;serverOnline=true;lastServerError="";pinPollSerial=serial;updateView();if(page==="heating")pollHeat();
  }catch(e){
    if(requestToken!==token){pinPollQueued=true;return;}
    if(lastServerError!==e.message)notice("Нет связи с панелью: "+e.message,true);
    lastServerError=e.message;serverOnline=false;
    if(pendingUpdate){pendingUpdate.connectionLost=true;saveUpdatePending();}
    pinPollSerial=serial;
-   updateView();markOffline();
+   updateView();markOffline();if(page==="heating")renderHeat();
    text("net","● Нет ответа панели");
    $("net").className="status";
    text("last-update","Сервер не отвечает, повторяем");

@@ -29,7 +29,12 @@ uint32_t fnv(const uint8_t* p,size_t n){
 }
 bool allowedType(Channel ch,Type t){
   if(t==Type::None)return true;
-  if(unsigned(ch)>=INPUT_COUNT)return t==Type::Relay;
+  const unsigned id=unsigned(ch);
+  if(!isInputChannel(id))return t==Type::Relay;
+  if(id>=unsigned(Channel::Presence)){
+    if(isHeatingTemperature(id))return t==Type::DS18B20;
+    return t==Type::ReedNO || t==Type::ReedNC;
+  }
   const bool temperature=temperatureIndex(unsigned(ch))>=0;
   return temperature?
     (t==Type::DS18B20||t==Type::RemoteModbus||t==Type::RemoteMQTT):
@@ -66,7 +71,9 @@ bool readSlot(unsigned slot,Persist& entry){
   const size_t size=prefs.getBytesLength("config");
   bool ok=false;
   if(size==sizeof(Persist)){
-    ok=readRecord(prefs,5,entry);
+    ok=readRecord(prefs,6,entry);
+  }else if(size==sizeof(StoredConfig<12>)){
+    ok=readPrevious<12>(prefs,5,entry);
   }else if(size==sizeof(StoredConfig<10>)){
     ok=readPrevious<10>(prefs,4,entry);
   }else if(size==sizeof(StoredConfig<8>)){
@@ -80,7 +87,7 @@ bool readSlot(unsigned slot,Persist& entry){
 }
 bool writeSlot(unsigned slot,const State& next){
   Persist entry{};
-  entry.magic=MAGIC;entry.schema=5;entry.revision=next.revision;
+  entry.magic=MAGIC;entry.schema=6;entry.revision=next.revision;
   for(unsigned i=0;i<COUNT;i++)entry.item[i]=next.item[i];
   entry.hash=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
   Preferences prefs;

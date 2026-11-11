@@ -50,7 +50,7 @@ def local_item(channel, kind, gpio, debounce=50):
 
 def empty_connections(revision):
     return {"available": True, "revision": revision, "drivers_active": False,
-            "items": [empty_item(channel) for channel in range(12)]}
+            "items": [empty_item(channel) for channel in range(32)]}
 
 
 fixture = {
@@ -222,8 +222,8 @@ class Handler(BaseHTTPRequestHandler):
                 items[channel] = empty_item(channel)
         if action == "connection_pin_set":
             channel, kind, debounce = (int(data[key]) for key in ("channel", "type", "debounce"))
-            thermometer = channel in (0, 1, 2, 3, 6, 7) and kind == 1 and debounce == 50
-            reed = channel in (4, 5) and kind in (2, 3) and 0 <= debounce <= 5000
+            thermometer = channel in (0, 1, 2, 3, 6, 7, *range(13, 27), 31) and kind == 1 and debounce == 50
+            reed = channel in (4, 5, 12, 27, 28, 29, 30) and kind in (2, 3) and 0 <= debounce <= 5000
             relay = channel in (8, 9, 10, 11) and kind == 6 and debounce == 50
             if not (thermometer or reed or relay):
                 return 400, {"error": "invalid_pin_assignment"}

@@ -17,6 +17,9 @@
 #include "panel_equipment.h"
 #include "panel_boiler.h"
 #include "panel_targets.h"
+#include "panel_heating_runtime.h"
+#include "panel_heating_settings.h"
+#include <math.h>
 #include "panel_screen.h"
 #include "panel_storage.h"
 #include "panel_update.h"
@@ -93,6 +96,7 @@ uint32_t asUint(const String& s) {
 
 #if BP_WEB_ENABLED
 WebServer server(80);
+void saveHeatingSettings();
 void responseHeaders() {
   server.sendHeader("Cache-Control","no-store, max-age=0");
   server.sendHeader("X-Content-Type-Options","nosniff");
@@ -324,7 +328,7 @@ void statusRequest() {
   j+=",\"message\":";jsonQuote(j,storage.message);j+='}';
   panel_config::State cfg;
   const bool hasConfig=panel_config::snapshot(cfg);
-  panel_sensors::Snapshot sensors;
+  static panel_sensors::Snapshot sensors; // This enlarged snapshot belongs to the single HTTP worker.
   const bool hasSensors=panel_sensors::snapshot(sensors);
   bool anyInputRunning=false;
   if(hasSensors)for(const auto& c:sensors.channels)if(c.active)anyInputRunning=true;
@@ -344,7 +348,7 @@ void statusRequest() {
     j+=",\"gpio\":";j+=String(a.gpio);
     j+=",\"address\":";j+=String(a.busAddress);
     j+=",\"debounce_ms\":";j+=String(a.debounceMs);
-    const bool input=i<panel_config::INPUT_COUNT;
+    const bool input=panel_config::isInputChannel(i);
     const auto& st=input?sensors.channels[i]:inactive;
     const bool fresh=input && hasConfig && hasSensors && sensors.configRevision==cfg.revision;
     j+=",\"active\":";j+=(fresh&&st.active)?"true":"false";
@@ -595,6 +599,10 @@ void commandRequest() {
     jsonResponse(202,"{\"ok\":true,\"saved\":true,\"drivers_active\":false}");
     return;
   }
+  if(kind=="heating_settings"){
+    if(!update.started){errorResponse(503,"update_state_unavailable");return;}
+    saveHeatingSettings();return;
+  }
   panel::Command cmd;
   if(kind=="wifi_scan")cmd.job=Job::WifiScan;
   else if(kind=="wifi_disconnect")cmd.job=Job::Disconnect;
@@ -683,6 +691,135 @@ void logoutRequest() {
 void notFound() {
   responseHeaders();server.send(404,"text/plain; charset=utf-8","Не найдено");
 }
+struct HeatingField {
+  const char* key;
+  float panel_heating::Config::*value;
+};
+constexpr HeatingField heatingFields[]={
+  {"room_on_c",&panel_heating::Config::roomOnC},
+  {"room_radiator_off_c",&panel_heating::Config::roomRadiatorOffC},
+  {"room_off_c",&panel_heating::Config::roomOffC},
+  {"supply_target_c",&panel_heating::Config::supplyTargetC},
+  {"return_target_c",&panel_heating::Config::returnTargetC},
+  {"return_restart_c",&panel_heating::Config::returnRestartC},
+  {"tank_on_c",&panel_heating::Config::tankOnC},
+  {"tank_off_c",&panel_heating::Config::tankOffC},
+  {"coil_start_delta_c",&panel_heating::Config::coilStartDeltaC},
+  {"coil_stop_delta_c",&panel_heating::Config::coilStopDeltaC}
+};
+void appendHeatC(String& json,float value){
+  if(isfinite(value))json+=String(value,1);else json+="null";
+}
+void heatingRequest(){
+  if(!authorized()){errorResponse(401,"pair_required");return;}
+  panel_heating_settings::State settings;
+  panel_heating_runtime::Snapshot sample;
+  const bool settingsOK=panel_heating_settings::snapshot(settings);
+  const bool sampled=panel_heating_runtime::snapshot(sample);
+  String j;j.reserve(2500);j="{\"settings\":";
+  if(settingsOK){
+    const auto& cfg=settings.config;
+    j+="{\"revision\":";j+=String(settings.revision);
+    j+=",\"season\":";j+=String(unsigned(settings.season));
+    j+=",\"reheat\":";j+=String(unsigned(cfg.reheat));
+    j+=",\"reheat_step_s\":";j+=String(cfg.reheatStepMs/1000);
+    j+=",\"away_diesel\":";j+=cfg.allowAwayDiesel?"true":"false";
+    j+=",\"rooms\":[";
+    for(unsigned i=0;i<14;i++){if(i)j+=',';j+=String(unsigned(cfg.roomForLoop[i]));}
+    j+=']';
+    for(const auto& field:heatingFields){j+=',';jsonQuote(j,field.key);j+=':';appendHeatC(j,cfg.*(field.value));}
+    j+='}';
+  }else j+="null";
+  j+=",\"calculation\":";
+  if(sampled&&settingsOK&&sample.settingsAvailable&&sample.settingsRevision==settings.revision){
+    const auto& in=sample.input;const auto& out=sample.output;
+    j+="{\"presence\":";j+=String(unsigned(in.presence));
+    j+=",\"circulation\":";j+=String(unsigned(in.circulation));
+    j+=",\"source\":";j+=String(unsigned(out.source));
+    j+=",\"demand\":";j+=String(unsigned(out.demand));
+    j+=",\"alarm\":";j+=String(unsigned(out.alarm));
+    j+=",\"diesel\":";j+=String(unsigned(in.diesel));
+    j+=",\"electric\":";j+=String(unsigned(in.electric));
+    j+=",\"plant_heat\":";j+=String(unsigned(in.plantHeatAvailable));
+    j+=",\"tank_power\":";j+=String(unsigned(out.tankPower));
+    j+=",\"coil_pump\":";j+=String(unsigned(out.coilPump));
+    j+=",\"stages\":";if(out.stages<0)j+="null";else j+=String(int(out.stages));
+    j+=",\"supply_c\":";appendHeatC(j,in.supplyC);
+    j+=",\"return_c\":";appendHeatC(j,in.returnC);
+    j+=",\"tank_c\":";appendHeatC(j,in.tankC);
+    j+=",\"coil_supply_c\":";appendHeatC(j,in.coilSupplyC);
+    j+=",\"room_c\":[";
+    for(unsigned i=0;i<14;i++){if(i)j+=',';appendHeatC(j,in.roomC[i]);}
+    j+="],\"loops\":[";
+    for(unsigned i=0;i<14;i++){if(i)j+=',';j+=String(unsigned(out.loop[i]));}
+    j+="]}";
+  }else j+="null";
+  j+='}';jsonResponse(200,j);
+}
+bool parseHeatC(const String& s,float& value){
+  if(s.isEmpty()){value=NAN;return true;}
+  // Fixed-point tenths. The empty string explicitly clears an optional setting.
+  unsigned i=s[0]=='-'?1:0,whole=0,start=i;
+  while(i<s.length()&&s[i]>='0'&&s[i]<='9'){
+    if(i-start>=3)return false;
+    whole=whole*10+unsigned(s[i++]-'0');
+  }
+  if(i==start)return false;
+  unsigned tenths=0;
+  if(i<s.length()){
+    if(s[i]!='.'||s.length()!=i+2||s[i+1]<'0'||s[i+1]>'9')return false;
+    tenths=unsigned(s[i+1]-'0');
+  }
+  value=(whole*10+tenths)/10.0f;
+  if(s[0]=='-')value=-value;
+  return true;
+}
+bool parseHeatRooms(const String& s,uint8_t (&rooms)[14]){
+  unsigned pos=0;
+  for(unsigned loop=0;loop<14;loop++){
+    unsigned room=0,start=pos;
+    while(pos<s.length()&&s[pos]>='0'&&s[pos]<='9'){
+      if(pos-start>=2)return false;
+      room=room*10+unsigned(s[pos++]-'0');
+    }
+    if(pos==start||room>14)return false;
+    rooms[loop]=uint8_t(room);
+    if(loop+1<14&&(pos>=s.length()||s[pos++]!=','))return false;
+  }
+  return pos==s.length();
+}
+void saveHeatingSettings(){
+  const String revision=server.arg("revision"),season=server.arg("season"),reheat=server.arg("reheat"),
+    seconds=server.arg("reheat_step_s"),away=server.arg("away_diesel");
+  if(!allDigits(revision,1,10)||strtoull(revision.c_str(),nullptr,10)>UINT32_MAX||
+     !allDigits(season,1,1)||asUint(season)>2||!allDigits(reheat,1,1)||asUint(reheat)>2||
+     !allDigits(seconds,1,7)||asUint(seconds)>UINT32_MAX/1000U||(away!="0"&&away!="1")){
+    errorResponse(400,"invalid_heating_settings");return;
+  }
+  panel_heating_settings::State next;
+  if(!parseHeatRooms(server.arg("rooms"),next.config.roomForLoop)){errorResponse(400,"invalid_heating_rooms");return;}
+  for(const auto& field:heatingFields){
+    if(!server.hasArg(field.key)||!parseHeatC(server.arg(field.key),next.config.*(field.value))){
+      errorResponse(400,"invalid_heating_value");return;
+    }
+  }
+  next.season=static_cast<panel_heating::Season>(asUint(season));
+  next.config.reheat=static_cast<panel_heating::Reheat>(asUint(reheat));
+  next.config.reheatStepMs=asUint(seconds)*1000U;
+  next.config.allowAwayDiesel=away=="1";
+  const uint32_t expected=asUint(revision);
+  const auto result=panel_heating_settings::save(expected,next);
+  using SaveResult=panel_heating_settings::Result;
+  if(result==SaveResult::Invalid){errorResponse(400,"invalid_heating_settings");return;}
+  if(result==SaveResult::Conflict){errorResponse(409,"stale_revision");return;}
+  if(result!=SaveResult::Saved){errorResponse(503,"heating_settings_unavailable");return;}
+  panel_heating_settings::State confirmed;
+  if(!panel_heating_settings::snapshot(confirmed)||
+     (confirmed.revision!=expected&&(expected==UINT32_MAX||confirmed.revision!=expected+1))){
+    errorResponse(409,"heating_save_unconfirmed");return;
+  }
+  jsonResponse(200,String("{\"ok\":true,\"saved\":true,\"revision\":")+String(confirmed.revision)+"}");
+}
 void worker(void*) {
   const char* headers[]={"Authorization","X-Boiler-Pairing","Origin","Sec-Fetch-Site"};
   server.collectHeaders(headers,4);
@@ -690,6 +827,7 @@ void worker(void*) {
   server.on("/assets/jp1-pinout.jpg",HTTP_GET,pinoutImage);
   server.on("/health",HTTP_GET,[]{responseHeaders();server.send(200,"text/plain; charset=utf-8","ok");});
   server.on("/api/status",HTTP_GET,statusRequest);
+  server.on("/api/heating",HTTP_GET,heatingRequest);
   server.on("/api/pair/start",HTTP_POST,pairStartRequest);
   server.on("/api/pair/cancel",HTTP_POST,pairCancelRequest);
   server.on("/api/pair",HTTP_POST,pairRequest);

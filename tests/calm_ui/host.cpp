@@ -330,7 +330,60 @@ int main(int argc,char** argv){
  assert(!strcmp(lv_label_get_text(tempValue[3]),"--.-"));
  assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
  touch("Топливо");assert(page==2&&!overlay);touch("В баке");assert(overlay&&targetEditor.channel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);
+ touch("В доме");touch("Пороги отопления");assert(overlay&&roomFields[0]);touch("Назад");
  swipe();assert(page==1&&view==0);save("equipment");
+ touch("Автоматика");assert(page==1&&view==5);save("heating-automation");
+ {
+   using namespace panel_heating;
+   using Channel=panel_config::Channel;
+   auto& spec=panel_heating_settings::fixture;
+   auto& sensor=panel_sensors::fixture;
+   const auto oldSettings=spec;
+   sensor.started=true;sensor.configRevision=panel_config::fixture.revision;
+   spec.season=Season::Winter;++spec.revision;
+   spec.config.roomForLoop[0]=1;spec.config.roomForLoop[8]=1;spec.config.roomForLoop[1]=2;
+   spec.config.supplyTargetC=55;spec.config.returnTargetC=45;spec.config.returnRestartC=40;
+   spec.config.tankOnC=40;spec.config.tankOffC=55;
+   spec.config.coilStartDeltaC=8;spec.config.coilStopDeltaC=3;
+   auto reading=[&](Channel id,float value,bool reached=false){
+     auto& s=sensor.channels[unsigned(id)];
+     s.valid=true;s.temperature=value;s.reached=reached;s.lastGoodMs=millis();
+   };
+   reading(Channel::Room,18);reading(Channel::Room2,24);
+   reading(Channel::Coolant,52);reading(Channel::CoolantReturn,35);
+   reading(Channel::TankWater,30);reading(Channel::CoilSupply,50);
+   reading(Channel::Presence,0);reading(Channel::DieselFault,0);reading(Channel::ElectricFault,0);
+   reading(Channel::PlantHeat,0,true);reading(Channel::Circulation,0,true);
+   step(1100);
+   panel_heating_runtime::Snapshot calc;
+   assert(panel_heating_runtime::snapshot(calc)&&calc.settingsRevision==spec.revision);
+   assert(calc.output.loop[0]==Flag::Yes&&calc.output.loop[8]==Flag::Yes&&calc.output.loop[1]==Flag::No);
+   assert(calc.output.source==Source::Electric&&calc.output.stages==3&&calc.output.tankPower==Flag::No);
+   assert(find(body,"9 кВт"));save("heating-automation-fixture");
+   reading(Channel::Room,22);reading(Channel::Presence,0,true);reading(Channel::DieselFault,0,true);
+   reading(Channel::Coolant,56);step(1100);
+   assert(panel_heating_runtime::snapshot(calc)&&calc.output.source==Source::Electric&&calc.output.stages==2);
+   assert(calc.output.loop[0]==Flag::Yes&&calc.output.loop[8]==Flag::No);
+   assert(calc.output.tankPower==Flag::Yes&&calc.output.coilPump==Flag::Yes);
+   assert(find(body,"6 кВт"));
+   reading(Channel::CoolantReturn,45);step(1100);assert(panel_heating_runtime::snapshot(calc)&&calc.output.stages==0);
+   sensor.channels[unsigned(Channel::Room)].lastGoodMs=millis()-panel::STALE_MS;
+   step(1100);assert(panel_heating_runtime::snapshot(calc)&&calc.output.loop[0]==Flag::Unknown);
+   assert(calc.output.loop[1]==Flag::No);
+   ++sensor.configRevision;step(1100);
+   assert(panel_heating_runtime::snapshot(calc)&&calc.input.presence==Presence::Unknown&&isnan(calc.input.tankC));
+   touch("Пороги отопления");assert(roomFields[0]&&roomFields[2]);save("room-heating-thresholds");
+   touch("Все +1 °C");assert(!strcmp(lv_textarea_get_text(roomFields[0]),"20.0")&&!strcmp(lv_textarea_get_text(roomFields[2]),"24.0"));
+   touch("Все −1 °C");assert(!strcmp(lv_textarea_get_text(roomFields[1]),"22.0")&&spec.config.roomOnC==19);
+   lv_textarea_set_text(roomFields[0],"23");touch("Сохранить");
+   assert(overlay&&spec.config.roomOnC==19);
+   lv_textarea_set_text(roomFields[0],"19,5");++spec.revision;touch("Сохранить");
+   assert(overlay&&strstr(lv_label_get_text(dialogError),"изменились"));touch("Назад");
+   touch("Пороги отопления");lv_textarea_set_text(roomFields[0],"19,5");touch("Сохранить");
+   assert(!overlay&&spec.config.roomOnC==19.5f&&spec.config.roomForLoop[8]==1);
+   sensor={};spec=oldSettings;step(1100);
+ }
+ touch("<");assert(page==1&&view==0);
  touch("Бойлер");assert(view==1&&find(body,"Температура воды в бойлере"));
  auto* blocked=lv_obj_get_parent(find(body,"Включить бойлер"));assert(lv_obj_has_state(blocked,LV_STATE_DISABLED));
  lv_area_t blockedAt;lv_obj_get_coords(blocked,&blockedAt);clickAt((blockedAt.x1+blockedAt.x2)/2,(blockedAt.y1+blockedAt.y2)/2);
@@ -377,7 +430,7 @@ int main(int argc,char** argv){
    clickAt((blockedAt.x1+blockedAt.x2)/2,(blockedAt.y1+blockedAt.y2)/2);
    assert(!overlay&&panel_boiler::attempts==electricAttempts);
  }
- assert(find(body,"Контур 1")&&find(body,"Контур 2")&&find(body,"Контур 3"));
+ assert(find(body,"Подача")&&find(body,"Обратка")&&find(body,"Запрос"));
  assert(!strcmp(lv_label_get_text(boilerOnLabel),"Не задано")&&!strcmp(lv_label_get_text(boilerOffLabel),"Не задано"));
  save("electric");
  // The DHW pin is deliberately interleaved in the stored channel map.

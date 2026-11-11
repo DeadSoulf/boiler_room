@@ -12,6 +12,7 @@
 #include "panel_boiler.h"
 #include "panel_targets.h"
 #include "panel_sensors.h"
+#include "panel_heating_settings.h"
 #include "panel_ha.h"
 uint32_t fakeMillis=1000;SerialStub Serial;ESPStub ESP;
 namespace panel_radio {
@@ -58,7 +59,23 @@ namespace panel_targets {
    return Result::Saved;
  }
 }
-namespace panel_sensors {std::deque<Event> queue;bool begin(){return true;}bool poll(Event& e){if(queue.empty())return false;e=queue.front();queue.pop_front();return true;}}
+namespace panel_heating_settings {
+ State fixture{};
+ bool available=true;
+ bool begin(){return true;}
+ bool snapshot(State& out){if(!available)return false;out=fixture;return true;}
+ Result save(uint32_t revision,const State& next){
+   if(!available)return Result::Unavailable;
+   if(revision!=fixture.revision)return Result::Conflict;
+   const auto& c=next.config;
+   if(!(c.roomOnC<c.roomRadiatorOffC && c.roomRadiatorOffC<c.roomOffC))return Result::Invalid;
+   fixture=next;fixture.revision=revision+1;return Result::Saved;
+ }
+}
+namespace panel_sensors {
+ Readings fixture{};
+ bool readings(Readings& out){out=fixture;return true;}
+ std::deque<Event> queue;bool begin(){return true;}bool poll(Event& e){if(queue.empty())return false;e=queue.front();queue.pop_front();return true;}}
 namespace panel_storage {
  Snapshot fixture;unsigned accepted=0,cancelled=0;
  bool begin(){return true;}bool snapshot(Snapshot& s){s=fixture;return true;}

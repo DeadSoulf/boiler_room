@@ -139,7 +139,7 @@ void badInputs(){
   request();server.args[field]="-1";expectError(400,"invalid_pin_fields");
   request();server.args[field]="1x";expectError(400,"invalid_pin_fields");
  }
- for(const char* channel:{"12","13","255"}){request();server.args["channel"]=channel;expectError(400,"invalid_pin_fields");}
+ for(const char* channel:{"32","33","255"}){request();server.args["channel"]=channel;expectError(400,"invalid_pin_fields");}
  for(const char* type:{"0","4","5","7","9"}){request();server.args["type"]=type;expectError(400,"invalid_pin_fields");}
  request();server.args["debounce"]="5001";expectError(400,"invalid_pin_fields");
  request();server.args["debounce"]="0";expectError(400,"invalid_pin_assignment");
