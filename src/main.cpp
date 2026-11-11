@@ -648,7 +648,7 @@ void canister(lv_obj_t* heading){
   }
   fuelCanister.glyph=label(fuelCanister.body,"?",0,3,25,&boiler_font_14,MUTED);
   lv_obj_set_style_text_align(fuelCanister.glyph,LV_TEXT_ALIGN_CENTER,0);passive(fuelCanister.glyph);
-  fuelCanister.status=label(heading,"Нет уровня",16,23,138,&boiler_font_14,MUTED);
+  fuelCanister.status=label(heading,"Нет уровня",16,27,138,&boiler_font_14,MUTED);
   updateCanister();
 }
 void updateCanister(){
@@ -682,7 +682,7 @@ void bindReading(lv_obj_t* object,unsigned channel){
   lv_obj_add_event_cb(object,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(Temp0+channel)));
 }
 void pairedReading(lv_obj_t* card,unsigned channel,int x,int y){
-  auto* row=box(card,x,y,206,126,CARD,0);
+  auto* row=box(card,x,y,206,125,CARD,0);
   lv_obj_set_style_border_width(row,0,0);
   lv_obj_set_style_bg_opa(row,LV_OPA_TRANSP,0);
   lv_obj_set_style_bg_color(row,c(0x26373B),LV_STATE_PRESSED);
@@ -691,7 +691,7 @@ void pairedReading(lv_obj_t* card,unsigned channel,int x,int y){
   label(row,SENSOR_NAMES[channel],16,0,135,&boiler_font_19);
   label(row,"°C",158,0,36,&boiler_font_19,MUTED);
   tempValue[channel]=label(row,"--.-",16,28,178,&boiler_font_55);
-  tempState[channel]=label(row,"Нет данных",16,105,178,&boiler_font_14,MUTED);
+  tempState[channel]=label(row,"Нет данных",16,104,178,&boiler_font_14,MUTED);
 }
 void home(){
   for(unsigned i=0;i<2;i++){
@@ -708,19 +708,19 @@ void home(){
   passive(coolant);
   label(coolant,"Теплоноситель",16,8,141,&boiler_font_19,MUTED);
   coolantIcon(coolant);
-  pairedReading(coolant,2,0,42);
-  pairedReading(coolant,4,0,169);
+  pairedReading(coolant,2,0,48);
+  pairedReading(coolant,4,0,173);
 
   auto* fuel=box(body,248,334,208,300);
   passive(fuel);
-  auto* heading=box(fuel,0,0,206,42,CARD,0);
+  auto* heading=box(fuel,0,0,206,48,CARD,0);
   lv_obj_set_style_border_width(heading,0,0);
   lv_obj_set_style_bg_opa(heading,LV_OPA_TRANSP,0);
   lv_obj_add_event_cb(heading,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(FuelOverview)));
   label(heading,"Топливо",16,0,138,&boiler_font_19,MUTED);
   canister(heading);
-  pairedReading(fuel,3,0,42);
-  pairedReading(fuel,5,0,169);
+  pairedReading(fuel,3,0,48);
+  pairedReading(fuel,5,0,173);
   if(homeUpdateVisible()){
     homeUpdateNotice=box(body,24,638,432,34,BG,8);lv_obj_set_style_border_width(homeUpdateNotice,0,0);
     lv_obj_add_event_cb(homeUpdateNotice,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(UpdateMenu));
