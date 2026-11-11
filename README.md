@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.13
+# Boiler Room Touch Panel — v0.10.14
+
+## v0.10.14 — Temperature target slider
+
+Select a temperature on the panel or browser home screen. For **Coolant** and **Fuel**, choose the row you want to adjust. The editor shows the current sensor reading and a slider for the desired temperature. Move the slider and select **Save**. Saving from the browser requires pairing with the panel.
+
+Each of the six readings has its own target. Targets start unset and a saved value is shared across both interfaces and retained on restart. Relay actuation is independent of these settings. [Panel slider with a test reading](docs/verification/assets/v0.10.14-temperature-slider.png) · [Browser example](docs/verification/assets/v0.10.14-web-temperature-slider.png).
 
 ## v0.10.13 — Relay assignments on the JP1 header map
 
