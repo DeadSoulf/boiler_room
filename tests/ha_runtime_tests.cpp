@@ -36,18 +36,23 @@ int main(){
  // Exercise actual publish -> queue -> MQTT JSON with original model objects.
  // main.cpp invokes publish(measurements,fuelLevel,millis()) every second.
  values[2].put(64.5f,1000);values[4].put(41.5f,1000);
+ values[3].put(34.0f,1000);values[5].put(40.0f,2000);
  fuel.put(true,true,1000);
  auto capture=[&](uint32_t now){
    fakeMillis=now;publish(values,fuel,now);
    assert(xQueueReceive(readings,&captured,0)==pdTRUE);
    assert(sendState(captured,radio));
  };
- capture(1000);
+ capture(2000);
+ assert(captured.input[3].valid&&captured.input[3].temperature==34.0f);
+ assert(captured.input[7].valid&&captured.input[7].temperature==40.0f);
  assert(captured.input[2].valid&&captured.input[2].temperature==64.5f);
  assert(captured.input[6].valid&&captured.input[6].temperature==41.5f);
  assert(sent.back().payload.find("\"coolant_return\":41.50")!=std::string::npos);
  assert(captured.input[0].valid&&captured.input[4].valid&&captured.input[5].valid);
  capture(31000); // The adapter must propagate expiration, not just valid/history.
+ assert(!captured.input[3].valid&&captured.input[7].valid);
+ assert(sent.back().payload.find("\"fuel_outlet\":40.00")!=std::string::npos);
  assert(!captured.input[0].valid&&!captured.input[4].valid&&!captured.input[5].valid);
  assert(values[0].expired&&fuel.lower.expired&&fuel.upper.expired);
  assert(values[0].valid&&values[0].updated==1000); // History still exists.

@@ -69,13 +69,13 @@ int main(){
   assert(!model.fresh(mock_now));
   mock_now=uint32_t(uint64_t(last)+(1ULL<<32)+1);
   assert(snapshot(s)&&!s.channels[0].valid&&!model.fresh(mock_now));
-  // Five separately wired sensors must work with only a single RMT pair.
+  // Six separately wired sensors must work with only a single RMT pair.
   // A missing supply sensor must not prevent return or fuel readings.
   panel_config::State config;
-  const unsigned ids[]={0,1,2,3,6};
-  const uint8_t pins[]={52,33,51,31,50};
+  const unsigned ids[]={0,1,2,3,6,7};
+  const uint8_t pins[]={52,33,51,31,50,49};
   config.revision=8;
-  for(unsigned n=0;n<5;n++){
+  for(unsigned n=0;n<panel::CHANNELS;n++){
     config.item[ids[n]].type=panel_config::Type::DS18B20;
     config.item[ids[n]].gpio=pins[n];
   }
@@ -96,11 +96,17 @@ int main(){
   };
   OneWire32::missingPin=51;
   runUntil(13000);
-  assert(seen[2]==0 && seen[6]>=2 && seen[3]>=2);
+  assert(seen[2]==0 && seen[6]>=2 && seen[3]>=2 && seen[7]>=2);
   OneWire32::missingPin=-1;
   runUntil(28000);
   for(unsigned id:ids)assert(seen[id]>=2 && first[id]<panel::STALE_MS);
   assert(!seen[4]&&!seen[5]);
+  const unsigned tankSamples=seen[3],outletSamples=seen[7];
+  OneWire32::missingPin=pins[3];
+  runUntil(44000);
+  // A conversion already running when the pin disappears can finish in this fixture.
+  assert(seen[3]<=tankSamples+1 && seen[7]>=outletSamples+2);
+  OneWire32::missingPin=-1;
   while(!wire){mock_now+=45;pollThermometers(mock_now);}
   ++config.revision;
   reconfigure(config);

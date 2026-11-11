@@ -9,7 +9,7 @@
 
 namespace panel {
 constexpr const char* VERSION = "v0.10.10";
-constexpr unsigned CHANNELS = 5;
+constexpr unsigned CHANNELS = 6;
 constexpr unsigned MAX_AP = 16;
 constexpr unsigned MAX_WIFI_PROFILES = 8;
 constexpr unsigned MAX_BLE = 16;

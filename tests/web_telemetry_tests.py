@@ -46,7 +46,7 @@ int main(){
  fuel.lower.put(true,2001);publish(temps,fuel,2001);
  assert(latest.lowerValid&&!latest.upperValid&&latest.fuelStatus==uint8_t(FuelLevelStatus::Stale));
  // Historical indices remain stable; missing or stale return affects only return.
- static_assert(CHANNELS==5);
+ static_assert(CHANNELS==6);
  temps[2].put(63.5f,60000);temps[3].put(28.0f,60000);
  publish(temps,fuel,60000);
  assert(latest.temp[2].value==63.5f&&latest.temp[3].value==28.0f&&!latest.temp[4].ever);
@@ -55,6 +55,12 @@ int main(){
  assert(latest.temp[2].count==2&&latest.temp[2].history[0]==63.5f);
  assert(latest.temp[4].count==2&&latest.temp[4].history[0]==49.0f&&latest.temp[4].maximum==50.0f);
  publish(temps,fuel,61000+STALE_MS);assert(latest.temp[2].valid&&!latest.temp[4].valid);
+ // The outlet is independent of both fuel-tank history and the two level switches.
+ assert(!latest.temp[5].ever);
+ temps[5].put(39.0f,95000);temps[5].put(41.5f,96000);publish(temps,fuel,96000);
+ assert(!latest.temp[3].valid&&latest.temp[3].count==1&&latest.temp[3].history[0]==28.0f);
+ assert(latest.temp[5].valid&&latest.temp[5].count==2&&latest.temp[5].minimum==39.0f&&latest.temp[5].maximum==41.5f);
+ assert(latest.temp[5].history[0]==39.0f&&latest.temp[5].history[1]==41.5f);
  puts("PASS: actual web telemetry, fresh/stale/missing, exact expiry, full-wrap persistence and recovery");
 }
 '''.replace("SHARED_SOURCE", shared).replace("PUBLISH_SOURCE", publish)

@@ -27,7 +27,7 @@ struct Driver {
   bool raw=false,debounced=false,haveRaw=false,haveStable=false;
 };
 Driver driver[panel_config::COUNT];
-// Five sensor pins share one RMT TX/RX pair. Keep the same bus from the
+// All temperature sensor pins share one RMT TX/RX pair. Keep the same bus from the
 // conversion request to its completion poll, then advance to the next due pin.
 std::optional<OneWire32> wire;
 unsigned probe=0;

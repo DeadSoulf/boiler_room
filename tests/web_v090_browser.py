@@ -16,7 +16,7 @@ fixture={
  'ble':{'supported':True,'message':'','devices':[]},'screen':{'timeout_s':60,'touch_ready':True,'message':''},
  'time':{'zone':0,'zone_name':'UTC','message':''},'service':{'free_heap':180000,'first_frame_ms':480,'display_ms':320,'lvgl_ms':2,'touch_ms':80},
  'host_version':'2.9.6','c6_version':'2.9.6',
- 'temperatures':[{'valid':True,'ever':True,'value':v,'minimum':v,'maximum':v,'trend':None,'age_s':0,'history':[]} for v in (22.4,-8.2,61.7,34.8,43.2)],
+ 'temperatures':[{'valid':True,'ever':True,'value':v,'minimum':v,'maximum':v,'trend':None,'age_s':0,'history':[]} for v in (22.4,-8.2,61.7,34.8,43.2,17.1)],
  'fuel':{'lower':{'valid':True,'reached':True,'age_s':0},'upper':{'valid':True,'reached':True,'age_s':0}},'fuel_level_text':'Полная',
  'storage':{'started':True,'mounted':True,'logging':True,'card_bytes':64000000000,'total_bytes':62602396160,'used_bytes':6000,'free_bytes':62602390160,'format_attempted':False,'format_state':0},
  'connections':{'revision':0,'drivers_active':False,'items':[],'message':''},
@@ -95,7 +95,29 @@ try:
   expect(coolant.locator('#t2')).to_have_text('61.7 °C')
   fixture['temperatures'][4]['valid']=True
   expect(coolant.locator('#t4')).to_have_text('43.2 °C',timeout=5500)
+  fuel=page.get_by_role('region',name='Топливо',exact=True)
+  tank=fuel.get_by_role('button',name=re.compile('В баке'))
+  outlet=fuel.get_by_role('button',name=re.compile('На выходе'))
+  tank.focus();page.keyboard.press('Tab');expect(outlet).to_be_focused()
+  for button,title,index in ((tank,'Топливо в баке',3),(outlet,'Топливо на выходе',5)):
+   button.press('Enter')
+   expect(page.locator('#detail-title')).to_have_text(title+' — подробности')
+   expect(page.locator('#detail-stats')).to_contain_text('Минимум: '+str(fixture['temperatures'][index]['minimum'])+' °C')
+   page.click('[data-action="close-detail"]');expect(button).to_be_focused()
+  fixture['temperatures'][5]['valid']=False
+  expect(fuel.locator('#tstate5')).to_have_text('Устарело',timeout=5500)
+  expect(fuel.locator('#t5')).to_have_text('--.- °C');expect(fuel.locator('#t3')).to_have_text('34.8 °C')
+  fixture['temperatures'][5]['valid']=True
+  expect(fuel.locator('#t5')).to_have_text('17.1 °C',timeout=5500)
   page.screenshot(path=str(out/'desktop-home.png'),full_page=True)
+  fuel.get_by_role('button',name=re.compile('Открыть раздел топлива')).click()
+  expect(page.locator('#fuel')).to_be_visible()
+  expect(page.locator('#fuel-temp')).to_have_text('34.8 °C');expect(page.locator('#fuel-outlet-temp')).to_have_text('17.1 °C')
+  for index,title in ((3,'Топливо в баке'),(5,'Топливо на выходе')):
+   trigger=page.locator(f'#fuel [data-temp="{index}"]')
+   trigger.click();expect(page.locator('#detail-title')).to_have_text(title+' — подробности')
+   page.click('[data-action="close-detail"]');expect(page.locator('#fuel')).to_be_visible();expect(trigger).to_be_focused()
+  page.click('.topnav [data-page="home"]')
   page.click('#pairbutton');expect(page.locator('#pairbox')).to_be_visible();expect(page.locator('#pair-submit')).to_be_enabled()
   assert state['starts']==1 and state['active'] and page.input_value('#paircode')==''
   assert '123456' not in page.content() # Test challenge never supplied to browser by server.

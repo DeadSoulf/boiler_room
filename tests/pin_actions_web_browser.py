@@ -50,7 +50,7 @@ def local_item(channel, kind, gpio, debounce=50):
 
 def empty_connections(revision):
     return {"available": True, "revision": revision, "drivers_active": False,
-            "items": [empty_item(channel) for channel in range(7)]}
+            "items": [empty_item(channel) for channel in range(8)]}
 
 
 fixture = {
@@ -64,7 +64,7 @@ fixture = {
     "time": {"zone": 0, "zone_name": "UTC"},
     "service": {"free_heap": 180000, "first_frame_ms": 480, "display_ms": 320,
                 "lvgl_ms": 2, "touch_ms": 80},
-    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(5)],
+    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(6)],
     "fuel": {"lower": {"valid": False}, "upper": {"valid": False}},
     "fuel_level_text": "Нет данных", "equipment": [],
     "connections": empty_connections(100),
@@ -222,8 +222,8 @@ class Handler(BaseHTTPRequestHandler):
                 items[channel] = empty_item(channel)
         if action == "connection_pin_set":
             channel, kind, debounce = (int(data[key]) for key in ("channel", "type", "debounce"))
-            if not (0 <= channel <= 6 and 0 <= debounce <= 5000 and
-                    ((channel in (0, 1, 2, 3, 6) and kind == 1 and debounce == 50) or (channel in (4, 5) and kind in (2, 3)))):
+            if not (0 <= channel <= 7 and 0 <= debounce <= 5000 and
+                    ((channel in (0, 1, 2, 3, 6, 7) and kind == 1 and debounce == 50) or (channel in (4, 5) and kind in (2, 3)))):
                 return 400, {"error": "invalid_pin_assignment"}
             items[channel] = local_item(channel, {1: "ds18b20", 2: "reed_no", 3: "reed_nc"}[kind], gpio, debounce)
         fields = ("type", "gpio", "address", "debounce_ms")
@@ -479,7 +479,8 @@ try:
             assert revision() == saved_revision, "No-op save changed the fixture revision"
             close_pin(33)
             if width == 1280:
-                for source, gpio, label in ((2, 51, "Подача"), (6, 50, "Обратка")):
+                for source, gpio, label in ((2, 51, "Подача"), (6, 50, "Обратка"),
+                                            (3, 29, "Топливо в баке"), (7, 30, "Топливо на выходе")):
                     open_pin(gpio)
                     channel.select_option(str(source))
                     expect(page.locator("#pin-temperature")).to_be_visible()
@@ -489,9 +490,13 @@ try:
                     last_command({"action": "connection_pin_set", "gpio": gpio, "channel": source,
                                   "type": 1, "debounce": 50, "revision": saved_revision})
                     close_pin(gpio)
+                    expect_pin(gpio, "busy", "Занят · " + label)
                 expect_pin(51, "busy", "Занят · Подача")
                 expect_pin(50, "busy", "Занят · Обратка")
+                expect_pin(29, "busy", "Занят · Топливо в баке")
+                expect_pin(30, "busy", "Занят · Топливо на выходе")
                 record("independent-supply-and-return-source-assignments")
+                record("independent-fuel-tank-and-outlet-source-assignments")
             result["widths"].append(width)
             record("responsive-assign-move-replace-clear", width=width,
                    posted_commands=count_commands() - start_count, explicit_no_nc=True,
@@ -751,7 +756,7 @@ try:
         page.locator("#pin-reload").click()
         expect(status).to_contain_text("Назначения перечитаны")
         expect(channel).to_have_value("3")
-        expect_pin(52, "busy", "Занят · Топливо")
+        expect_pin(52, "busy", "Занят · Топливо в баке")
         close_pin(52)
         record("post-headers-then-stalled-body-times-out", automatic_retries=0,
                close_available_after_deadline=True)
@@ -803,7 +808,7 @@ try:
         last_command({"action": "connection_pin_set", "gpio": 31, "channel": 5,
                       "type": 3, "debounce": 0, "revision": saved_revision})
         expect_pin(31, "busy", "Занят · Верхний геркон")
-        expect_pin(52, "busy", "Занят · Топливо")
+        expect_pin(52, "busy", "Занят · Топливо в баке")
         close_pin(31)
         record("remote-descriptor-replaced-by-explicit-local-sensor", other_gpio_preserved=True)
 

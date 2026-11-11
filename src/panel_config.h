@@ -4,12 +4,13 @@
 // externally routed, validated JP1 GPIOs. Never controls actuator outputs.
 namespace panel_config {
 enum class Type:uint8_t { None=0,DS18B20=1,ReedNO=2,ReedNC=3,RemoteModbus=4,RemoteMQTT=5 };
-enum class Channel:uint8_t { Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5,CoolantReturn=6 };
-constexpr unsigned COUNT=7;
+enum class Channel:uint8_t { Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5,CoolantReturn=6,FuelOutlet=7 };
+constexpr unsigned COUNT=8;
 // Temperature samples are consecutive in the UI; persisted reed slots keep IDs 4/5.
 constexpr int temperatureIndex(unsigned channel) {
   if(channel<=unsigned(Channel::FuelTemp))return int(channel);
-  return channel==unsigned(Channel::CoolantReturn)?4:-1;
+  if(channel==unsigned(Channel::CoolantReturn))return 4;
+  return channel==unsigned(Channel::FuelOutlet)?5:-1;
 }
 // INPUT_PULLUP: open contact = HIGH. Reached is a normalized fuel-height state,
 // NOT physical contact closure. User's open=full float arrangement uses ReedNC.

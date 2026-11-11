@@ -51,7 +51,7 @@ inventory = [{"name": name, "connected": False, "state": "not_connected"} for na
 def empty_connections(revision=0):
     return {"available": True, "revision": revision, "drivers_active": False,
             "items": [{"channel": channel, "type": "none", "gpio": -1, "jp1_pin": 0,
-                       "active": False, "online": False} for channel in range(7)]}
+                       "active": False, "online": False} for channel in range(8)]}
 
 
 def local_assignment(channel, kind, gpio):
@@ -71,7 +71,7 @@ fixture = {
     "time": {"zone": 0, "zone_name": "UTC"},
     "service": {"free_heap": 180000, "first_frame_ms": 480, "display_ms": 320,
                 "lvgl_ms": 2, "touch_ms": 80},
-    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(5)],
+    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(6)],
     "fuel": {"lower": {"valid": False}, "upper": {"valid": False}},
     "fuel_level_text": "Нет данных", "equipment": deepcopy(inventory),
     "connections": empty_connections(),
@@ -233,7 +233,7 @@ try:
                             text:value.textContent,font_family:style.fontFamily,line_height:style.lineHeight,
                             font_px:parseFloat(style.fontSize),weight:style.fontWeight,spacing:style.letterSpacing,
                             overflow_x:style.overflowX,overflow_y:style.overflowY,clipping,
-                            card:box(card.getBoundingClientRect()),target:box(target.getBoundingClientRect()),grouped,
+                            group:card.querySelector("h2")?.textContent||"",card:box(card.getBoundingClientRect()),target:box(target.getBoundingClientRect()),grouped,
                             name:box(target.querySelector(".temp-name").getBoundingClientRect()),
                             value:box(value.getBoundingClientRect()),
                             icon:box(card.querySelector("svg").getBoundingClientRect()),
@@ -247,14 +247,15 @@ try:
                 (out / f"home-font-{case}-{width}-metrics.json").write_text(
                     json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 page.screenshot(path=str(out / f"home-font-{case}-{width}.png"), full_page=True)
-                assert len(metrics) == 5
+                assert len(metrics) == 6
                 expect(page.locator("#home > .grid > .card")).to_have_count(4)
-                coolant = page.get_by_role("region", name="Теплоноситель")
-                expect(coolant.get_by_role("button")).to_have_count(2)
-                expect(coolant.locator("svg")).to_have_count(1)
-                paired = [item for item in metrics if item["grouped"]]
-                assert len(paired) == 2 and paired[0]["card"] == paired[1]["card"]
-                assert paired[0]["target"]["bottom"] <= paired[1]["target"]["top"] + 1
+                for title in ("Теплоноситель", "Топливо"):
+                    group = page.get_by_role("region", name=title, exact=True)
+                    expect(group.locator("button[data-temp]")).to_have_count(2)
+                    expect(group.locator("svg")).to_have_count(1)
+                    paired = [item for item in metrics if item["group"] == title]
+                    assert len(paired) == 2 and paired[0]["card"] == paired[1]["card"]
+                    assert paired[0]["target"]["bottom"] <= paired[1]["target"]["top"] + 1
                 # Every channel keeps the same large numeric font.
                 expected_font = {320: 28, 390: 28, 768: 42, 1280: 39.68}[width]
                 for item in metrics:
@@ -519,7 +520,7 @@ try:
                     fixture["equipment"] = deepcopy(inventory)
                     fixture["equipment"][1]["connected"] = connected
                     fixture["equipment"][2].update(name="Контур 1 · гостевая", connected=True)
-                    fixture["temperatures"] = [{"valid": False, "ever": False, "history": []} for _ in range(5)]
+                    fixture["temperatures"] = [{"valid": False, "ever": False, "history": []} for _ in range(6)]
                 for index in range(4):
                     expect(cards.nth(index)).to_have_js_property("open", False)
                 # Mouse opens the first card. Native Tab/Enter/Space open the others.
@@ -562,9 +563,9 @@ try:
                 expect(rows.nth(0).locator("span").nth(0)).to_have_text("Контур 1")
                 expect(rows.nth(0).locator("span").nth(1)).to_have_text("Нет данных")
                 page.click('.topnav [data-page="home"]')
-                home_temperatures(width, "no-data", [None] * 5)
-                for case, values in (("negative", [-55.0] * 5), ("three-digit", [125.0] * 5),
-                                     ("mixed", [-55.0, 0.0, 125.0, 34.8, 46.2])):
+                home_temperatures(width, "no-data", [None] * 6)
+                for case, values in (("negative", [-55.0] * 6), ("three-digit", [125.0] * 6),
+                                     ("mixed", [-55.0, 0.0, 125.0, 34.8, 46.2, 17.1])):
                     with guard:
                         fixture["temperatures"] = [
                             {"valid": True, "ever": True, "value": value, "minimum": value,
@@ -610,7 +611,7 @@ try:
                 "null entries and missing tail preserve stable API types and unknown data",
                 "restored inventory refreshes values", "page navigation retains user disclosure",
                 "four responsive widths and minimum 44px summary targets",
-                "five Home temperatures with equal font sizes at every viewport",
+                "six Home temperatures with equal font sizes at every viewport",
                 "no-data, negative, three-digit and mixed readings on all four widths",
                 "single-line numbers, wrapping units when necessary, no text clipping or icon overlap",
                 "supplied JP1 JPEG served from the actual embedded bytes without external requests",

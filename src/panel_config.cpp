@@ -15,7 +15,6 @@ template<unsigned N> struct StoredConfig {
   Assignment item[N];
   uint32_t hash=0;
 };
-using LegacyConfig=StoredConfig<6>;
 using Persist=StoredConfig<COUNT>;
 constexpr uint32_t MAGIC=0x42504336U;
 SemaphoreHandle_t lock=nullptr;
@@ -53,32 +52,36 @@ template<unsigned N> bool readRecord(Preferences& prefs,uint32_t schema,StoredCo
   if(h!=entry.hash || !checked(entry.item))return false;
   return true;
 }
+template<unsigned N> bool readPrevious(Preferences& prefs,uint32_t schema,Persist& entry){
+  StoredConfig<N> previous{};
+  if(!readRecord(prefs,schema,previous))return false;
+  entry=Persist{};
+  entry.revision=previous.revision;
+  for(unsigned i=0;i<N;i++)entry.item[i]=previous.item[i];
+  return true;
+}
 bool readSlot(unsigned slot,Persist& entry){
   Preferences prefs;
   if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",true))return false;
   const size_t size=prefs.getBytesLength("config");
   bool ok=false;
   if(size==sizeof(Persist)){
-    ok=readRecord(prefs,2,entry);
-  }else if(size==sizeof(LegacyConfig)){
-    LegacyConfig previous{};
-    ok=readRecord(prefs,1,previous);
-    if(ok){
-      entry=Persist{};
-      entry.revision=previous.revision;
-      for(unsigned i=0;i<6;i++)entry.item[i]=previous.item[i];
-    }
+    ok=readRecord(prefs,3,entry);
+  }else if(size==sizeof(StoredConfig<7>)){
+    ok=readPrevious<7>(prefs,2,entry);
+  }else if(size==sizeof(StoredConfig<6>)){
+    ok=readPrevious<6>(prefs,1,entry);
   }
   prefs.end();return ok;
 }
 bool writeSlot(unsigned slot,const State& next){
   Persist entry{};
-  entry.magic=MAGIC;entry.schema=2;entry.revision=next.revision;
+  entry.magic=MAGIC;entry.schema=3;entry.revision=next.revision;
   for(unsigned i=0;i<COUNT;i++)entry.item[i]=next.item[i];
   entry.hash=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
   Preferences prefs;
   if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false))return false;
-  // Keep the exact previous bytes, including an older six-channel record.
+  // Keep the exact previous bytes, including records from either older schema.
   uint8_t previous[sizeof(Persist)];
   const size_t previousSize=prefs.getBytesLength("config");
   if(previousSize>sizeof(previous) ||

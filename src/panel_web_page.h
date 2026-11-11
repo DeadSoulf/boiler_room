@@ -16,11 +16,12 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 .temp-icon g{stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;fill:var(--card)}
 .temp-icon .icon-tint{fill:#245d55}.temp:not(.temp-fuel) .temp-detail{margin-top:auto}
 @media(max-width:680px){.temp-icon{width:112px;height:112px}.temp .temp-value{margin:13px 0 4px}}
-.coolant-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 8px;width:100%;margin-bottom:4px}
-.coolant-heading h2{margin:0}.coolant-heading .temp-icon{width:34px;height:30px;margin:0}
-.coolant-reading{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;width:100%;min-height:48px;padding:8px 0;text-align:left;background:transparent;border:0;border-radius:4px}
-.coolant-reading+.coolant-reading{border-top:1px solid var(--line)}.coolant-reading:hover,.coolant-reading:focus-visible{background:#233136}
-.temp .coolant-reading .temp-value{margin:3px 0 2px}.temp.temp-coolant .temp-detail{margin:0}
+.temp-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 8px;width:100%;margin-bottom:4px}
+.temp-heading h2{margin:0}.temp-heading .temp-icon{width:34px;height:30px;margin:0}
+.temp-reading{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;width:100%;min-height:48px;padding:8px 0;text-align:left;background:transparent;border:0;border-radius:4px}
+.temp-reading+.temp-reading{border-top:1px solid var(--line)}.temp-reading:hover,.temp-reading:focus-visible{background:#233136}
+.temp .temp-reading .temp-value{margin:3px 0 2px}.temp .temp-reading .temp-detail{margin:0}
+.fuel-open{display:grid;place-items:center;min-height:44px;min-width:44px;border:0;border-radius:6px;background:transparent;padding:0}.fuel-open:hover,.fuel-open:focus-visible{background:#233136}.fuel-open .canister{width:30px;height:38px;margin:0}
 .update-offer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:-12px 0 24px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--accent)}.update-offer button{padding:8px 14px;flex-shrink:0}.update-offer span{overflow-wrap:anywhere}.update-panel{max-width:760px}.update-panel progress{display:block;width:100%;height:12px;accent-color:var(--accent);margin:24px 0 10px}.update-panel .row b{font-variant-numeric:tabular-nums}#update-message{white-space:pre-wrap}#update-progress-text{font-variant-numeric:tabular-nums}#update-error:empty{display:none}
 .pinout{max-width:800px;margin:24px auto}.pinout figcaption{font-size:18px;font-weight:550;margin-bottom:12px}.pinout a{display:block;color:var(--accent);text-decoration:none}.pinout a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.pinout img{display:block;width:100%;height:auto}.pinout-open{display:block;min-height:46px;padding:12px 0;font-size:14px;line-height:1.5;text-decoration:underline;text-underline-offset:3px}
 .jp1-section{max-width:800px;margin:24px auto}.jp1-section h3{margin-bottom:8px}.jp1-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12px}.jp1-legend span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px}.jp1-free{color:var(--accent)}.jp1-busy{color:var(--warn)}.jp1-map{display:grid;gap:6px;margin:16px 0}.jp1-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}.jp1-pin{--pin-color:var(--muted);position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:center;gap:3px 4px;min-width:0;min-height:52px;padding:8px;border:1px solid var(--pin-color);border-radius:8px;background:#142024}.jp1-pin.right{grid-template-columns:auto minmax(0,1fr)}.jp1-name{font-size:14px;font-weight:550;overflow-wrap:anywhere}.jp1-number{font-size:11px;color:var(--muted);align-self:center}.jp1-status{grid-column:1/-1;color:var(--pin-color);font-size:12px;line-height:1.4;overflow-wrap:anywhere}.jp1-pin::after{content:"";position:absolute;right:-11px;top:calc(50% - 3px);width:6px;height:6px;border-radius:50%;background:var(--pin-color)}.jp1-pin.right::after{right:auto;left:-11px}.jp1-pin[data-state=free]{--pin-color:var(--accent)}.jp1-pin[data-state=busy]{--pin-color:var(--warn)}.jp1-pin[data-state=conflict]{--pin-color:var(--red)}.jp1-pin[data-kind=power],.jp1-pin[data-kind=boot]{--pin-color:#efb28c}.jp1-pin[data-kind=c6]{--pin-color:#9cc9ed}.jp1-pin[data-kind=i2c]{--pin-color:#c2b1e9}
@@ -34,11 +35,15 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 <button class="card temp" data-temp="0"><span class="temp-name">В доме</span><span class="temp-value" id="t0">--.- °C</span><svg class="temp-icon" data-icon="house" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><rect x="82" y="16" width="10" height="27" rx="2"/><rect x="24" y="44" width="72" height="56" rx="6"/><polyline points="10,46 60,8 110,46" fill="none"/><rect class="icon-tint" x="56" y="65" width="22" height="35" rx="3"/><rect class="icon-tint" x="35" y="61" width="12" height="14" rx="2"/></g></svg><span class="temp-detail" id="tstate0">Нет данных</span></button>
 <button class="card temp" data-temp="1"><span class="temp-name">На улице</span><span class="temp-value" id="t1">--.- °C</span><svg class="temp-icon" data-icon="outdoor" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><circle cx="38" cy="36" r="20"/><path d="M38 3V9M8 36H2M64 10L59 15M10 10L15 15M67 36H74M10 62L15 57" fill="none"/><path d="M34 94C24 94 18 87 18 76C18 66 25 60 34 60C37 43 48 34 65 34C78 34 86 43 88 54C103 52 112 63 112 74C112 87 106 94 96 94Z"/></g></svg><span class="temp-detail" id="tstate1">Нет данных</span></button>
 <section class="card temp temp-coolant" aria-labelledby="coolant-title">
- <div class="coolant-heading"><h2 class="temp-name" id="coolant-title">Теплоноситель</h2><svg class="temp-icon" data-icon="radiator" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><path d="M15 40V18H5M105 82H115V98M28 92V100M92 92V100" fill="none"/><rect x="14" y="32" width="92" height="58" rx="7"/><rect class="icon-tint" x="25" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="44" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="63" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="82" y="36" width="12" height="50" rx="4"/></g></svg></div>
- <button type="button" class="coolant-reading" data-temp="2" aria-controls="temperature-detail"><span class="temp-name">Подача</span><span class="temp-value" id="t2">--.- °C</span><span class="temp-detail" id="tstate2">Нет данных</span></button>
- <button type="button" class="coolant-reading" data-temp="4" aria-controls="temperature-detail"><span class="temp-name">Обратка</span><span class="temp-value" id="t4">--.- °C</span><span class="temp-detail" id="tstate4">Нет данных</span></button>
+ <div class="temp-heading"><h2 class="temp-name" id="coolant-title">Теплоноситель</h2><svg class="temp-icon" data-icon="radiator" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><path d="M15 40V18H5M105 82H115V98M28 92V100M92 92V100" fill="none"/><rect x="14" y="32" width="92" height="58" rx="7"/><rect class="icon-tint" x="25" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="44" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="63" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="82" y="36" width="12" height="50" rx="4"/></g></svg></div>
+ <button type="button" class="temp-reading" data-temp="2" aria-controls="temperature-detail"><span class="temp-name">Подача</span><span class="temp-value" id="t2">--.- °C</span><span class="temp-detail" id="tstate2">Нет данных</span></button>
+ <button type="button" class="temp-reading" data-temp="4" aria-controls="temperature-detail"><span class="temp-name">Обратка</span><span class="temp-value" id="t4">--.- °C</span><span class="temp-detail" id="tstate4">Нет данных</span></button>
 </section>
-<button class="card temp temp-fuel" data-page="fuel"><span class="temp-name">Топливо</span><span class="temp-value" id="t3">--.- °C</span><svg id="fuel-canister" class="canister" data-state="unknown" viewBox="0 0 120 148" role="img" aria-label="Уровень топлива: нет данных"><title id="canister-title">Нет данных</title><rect id="canister-fill" class="can-fill" x="18" y="136" width="84" height="0" rx="5"/><g class="can-outline"><rect x="12" y="24" width="96" height="118" rx="10"/><path d="M62 24V4H99V24M21 18V10H41V18Z"/></g><path id="canister-cross" class="can-cross" d="M43 62L78 104M78 62L43 104" visibility="hidden"/><text id="canister-symbol" class="can-symbol" x="60" y="101" text-anchor="middle">?</text></svg><span class="temp-detail" id="tstate3">Нет данных</span></button>
+<section class="card temp temp-fuel" aria-labelledby="fuel-title">
+ <div class="temp-heading"><h2 class="temp-name" id="fuel-title">Топливо</h2><button type="button" id="fuel-open" class="fuel-open" data-page="fuel" aria-label="Уровень топлива: нет данных. Открыть раздел топлива"><svg id="fuel-canister" class="canister" data-state="unknown" viewBox="0 0 120 148" role="img" aria-label="Уровень топлива: нет данных"><title id="canister-title">Нет данных</title><rect id="canister-fill" class="can-fill" x="18" y="136" width="84" height="0" rx="5"/><g class="can-outline"><rect x="12" y="24" width="96" height="118" rx="10"/><path d="M62 24V4H99V24M21 18V10H41V18Z"/></g><path id="canister-cross" class="can-cross" d="M43 62L78 104M78 62L43 104" visibility="hidden"/><text id="canister-symbol" class="can-symbol" x="60" y="101" text-anchor="middle">?</text></svg></button></div>
+ <button type="button" class="temp-reading" data-temp="3" aria-controls="temperature-detail"><span class="temp-name">В баке</span><span class="temp-value" id="t3">--.- °C</span><span class="temp-detail" id="tstate3">Нет данных</span></button>
+ <button type="button" class="temp-reading" data-temp="5" aria-controls="temperature-detail"><span class="temp-name">На выходе</span><span class="temp-value" id="t5">--.- °C</span><span class="temp-detail" id="tstate5">Нет данных</span></button>
+</section>
 </div>
 <div id="temperature-detail" class="card section hidden"><div class="stack" style="justify-content:space-between"><h2 id="detail-title">Температура</h2><button data-action="close-detail" class="ghost">Закрыть</button></div><p id="detail-meta"></p><svg id="detail-chart" class="detail-chart" viewBox="0 0 400 100" preserveAspectRatio="none" aria-label="История измерений"></svg><p id="detail-stats" class="tiny"></p></div></section>
 <section id="equipment" class="page hidden"><h2>Оборудование</h2><div class="equip-list" id="equipment-list"></div><p class="tiny">Управление появится после подключения и проверки исполнительных контроллеров.</p></section>
@@ -52,7 +57,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <div class="actions"><button type="submit" id="boiler-save" class="primary" disabled>Сохранить пороги</button><button type="button" id="boiler-reload" class="ghost hidden" disabled>Перечитать с панели</button></div>
  <p class="hint" id="boiler-feedback" role="status"></p></form>
 </div></template>
-<section id="fuel" class="page hidden"><h2>Топливо</h2><div class="two"><div class="card"><h3>Уровень</h3><p id="fuel-status" class="fuel-summary-value">Нет данных</p><div class="row"><span>Нижний датчик</span><span id="lower-status">Нет данных</span></div><div class="row"><span>Верхний датчик</span><span id="upper-status">Нет данных</span></div><details><summary>Как определяется уровень</summary><p class="tiny">Два геркона дают три состояния, без расчёта литров. Для принятой схемы контактов используйте режим NC: оба разомкнуты — полная канистра; замкнут верхний — половина; замкнуты оба — пустая. Обрыв провода неотличим от размыкания контакта.</p></details></div><div class="card"><h3>Температура и подогрев</h3><div class="row"><span>Температура топлива</span><b id="fuel-temp">--.- °C</b></div><div class="row"><span>Контроллер подогрева</span><span id="fuel-controller">Не подключён</span></div><button class="ghost section" data-temp="3">История температуры</button><p class="tiny">До 80 °C — требование проекта, не действующая уставка. Команд нагрева нет.</p></div></div></section>
+<section id="fuel" class="page hidden"><h2>Топливо</h2><div class="two"><div class="card"><h3>Уровень</h3><p id="fuel-status" class="fuel-summary-value">Нет данных</p><div class="row"><span>Нижний датчик</span><span id="lower-status">Нет данных</span></div><div class="row"><span>Верхний датчик</span><span id="upper-status">Нет данных</span></div><details><summary>Как определяется уровень</summary><p class="tiny">Два геркона дают три состояния, без расчёта литров. Для принятой схемы контактов используйте режим NC: оба разомкнуты — полная канистра; замкнут верхний — половина; замкнуты оба — пустая. Обрыв провода неотличим от размыкания контакта.</p></details></div><div class="card"><h3>Температура и подогрев</h3><div class="row"><span>В баке</span><b id="fuel-temp">--.- °C</b></div><div class="row"><span>На выходе</span><b id="fuel-outlet-temp">--.- °C</b></div><div class="row"><span>Контроллер подогрева</span><span id="fuel-controller">Не подключён</span></div><div class="actions"><button class="ghost" data-temp="3" aria-controls="temperature-detail">История в баке</button><button class="ghost" data-temp="5" aria-controls="temperature-detail">История на выходе</button></div><p class="tiny">До 80 °C — требование проекта, не действующая уставка. Команд нагрева нет.</p></div></div></section>
 <section id="settings" class="page hidden">
  <h2>Настройки</h2><div id="settings-menu" class="menu-grid">
 <button class="menu-item" data-tab="wifi"><strong>Wi-Fi</strong><span>Сеть и подключение</span><b>›</b></button>
@@ -114,7 +119,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
     <option value="0">Температура в доме</option>
     <option value="1">Температура улицы</option>
     <option value="2">Температура подачи</option><option value="6">Температура обратки</option>
-    <option value="3">Температура топлива</option>
+    <option value="3">Топливо в баке</option><option value="7">Топливо на выходе</option>
     <option value="4">Нижний геркон топлива</option>
     <option value="5">Верхний геркон топлива</option>
   </select></div>
@@ -160,7 +165,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <p id="pin-current"></p><p id="pin-base-revision" class="tiny muted"></p>
  <form id="pin-form">
   <div class="field"><label for="pin-channel">Назначить на</label><select id="pin-channel" required>
-   <option value="">Выберите назначение</option><option value="0">Температура в доме</option><option value="1">Температура улицы</option><option value="2">Температура подачи</option><option value="6">Температура обратки</option><option value="3">Температура топлива</option><option value="4">Нижний геркон топлива</option><option value="5">Верхний геркон топлива</option>
+   <option value="">Выберите назначение</option><option value="0">Температура в доме</option><option value="1">Температура улицы</option><option value="2">Температура подачи</option><option value="6">Температура обратки</option><option value="3">Топливо в баке</option><option value="7">Топливо на выходе</option><option value="4">Нижний геркон топлива</option><option value="5">Верхний геркон топлива</option>
   </select></div>
   <p id="pin-temperature" class="tiny hidden">Датчик DS18B20 · отдельная линия OneWire.</p>
   <div id="pin-reed" class="hidden">
@@ -264,9 +269,9 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 "use strict";
 const $=id=>document.getElementById(id);
 const names=["Бойлер косвенного нагрева","Электрокотёл","Контур 1","Контур 2","Контур 3","Дизельный отопитель","Подогрев топлива"];
-const tnames=["В доме","На улице","Подача","Топливо","Обратка"];
-// Source IDs 4 and 5 belong to the reeds; return is temperature 4 and source 6.
-const inputNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",tnames[4]];
+const tnames=["В доме","На улице","Подача","Топливо в баке","Обратка","Топливо на выходе"];
+// Saved input IDs 4 and 5 are reed switches. Appended temperatures follow them.
+const inputNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",...tnames.slice(4)];
 const isReedInput=channel=>channel===4||channel===5;
 function selectedPinChannel(){
  const value=$("pin-channel").value,channel=Number(value);
@@ -289,7 +294,7 @@ const jp1Pins=[
  ["I2C_SCL","i2c","I2C · резерв"],["C6_CHIP_PU","c6","ESP32-C6 · резерв"]
 ];
 const jp1Nodes=[];
-let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="home",tab="",detail=-1;
+let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="home",tab="",detail=-1,detailTrigger=null;
 let lastServerError="",lastToast=null,refreshInFlight=false,serverOnline=false;
 let pairTicket="",pairDeadline=0,pairGeneration=0,pairBusy=false;
 let haFormRevision=null,haDirty=false;
@@ -739,6 +744,7 @@ function updateCanister(f){
   else{state="invalid";title="Проверьте герконы";}
  }
  const icon=$("fuel-canister");icon.dataset.state=state;icon.setAttribute("aria-label","Уровень топлива: "+title);
+ $("fuel-open").setAttribute("aria-label","Уровень топлива: "+title+". Открыть раздел топлива");
  text("canister-title",title);text("canister-symbol",symbol);
  $("canister-fill").setAttribute("height",height);$("canister-fill").setAttribute("y",136-height);
  $("canister-cross").setAttribute("visibility",height?"visible":"hidden");
@@ -746,7 +752,7 @@ function updateCanister(f){
 }
 function markOffline(){
  for(let i=0;i<tnames.length;i++){text("t"+i,"--.- °C");text("tstate"+i,"Нет связи");}
- text("fuel-temp","--.- °C");text("lower-status","Нет связи");text("upper-status","Нет связи");updateCanister(null);
+ text("fuel-temp","Нет связи");text("fuel-outlet-temp","Нет связи");text("lower-status","Нет связи");text("upper-status","Нет связи");updateCanister(null);
 }
 function updateView(){
  const d=current;renderPinout(d&&d.connections);if(!d){renderPinEditor();return;}
@@ -764,8 +770,10 @@ function updateView(){
  for(let i=0;i<tnames.length;i++){
    const t=d.temperatures&&d.temperatures[i]||{};
    const value=t.valid&&typeof t.value==="number"?t.value.toFixed(1)+" °C":"--.- °C";
-   text("t"+i,value);text("tstate"+i,t.valid?"":t.ever?"Устарело":"Нет данных");
-   if(i===3)text("fuel-temp",value);
+   const status=t.valid?"":t.ever?"Устарело":"Нет данных";
+   text("t"+i,value);text("tstate"+i,status);
+   if(i===3)text("fuel-temp",status||value);
+   if(i===5)text("fuel-outlet-temp",status||value);
  }
  updateDetail();
  text("fuel-status",d.fuel_level_text);
@@ -1033,7 +1041,10 @@ function handleAction(b){
  if(action==="hide-pair"){cancelPairing();return;}
  if(action==="pair"){login();return}
  if(action==="logout"){logout();return}
- if(action==="close-detail"){detail=-1;updateDetail();return}
+ if(action==="close-detail"){
+  detail=-1;page=detailTrigger?.closest(".page")?.id||"home";drawPage();
+  detailTrigger?.focus();detailTrigger=null;return;
+ }
  if(action==="refresh"){poll();return}
  if(action==="wifi_forget"){
    const n=selectedProfile();
@@ -1071,11 +1082,15 @@ document.addEventListener("click",e=>{
  const pin=target.closest('#jp1-map button[data-gpio]');
  if(pin){openPinEditor(pin);return;}
  const p=target.closest("[data-page]");
- if(p){page=p.dataset.page;if(page==="settings")tab="";detail=-1;drawPage();return;}
+ if(p){page=p.dataset.page;if(page==="settings")tab="";detail=-1;detailTrigger=null;drawPage();return;}
  const t=target.closest("[data-tab]");
  if(t){setTab(t.dataset.tab);return}
  const temperature=target.closest("[data-temp]");
- if(temperature){detail=Number(temperature.dataset.temp);page="home";drawPage();$("temperature-detail").scrollIntoView({behavior:"smooth",block:"nearest"});return}
+ if(temperature){
+  detailTrigger=temperature;detail=Number(temperature.dataset.temp);page="home";drawPage();
+  const panel=$("temperature-detail");panel.querySelector("button").focus({preventScroll:true});
+  panel.scrollIntoView({behavior:"smooth",block:"nearest"});return;
+ }
  const button=target.closest("[data-action]");
  if(button){if(button.disabled)return;handleAction(button)}
 });

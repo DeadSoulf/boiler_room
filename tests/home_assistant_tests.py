@@ -25,11 +25,13 @@ with tempfile.TemporaryDirectory() as td:
     assert len(obj['availability'])==2 and 'command_topic' not in obj
    elif not line.startswith('PASS:'):
     name,payload=line.split(' ',1);states[name]=json.loads(payload)
-  assert len(configs)==13 and len({c['unique_id'] for c in configs})==13
+  assert len(configs)==14 and len({c['unique_id'] for c in configs})==14
   assert all(c['device']['identifiers']==['bp_0123456789ab'] for c in configs)
   assert states['EMPTY']['room'] is None and not states['EMPTY']['room_valid']
   assert states['LIVE']['room']==-12.25 and states['LIVE']['fuel_lower']=='ON'
   assert states['LIVE']['coolant']==58.0 and states['LIVE']['coolant_return']==43.5
+  assert states['LIVE']['fuel_temp']==28.5 and states['LIVE']['fuel_outlet']==37.0
+  assert states['EMPTY']['fuel_outlet'] is None and not states['EMPTY']['fuel_outlet_valid']
   assert states['EMPTY']['coolant_return'] is None and not states['EMPTY']['coolant_return_valid']
   assert states['LIVE']['sd_free']==62602392064 and states['LIVE']['fuel_level']=='between'
   assert states['INCONSISTENT']['fuel_level']=='inconsistent'

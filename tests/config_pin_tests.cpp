@@ -25,7 +25,7 @@ void validationAndAvailability(){
     assert(setPin(52,Channel::Room,type,50,0,saved)==PinResult::Invalid);
   for(unsigned channel=0;channel<COUNT;channel++){
     const auto ch=static_cast<Channel>(channel);
-    if(channel<4||ch==Channel::CoolantReturn){
+    if(ch!=Channel::FuelLower&&ch!=Channel::FuelUpper){
       for(const Type type:{Type::ReedNO,Type::ReedNC})
         assert(setPin(52,ch,type,50,0,saved)==PinResult::Invalid);
     }else assert(setPin(52,ch,Type::DS18B20,50,0,saved)==PinResult::Invalid);
@@ -175,7 +175,7 @@ void migrateLegacySlots(){
   assert(before.item[3].type==Type::RemoteMQTT&&before.item[1].type==Type::None);
   assert(before.item[4].type==Type::ReedNC&&before.item[4].gpio==29&&before.item[4].debounceMs==75);
   assert(before.item[5].type==Type::ReedNO&&before.item[5].gpio==30&&before.item[5].debounceMs==80);
-  assert(before.item[6].type==Type::None&&before.item[6].gpio==-1&&config_host::nvs==originals);
+  assert(before.item[6].type==Type::None&&before.item[6].gpio==-1&&before.item[7].gpio==-1&&config_host::nvs==originals);
   config_host::afterWrite=[](){config_host::failRead=true;};
   uint32_t saved=0;
   assert(setPin(28,Channel::CoolantReturn,Type::DS18B20,50,7,saved)==PinResult::StorageError);
@@ -189,8 +189,40 @@ void migrateLegacySlots(){
                 "supply, return and float switches have distinct destinations");
 }
 
+void migrateSevenChannelSlots(){
+  // Schema 2 as written by v0.10.9/v0.10.10: seven 8-byte assignments.
+  uint8_t bytes[]={
+    0x36,0x43,0x50,0x42,2,0,0,0,17,0,0,0,
+    1,0,52,0,0,0,50,0, 0,0,255,255,0,0,50,0,
+    1,0,51,0,0,0,50,0, 1,0,33,0,0,0,50,0,
+    3,0,29,0,0,0,75,0, 2,0,30,0,0,0,80,0,
+    1,0,28,0,0,0,50,0, 0,0,0,0
+  };
+  static_assert(sizeof(bytes)==72,"seven-channel ESP32 config size");
+  const uint32_t hash=fnv(bytes,68);
+  memcpy(bytes+68,&hash,4);
+  fresh();
+  config_host::nvs["bp_cfg_a"]=std::vector<uint8_t>(bytes,bytes+sizeof(bytes));
+  config_host::nvs["bp_cfg_b"]=config_host::nvs["bp_cfg_a"];
+  const auto originals=config_host::nvs;
+  reboot();const State before=state();
+  assert(before.revision==17&&before.item[3].gpio==33&&before.item[6].gpio==28);
+  assert(before.item[7].type==Type::None&&before.item[7].gpio==-1&&config_host::nvs==originals);
+  uint32_t saved=0;config_host::afterWrite=[](){config_host::failRead=true;};
+  assert(setPin(49,Channel::FuelOutlet,Type::DS18B20,50,17,saved)==PinResult::StorageError);
+  assert(config_host::nvs==originals);reboot();unchanged(before);
+  assert(setPin(49,Channel::FuelOutlet,Type::DS18B20,50,17,saved)==PinResult::Saved&&saved==18);
+  reboot();const State after=state();
+  for(unsigned i=0;i<7;i++)assert(!memcmp(&before.item[i],&after.item[i],sizeof(Assignment)));
+  assert(after.item[7].type==Type::DS18B20&&after.item[7].gpio==49);
+  assert(rollback());reboot();assert(state().revision==19&&sameBindings(state(),before));
+  assert(rollback());reboot();assert(state().revision==20&&sameBindings(state(),after));
+  static_assert(temperatureIndex(3)==3&&temperatureIndex(7)==5&&temperatureIndex(8)==-1,
+                "tank and outlet temperatures have distinct destinations");
+}
+
 int main(){
-  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();
+  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();migrateSevenChannelSlots();
   powerOff();
   puts("PASS: real config/NVS 11-pin validation, atomic owner replacement/move, remote replacement, clear/no-op, mutex revision race, write/read-back recovery, repeated rollback, transient-fault reboot and revision wrap; persistent cleanup failure boundary demonstrated");
 }
