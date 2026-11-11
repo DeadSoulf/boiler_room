@@ -33,7 +33,8 @@ class ArtifactManifestTests(unittest.TestCase):
     def test_existing_notices_are_packaged_and_hashed(self):
         output = self.manifest()
         inputs = json.loads((self.root / 'artifacts/input-manifest.json').read_text())['sha256']
-        for name in ('NotoSansDisplay-OFL.txt', 'guition-jc4880p4-bsp-LICENSE.txt', 'FONT_PROVENANCE.md'):
+        for name in ('NotoSansDisplay-OFL.txt', 'guition-jc4880p4-bsp-LICENSE.txt', 'FONT_PROVENANCE.md',
+                     'rust-core-1.88.0-MIT.txt', 'rust-compiler-builtins-0.1.158-LICENSE.txt'):
             original = (self.root / 'licenses' / name).read_bytes()
             self.assertEqual((self.root / 'artifacts/licenses' / name).read_bytes(), original)
             digest = hashlib.sha256(original).hexdigest()

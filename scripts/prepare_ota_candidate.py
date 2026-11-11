@@ -115,7 +115,7 @@ def validate_build_inputs(root, source, source_paths=None, source_file=None):
     require(inputs.get('commit') == source, 'Firmware artifact came from another source commit')
     if source_paths is None:
         source_paths = git(root, 'ls-tree', '-r', '--name-only', source, '--',
-                           'src', 'ci', 'tests', 'scripts', '.github', 'licenses', 'apply_update.py').splitlines()
+                           'src', 'rust', 'ci', 'tests', 'scripts', '.github', 'licenses', 'apply_update.py').splitlines()
     expected = {path for path in source_paths if '__pycache__' not in Path(path).parts}
     recorded = inputs.get('sha256')
     require(type(recorded) is dict and set(recorded) == expected, 'Build input manifest is incomplete or contains unexpected paths')

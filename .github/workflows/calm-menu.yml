@@ -1,9 +1,9 @@
 name: Calm physical menu
 on:
   push:
-    paths: ['src/**', 'tests/calm_ui/**', 'tests/config_060_static.py', 'tests/web_firmware_tests.py', 'tests/sensors_static_tests.py', '.github/workflows/calm-menu.yml']
+    paths: ['rust/**', 'src/**', 'tests/calm_ui/**', 'ci/build_heating_rust.py', 'tests/config_060_static.py', 'tests/web_firmware_tests.py', 'tests/sensors_static_tests.py', '.github/workflows/calm-menu.yml']
   pull_request:
-    paths: ['src/**', 'tests/calm_ui/**', 'tests/config_060_static.py', 'tests/web_firmware_tests.py', 'tests/sensors_static_tests.py', '.github/workflows/calm-menu.yml']
+    paths: ['rust/**', 'src/**', 'tests/calm_ui/**', 'ci/build_heating_rust.py', 'tests/config_060_static.py', 'tests/web_firmware_tests.py', 'tests/sensors_static_tests.py', '.github/workflows/calm-menu.yml']
   workflow_dispatch:
   workflow_call:
     outputs:

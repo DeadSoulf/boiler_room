@@ -7,7 +7,12 @@ ESP32-P4. Он не посылает команды прошивки, не ст�
 
 ## Состав
 
-- `src/` — текущие исходники приложения.
+- `src/` — интерфейс, драйверы и адаптер входов и запросов автоматики.
+- `rust/heating-core/` — действующее ядро автоматики. Для сборки нужен `rustup`.
+  `ci/build_heating_rust.py` устанавливает закреплённый Rust 1.88.0 и собирает статическую библиотеку.
+  Native-проверки и прошивка используют общий исходник. Для ESP32-P4 выбран `riscv32imafc-unknown-none-elf` с ABI ILP32F.
+- `tests/heating_reference.h` — эталон алгоритмов v0.11.0. `tests/rust_heating_parity.sh` сравнивает расчёт Rust и C++.
+- `ci/verify_heating_rust.py` проверяет вызовы Rust из модуля опроса датчиков и разрешённые символы итогового ELF. Результат сохраняется в `artifacts/heating-rust-link.json`.
 - `tests/fixtures/` — исторические известные наборы и тестовые BSP-файлы.
   Они нужны для проверки миграции и не копируются в собираемую прошивку.
 - `tests/calm_ui/` — актуальный стенд настоящего LVGL с заменами платы, касаний и радио.
@@ -35,6 +40,8 @@ GitHub-hosted Ubuntu и отдельный Windows runner запускаются
 в исходники, fixtures и артефакты не включаются.
 
 ## Закреплённые входы
+
+В целевой прошивке ядро использует библиотеку Rust `core` без `std` и без выделения памяти в куче. Уведомления добавлены в комплект сборки. [Лицензия Rust core](../licenses/rust-core-1.88.0-MIT.txt) · [Условия compiler-builtins](../licenses/rust-compiler-builtins-0.1.158-LICENSE.txt) · [Версии компонентов Rust 1.88.0](https://github.com/rust-lang/rust/blob/1.88.0/library/Cargo.lock).
 
 - BSP `ultramcu/guition-jc4880p4-bsp`:
   `324970bade0d1f4e52880fe8016580368bc1e06e`.

@@ -5,8 +5,16 @@
 
 using namespace panel_heating;
 
+#ifdef HEATING_TEST_RUST
+#include "panel_heating_rust.h"
+using TestController = panel_heating::RustController;
+#else
+#include "heating_reference.h"
+using TestController = panel_heating::Controller;
+#endif
+
 struct Plant {
-  Controller controller;
+  TestController controller;
   Config config;
   Inputs in;
   Plant() {

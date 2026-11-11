@@ -6,6 +6,10 @@ r=Path(__file__).resolve().parents[1]
 (r/'artifacts').mkdir(exist_ok=True)
 shutil.copytree(r/'licenses',r/'artifacts/licenses',dirs_exist_ok=True)
 paths=[p for base in ['src','ci','tests','scripts','.github','licenses'] for p in (r/base).rglob('*') if p.is_file() and '__pycache__' not in p.parts]
+# Cargo can create a large target directory next to the crate on developer machines.
+# Only tracked Rust inputs participate in a release, matching the immutable git tree.
+rust_inputs=subprocess.check_output(['git','ls-files','-z','--','rust'],cwd=r).decode().split('\0')
+paths.extend(r/name for name in rust_inputs if name)
 if (r/'apply_update.py').exists():paths.append(r/'apply_update.py')
 result={'commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip(),'sha256':{str(p.relative_to(r)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}}
 (r/'artifacts/input-manifest.json').write_text(json.dumps(result,indent=2)+'\n')

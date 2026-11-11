@@ -2,6 +2,7 @@
 #include <math.h>
 #include <mutex>
 #include "panel_heating_runtime.h"
+#include "panel_heating_rust.h"
 #include "panel_heating_settings.h"
 #include "panel_types.h"
 #include "panel_sensors.h"
@@ -16,7 +17,7 @@ struct Freshness {
   bool expired=false;
 };
 Freshness ages[panel_config::COUNT];
-panel_heating::Controller controller;
+panel_heating::RustController controller;
 std::mutex resultMutex;
 Snapshot published;
 bool haveResult=false,haveCompleteTick=false;
@@ -45,7 +46,7 @@ Health health(Flag fault){
 
 void resetSensors(){
   for(auto& age:ages)age=Freshness{};
-  controller=Controller{};
+  controller.reset();
   haveCompleteTick=false;
   std::lock_guard<std::mutex> lock(resultMutex);
   haveResult=false;
@@ -84,7 +85,7 @@ void tick(bool pinConfigKnown,uint32_t pinRevision){
   // A missed lock is not a new measurement. Withhold requests during the
   // missed sample, while retaining a recent, legitimate hysteresis state.
   if(haveCompleteTick && uint32_t(now-lastCompleteTick)>=panel::STALE_MS){
-    controller=Controller{};
+    controller.reset();
     haveCompleteTick=false;
   }
   if(copied && next.settingsAvailable){
@@ -94,7 +95,7 @@ void tick(bool pinConfigKnown,uint32_t pinRevision){
     // The physical presence switch alone determines DHW supply. Use a fresh
     // controller for this independent decision without altering plant history.
     Inputs presenceOnly;presenceOnly.presence=in.presence;
-    next.output=Controller{}.tick(now,Config{},presenceOnly);
+    next.output=RustController{}.tick(now,Config{},presenceOnly);
   }
   std::lock_guard<std::mutex> lock(resultMutex);
   published=next;

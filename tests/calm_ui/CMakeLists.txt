@@ -9,10 +9,22 @@ file(GLOB_RECURSE LVGL_SOURCES "${LVGL_DIR}/src/*.c")
 add_library(lvgl STATIC ${LVGL_SOURCES})
 target_compile_definitions(lvgl PUBLIC LV_CONF_PATH=${CMAKE_CURRENT_SOURCE_DIR}/../host/lv_conf.h)
 target_include_directories(lvgl PUBLIC ${LVGL_DIR})
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+get_filename_component(PANEL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+set(HEATING_CRATE "${PANEL_ROOT}/rust/heating-core")
+set(HEATING_ARCHIVE "${PANEL_ROOT}/.build/heating-rust/host/libheating_core.a")
+file(GLOB_RECURSE HEATING_SOURCES CONFIGURE_DEPENDS "${HEATING_CRATE}/src/*.rs")
+add_custom_command(OUTPUT "${HEATING_ARCHIVE}"
+  COMMAND "${Python3_EXECUTABLE}" "${PANEL_ROOT}/ci/build_heating_rust.py" host
+  DEPENDS "${PANEL_ROOT}/ci/build_heating_rust.py" "${HEATING_CRATE}/Cargo.toml"
+          "${HEATING_CRATE}/Cargo.lock" ${HEATING_SOURCES}
+  VERBATIM)
+add_custom_target(build_heating_core DEPENDS "${HEATING_ARCHIVE}")
 add_executable(calm_test host.cpp ../../src/panel_heating_runtime.cpp ../../src/panel_screen.cpp ../../src/boiler_fonts.c)
 target_include_directories(calm_test PRIVATE ../host/stubs ../../src)
 target_compile_options(calm_test PRIVATE -Wall -Wextra)
-target_link_libraries(calm_test lvgl m)
+add_dependencies(calm_test build_heating_core)
+target_link_libraries(calm_test lvgl "${HEATING_ARCHIVE}" ${CMAKE_DL_LIBS} m pthread)
 if(OLD_UI_SOURCE)
  add_executable(before_capture host.cpp ../../src/panel_screen.cpp ../../src/boiler_fonts.c)
  target_compile_definitions(before_capture PRIVATE BEFORE_CAPTURE=1 UI_SOURCE="${OLD_UI_SOURCE}")

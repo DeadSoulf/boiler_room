@@ -1,6 +1,7 @@
 from pathlib import Path
 import shutil,json,re,importlib.util,os,hashlib,subprocess,tempfile
 from portrait import transform
+from build_heating_rust import build as build_heating_rust
 root=Path(__file__).resolve().parents[1]
 bsp=root/'.build/bsp'; example=bsp/'examples/LvglUi'
 board=json.loads((bsp/'boards/jc4880p4.json').read_text(encoding='utf-8'))
@@ -36,6 +37,13 @@ s,n=re.subn(r'-DCORE_DEBUG_LEVEL=\d+', '-DCORE_DEBUG_LEVEL=0',s)
 assert n==1
 assert 'board_build.f_cpu' not in s
 s=s.replace('board = jc4880p4','board = jc4880p4\nboard_build.f_cpu = 360000000L')
+# Put the library on PlatformIO's normal LIBPATH/LIBS so it is linked after
+# sketch objects. The generated project and archive also work with plain pio run.
+rust_dir=example/'heating-rust'
+rust_dir.mkdir(exist_ok=True)
+shutil.copy2(build_heating_rust('esp32p4'),rust_dir/'libheating_core.a')
+assert s.count('build_flags =\n')==1
+s=s.replace('build_flags =\n','build_flags =\n    -L"${PROJECT_DIR}/heating-rust"\n    -lheating_core\n')
 ini.write_text(s,encoding='utf-8')
 glue=example/'src/lvgl_glue.c'; glue.write_text(transform(glue.read_text(encoding='utf-8')),encoding='utf-8')
 # Reuse exactly the installer's checked v0.3.1 touch-ready/wake adapter.

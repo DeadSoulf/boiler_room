@@ -32,6 +32,7 @@ host)
  # Use the maintained real-LVGL harness for the current firmware, not v0.5 demo state.
  cmake -S tests/calm_ui -B .build/host -DLVGL_DIR="$ROOT/.build/lvgl"
  cmake --build .build/host --parallel 2 2>&1 | tee artifacts/host-build.log
+ bash tests/rust_heating_parity.sh "$ROOT/.build/heating-rust/host/libheating_core.a" | tee artifacts/heating-rust-parity.log
  # Preserve the exact official LVGL inputs for offline reproduction when local network is restricted.
  tar -czf artifacts/lvgl-native-source.tar.gz -C .build/lvgl src lvgl.h lv_conf_template.h LICENCE.txt
  mkdir -p artifacts/host-ui artifacts/host-ui-full-refresh
@@ -49,6 +50,7 @@ firmware)
  .build/venv/bin/pio run -d .build/bsp/examples/LvglUi -e jc4880p4 2>&1 | tee artifacts/firmware-build.log
  .build/venv/bin/pio pkg list -d .build/bsp/examples/LvglUi > artifacts/packages.txt
  cp .build/bsp/examples/LvglUi/.pio/build/jc4880p4/{firmware.bin,firmware.elf,bootloader.bin,partitions.bin} artifacts/
+ python3 ci/verify_heating_rust.py .build/bsp/examples/LvglUi/.pio/build/jc4880p4
  python3 ci/verify_binary.py
  python3 ci/package_flash.py
  ;;
