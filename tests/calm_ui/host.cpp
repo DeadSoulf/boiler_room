@@ -231,6 +231,10 @@ int main(int argc,char** argv){
    clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);assert(overlay&&detailChannel==int(i));
    assert(find(overlay,SENSOR_NAMES[i]));touch("Назад");assert(!overlay&&page==0);
  }
+ for(unsigned i:{2U,4U}){
+   touch(SENSOR_NAMES[i]);assert(overlay&&detailChannel==int(i));
+   save(i==2?"supply-no-data":"return-no-data");touch("Назад");
+ }
  // Exercise the real sensor-event route, including the non-contiguous return input.
  auto sensorReading=[](uint8_t channel,float value){
    panel_sensors::Event event{};event.revision=panel_config::fixture.revision;
@@ -405,6 +409,10 @@ int main(int argc,char** argv){
  go(0);const float values[CHANNELS]={22.4f,-8.2f,61.7f,34.8f,47.3f};for(unsigned i=0;i<CHANNELS;i++)measurements[i].put(values[i],millis());fuelLevel.put(true,false,millis());step(1100);save("home-values-fixture");check();
  for(unsigned i:{0U,1U,2U,4U})assert(!strcmp(lv_label_get_text(tempState[i]),""));
  assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"34.8"));homeTemperatureChecks();
+ for(unsigned i:{2U,4U}){
+   touch(SENSOR_NAMES[i]);assert(overlay&&detailChannel==int(i));
+   save(i==2?"supply-values-fixture":"return-values-fixture");touch("Назад");
+ }
  go(2);save("fuel-values-fixture");go(0);step(31000);assert(!strcmp(lv_label_get_text(tempState[0]),"Устарело"));save("home-stale-fixture");
  // Screen wake consumes the first touch rather than activating the underlying tile.
  panel_screen::setTimeout(30);clickAt(8,110);step(31000);assert(!panel_screen::awake());clickAt(100,260);assert(panel_screen::awake()&&!overlay);clickAt(100,260);assert(overlay);dismiss();panel_screen::setTimeout(0);
@@ -446,7 +454,7 @@ int main(int argc,char** argv){
  assert(!panel_config::reedLevelReached(panel_config::Type::ReedNO,true));
  for(int n=0;n<240;n++){go(n%4);}
 
- printf("RESULT: %u layout checks, clipped=%u; Home date/clock/PIN fit, unknown time/recovery/rollover/timezone, all four Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
+ printf("RESULT: %u layout checks, clipped=%u; Home date/clock/PIN fit, unknown time/recovery/rollover/timezone, all five Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
  return clipped?1:0;
 #endif
 }

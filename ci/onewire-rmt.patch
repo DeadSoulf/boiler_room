@@ -1,0 +1,77 @@
+--- a/OneWireESP32.h
++++ b/OneWireESP32.h
+@@ -23,13 +23,15 @@
+ class OneWire32 {
+ 	private:
+ 		gpio_num_t owpin;
+-		rmt_channel_handle_t owtx;
+-		rmt_channel_handle_t owrx;
+-		rmt_encoder_handle_t owcenc;
+-		rmt_encoder_handle_t owbenc;
+-		rmt_symbol_word_t owbuf[MAX_BLOCKS];
+-		QueueHandle_t owqueue;
+-		uint8_t drv = 0;
++		rmt_channel_handle_t owtx = nullptr;
++		rmt_channel_handle_t owrx = nullptr;
++		rmt_encoder_handle_t owcenc = nullptr;
++		rmt_encoder_handle_t owbenc = nullptr;
++		rmt_symbol_word_t owbuf[MAX_BLOCKS];
++		QueueHandle_t owqueue = nullptr;
++		bool rx_enabled = false;
++		bool tx_enabled = false;
++		uint8_t drv = 0;
+ 	public:
+ 		OneWire32(uint8_t pin);
+ 		~OneWire32();
+--- a/OneWireESP32.cpp
++++ b/OneWireESP32.cpp
+@@ -109,13 +109,14 @@
+ 		return;
+ 	}
+ 
+-	if(rmt_enable(owrx) != ESP_OK) {
+-		return;
+-	}
+-	
+-	if(rmt_enable(owtx) != ESP_OK) {
+-		return;
+-	}
++	if(rmt_enable(owrx) != ESP_OK) {
++		return;
++	}
++	rx_enabled = true;
++	if(rmt_enable(owtx) != ESP_OK) {
++		return;
++	}
++	tx_enabled = true;
+ 
+ 	static rmt_symbol_word_t release_symbol = {
+ 		.duration0 = 1,
+@@ -131,20 +132,13 @@
+ 
+ 
+ OneWire32::~OneWire32(){
+-	if(owbenc) {
+-		rmt_del_encoder(owbenc);
+-	}
+-	if(owcenc) {
+-		rmt_del_encoder(owcenc);
+-	}
+-	if(owrx) {
+-		rmt_disable(owrx);
+-		rmt_del_channel(owrx);
+-	}
+-	if(owtx) {
+-		rmt_disable(owtx);
+-		rmt_del_channel(owtx);
+-	}
++	// Stop callbacks and transfers before freeing the resources they reference.
++	if(tx_enabled) rmt_disable(owtx);
++	if(rx_enabled) rmt_disable(owrx);
++	if(owtx) rmt_del_channel(owtx);
++	if(owrx) rmt_del_channel(owrx);
++	if(owcenc) rmt_del_encoder(owcenc);
++	if(owbenc) rmt_del_encoder(owbenc);
+ 	if(owqueue) {
+ 		vQueueDelete(owqueue);
+ 	}

@@ -1,5 +1,5 @@
 from pathlib import Path
-import shutil,json,re,importlib.util,os,hashlib
+import shutil,json,re,importlib.util,os,hashlib,subprocess,tempfile
 from portrait import transform
 root=Path(__file__).resolve().parents[1]
 bsp=root/'.build/bsp'; example=bsp/'examples/LvglUi'
@@ -8,10 +8,23 @@ assert board['build']['chip_variant']=='esp32p4_es'
 ini=example/'platformio.ini'; s=ini.read_text(encoding='utf-8')
 assert s.count('lvgl@~8.3.0')==1
 s=s.replace('lvgl@~8.3.0','lvgl@8.3.11')
-# Arduino-ESP32 3.x / IDF 5.x RMT-backed DS18B20 library, fixed commit.
-ow='https://github.com/junkfix/esp32-ds18b20.git#c2aa0147aa7414419fce61e89ed07ef6ff1d535b'
-assert s.count('lvgl@8.3.11')==1
-s=s.replace('lvgl@8.3.11','lvgl@8.3.11\n    '+ow)
+# Use immutable upstream files and a project-local PlatformIO library so that
+# reports from this firmware always correspond to the reviewed RMT lifetime fix.
+onewire_commit='c2aa0147aa7414419fce61e89ed07ef6ff1d535b'
+onewire_cache=root/'.build/onewire-git'
+if not onewire_cache.is_dir():
+    subprocess.run(['git','init','--bare',str(onewire_cache)],check=True)
+git=['git','--git-dir',str(onewire_cache)]
+if subprocess.run(git+['cat-file','-e',onewire_commit+'^{commit}'],stderr=subprocess.DEVNULL).returncode:
+    subprocess.run(git+['fetch','--depth=1','https://github.com/junkfix/esp32-ds18b20.git',onewire_commit],check=True)
+with tempfile.TemporaryDirectory() as stage:
+    library=Path(stage)
+    for name in ('OneWireESP32.h','OneWireESP32.cpp','library.properties','LICENSE'):
+        (library/name).write_bytes(subprocess.check_output(git+['show',onewire_commit+':'+name]))
+    if (library/'LICENSE').read_text(encoding='utf-8')!=(root/'licenses/esp32-ds18b20-MIT.txt').read_text(encoding='utf-8'):
+        raise RuntimeError('Packaged esp32-ds18b20 license differs from the pinned source')
+    subprocess.run(['git','apply','--no-index',str(root/'ci/onewire-rmt.patch')],cwd=library,check=True)
+    shutil.copytree(library,example/'lib/esp32-ds18b20',dirs_exist_ok=True)
 url='https://github.com/pioarduino/platform-espressif32/releases/download/55.03.36-1/platform-espressif32.zip'
 assert s.count(url)==1
 # Verify the pinned platform archive independently of OS-specific PlatformIO URI handling.

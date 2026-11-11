@@ -4,7 +4,7 @@
 #include <freertos/task.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
-#include <new>
+#include <optional>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -29,8 +29,7 @@ struct Driver {
 Driver driver[panel_config::COUNT];
 // Five sensor pins share one RMT TX/RX pair. Keep the same bus from the
 // conversion request to its completion poll, then advance to the next due pin.
-alignas(OneWire32) uint8_t wireStorage[sizeof(OneWire32)];
-OneWire32* wire=nullptr;
+std::optional<OneWire32> wire;
 unsigned probe=0;
 uint32_t activeRevision=0xffffffffU;
 uint8_t crc8(const uint8_t* data,unsigned len){
@@ -84,8 +83,7 @@ bool due(uint32_t now,uint32_t target){
 }
 void releaseWire(){
   if(!wire)return;
-  wire->~OneWire32();
-  wire=nullptr;
+  wire.reset();
   pinMode(driver[probe].setting.gpio,INPUT);
 }
 void destroy(unsigned i){
@@ -218,10 +216,7 @@ void pollThermometers(uint32_t now){
     Driver& d=driver[i];
     if(d.setting.type!=panel_config::Type::DS18B20 || !due(now,d.due))continue;
     probe=i;
-    // The pinned driver may return early from its constructor. Zero its handles
-    // before construction so its destructor can release partial allocations.
-    memset(wireStorage,0,sizeof(wireStorage));
-    wire=new(wireStorage) OneWire32(uint8_t(d.setting.gpio));
+    wire.emplace(uint8_t(d.setting.gpio));
     if(!startConversion(i)){
       d.due=millis()+RETRY_MS;
       releaseWire();
