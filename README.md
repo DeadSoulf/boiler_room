@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.8
+# Boiler Room Touch Panel — v0.10.9
+
+## v0.10.9 — Coolant supply and return
+
+**Supply** and **Return** appear separately on the home screen and in the paired browser. Tap either reading for its own history. On upgrade, the former coolant input becomes supply, with its GPIO and Home Assistant identity preserved. To add return, open **Settings → Sensors** in the paired browser, select the GPIO wired to the second DS18B20 and assign **Return**. Until a sensor reports, the panel shows that reading as unavailable. Tank water temperature is a separate measurement.
+
+[Home screen with test readings](docs/verification/assets/v0.10.9-coolant-home.png).
 
 ## v0.10.8: Indirect hot-water tank thresholds
 
