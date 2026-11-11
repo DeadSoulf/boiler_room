@@ -8,20 +8,20 @@ use super::{Config, Controller, Flag, Health, Inputs, Output, Presence, Reheat, 
 
 #[repr(C)]
 pub struct RawConfig {
-    room_for_loop: [u8; LOOPS],
-    allow_away_diesel: u8,
-    reheat: u8,
-    room_on_c: f32,
-    room_radiator_off_c: f32,
-    room_off_c: f32,
-    supply_target_c: f32,
-    return_target_c: f32,
-    return_restart_c: f32,
-    tank_on_c: f32,
-    tank_off_c: f32,
-    coil_start_delta_c: f32,
-    coil_stop_delta_c: f32,
-    reheat_step_ms: u32,
+    pub(super) room_for_loop: [u8; LOOPS],
+    pub(super) allow_away_diesel: u8,
+    pub(super) reheat: u8,
+    pub(super) room_on_c: f32,
+    pub(super) room_radiator_off_c: f32,
+    pub(super) room_off_c: f32,
+    pub(super) supply_target_c: f32,
+    pub(super) return_target_c: f32,
+    pub(super) return_restart_c: f32,
+    pub(super) tank_on_c: f32,
+    pub(super) tank_off_c: f32,
+    pub(super) coil_start_delta_c: f32,
+    pub(super) coil_stop_delta_c: f32,
+    pub(super) reheat_step_ms: u32,
 }
 
 #[repr(C)]
@@ -170,4 +170,49 @@ pub unsafe extern "C" fn boiler_heating_tick(
     let decision = controller.tick(now, &Config::from(config), &Inputs::from(input));
     // SAFETY: the output contains only bytes and the caller supplied non-overlapping writable storage.
     unsafe { output.write(decision.into()) };
+}
+
+/// Encode and validate one record for the v1 NVS settings key.
+///
+/// # Safety
+/// All pointers must be valid, aligned and non-overlapping. `output` must
+/// have space for one 56-byte record. It is written only on success.
+#[no_mangle]
+pub unsafe extern "C" fn boiler_heating_settings_encode(
+    config: *const RawConfig,
+    season: u8,
+    revision: u32,
+    output: *mut super::settings::Record,
+) -> u8 {
+    // SAFETY: the caller supplies a valid initialized RawConfig.
+    if let Some(record) = super::settings::encode(unsafe { &*config }, season, revision) {
+        // SAFETY: the caller provides exclusive space for the entire record.
+        unsafe { output.write(record) };
+        1
+    } else {
+        0
+    }
+}
+
+/// Decode a saved v1 NVS record. Failed reads leave all outputs intact.
+///
+/// # Safety
+/// `record` must point to 56 initialized bytes. All four pointers must be
+/// valid, aligned and non-overlapping, with exclusive access to the outputs.
+#[no_mangle]
+pub unsafe extern "C" fn boiler_heating_settings_decode(
+    record: *const super::settings::Record,
+    config: *mut RawConfig,
+    season: *mut u8,
+    revision: *mut u32,
+) -> u8 {
+    // SAFETY: the caller guarantees a readable record of the exact size.
+    let Some(decoded) = super::settings::decode(unsafe { &*record }) else { return 0 };
+    // SAFETY: all output locations are writable and distinct from each other and the input.
+    unsafe {
+        config.write(decoded.config);
+        season.write(decoded.season);
+        revision.write(decoded.revision);
+    }
+    1
 }

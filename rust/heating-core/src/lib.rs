@@ -3,6 +3,7 @@
 #![cfg_attr(target_os = "none", no_std)]
 
 mod ffi;
+mod settings;
 
 const ROOMS: usize = 14;
 const LOOPS: usize = 14;
@@ -23,7 +24,7 @@ fn panic(_: &core::panic::PanicInfo<'_>) -> ! {
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u8)]
-enum Flag {
+pub enum Flag {
     #[default]
     Unknown = 0,
     No = 1,
@@ -31,7 +32,7 @@ enum Flag {
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
-enum Presence {
+pub enum Presence {
     #[default]
     Unknown,
     Home,
@@ -39,21 +40,21 @@ enum Presence {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Season {
+pub enum Season {
     Unknown,
     Summer,
     Winter,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Health {
+pub enum Health {
     Unknown,
     Ready,
     Fault,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Reheat {
+pub enum Reheat {
     Unset,
     All,
     OneByOne,
@@ -61,7 +62,7 @@ enum Reheat {
 
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 #[repr(u8)]
-enum Source {
+pub enum Source {
     #[default]
     Unknown = 0,
     None = 1,
@@ -69,45 +70,45 @@ enum Source {
     Electric = 3,
 }
 
-struct Config {
-    room_for_loop: [u8; LOOPS],
-    room_on_c: f32,
-    room_radiator_off_c: f32,
-    room_off_c: f32,
-    supply_target_c: f32,
-    return_target_c: f32,
-    return_restart_c: f32,
-    tank_on_c: f32,
-    tank_off_c: f32,
-    coil_start_delta_c: f32,
-    coil_stop_delta_c: f32,
-    allow_away_diesel: bool,
-    reheat: Reheat,
-    reheat_step_ms: u32,
+pub struct Config {
+    pub room_for_loop: [u8; LOOPS],
+    pub room_on_c: f32,
+    pub room_radiator_off_c: f32,
+    pub room_off_c: f32,
+    pub supply_target_c: f32,
+    pub return_target_c: f32,
+    pub return_restart_c: f32,
+    pub tank_on_c: f32,
+    pub tank_off_c: f32,
+    pub coil_start_delta_c: f32,
+    pub coil_stop_delta_c: f32,
+    pub allow_away_diesel: bool,
+    pub reheat: Reheat,
+    pub reheat_step_ms: u32,
 }
 
-struct Inputs {
-    room_c: [f32; ROOMS],
-    supply_c: f32,
-    return_c: f32,
-    tank_c: f32,
-    coil_supply_c: f32,
-    presence: Presence,
-    season: Season,
-    diesel: Health,
-    electric: Health,
-    circulation: Flag,
-    plant_heat_available: Flag,
+pub struct Inputs {
+    pub room_c: [f32; ROOMS],
+    pub supply_c: f32,
+    pub return_c: f32,
+    pub tank_c: f32,
+    pub coil_supply_c: f32,
+    pub presence: Presence,
+    pub season: Season,
+    pub diesel: Health,
+    pub electric: Health,
+    pub circulation: Flag,
+    pub plant_heat_available: Flag,
 }
 
-struct Output {
-    loops: [Flag; LOOPS],
-    demand: Flag,
-    alarm: Flag,
-    tank_power: Flag,
-    coil_pump: Flag,
-    source: Source,
-    stages: i8,
+pub struct Output {
+    pub loops: [Flag; LOOPS],
+    pub demand: Flag,
+    pub alarm: Flag,
+    pub tank_power: Flag,
+    pub coil_pump: Flag,
+    pub source: Source,
+    pub stages: i8,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -267,7 +268,7 @@ fn ordered(low: f32, high: f32) -> bool {
 }
 
 #[derive(Default)]
-struct Controller {
+pub struct Controller {
     rooms: [Room; ROOMS],
     last_presence: Presence,
     on_backup: bool,
@@ -276,7 +277,8 @@ struct Controller {
 }
 
 impl Controller {
-    fn tick(&mut self, now: u32, c: &Config, input: &Inputs) -> Output {
+    /// Calculate logical requests from the current inputs and monotonic time in milliseconds.
+    pub fn tick(&mut self, now: u32, c: &Config, input: &Inputs) -> Output {
         let (loops, demand) = self.evaluate_rooms(c, input);
         let (source, alarm) = self.choose_source(c, input, demand);
         let tank_power = match input.presence {

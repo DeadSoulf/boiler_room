@@ -31,6 +31,44 @@ static_assert(sizeof(RawOutput) == 20 && offsetof(RawOutput, stages) == 19, "Rus
 extern "C" void boiler_heating_init(void* state);
 extern "C" void boiler_heating_tick(void* state, uint32_t now, const RawConfig* config,
                                     const RawInputs* inputs, RawOutput* output);
+// Historical NVS v1 payload, shared with previous panel firmware.
+struct SettingsRecord { uint8_t bytes[56]; };
+static_assert(sizeof(SettingsRecord) == 56, "Rust v1 settings ABI");
+extern "C" uint8_t boiler_heating_settings_encode(const RawConfig* config, uint8_t season,
+                                                   uint32_t revision, SettingsRecord* record);
+extern "C" uint8_t boiler_heating_settings_decode(const SettingsRecord* record, RawConfig* config,
+                                                   uint8_t* season, uint32_t* revision);
+
+inline RawConfig toRaw(const Config& c) {
+  RawConfig config{
+    {}, uint8_t(c.allowAwayDiesel), uint8_t(c.reheat),
+    c.roomOnC, c.roomRadiatorOffC, c.roomOffC,
+    c.supplyTargetC, c.returnTargetC, c.returnRestartC,
+    c.tankOnC, c.tankOffC, c.coilStartDeltaC, c.coilStopDeltaC,
+    c.reheatStepMs
+  };
+  memcpy(config.room_for_loop, c.roomForLoop, sizeof(config.room_for_loop));
+  return config;
+}
+
+inline Config fromRaw(const RawConfig& raw) {
+  Config config{};
+  memcpy(config.roomForLoop, raw.room_for_loop, sizeof(config.roomForLoop));
+  config.allowAwayDiesel = raw.allow_away_diesel != 0;
+  config.reheat = Reheat(raw.reheat);
+  config.roomOnC = raw.room_on_c;
+  config.roomRadiatorOffC = raw.room_radiator_off_c;
+  config.roomOffC = raw.room_off_c;
+  config.supplyTargetC = raw.supply_target_c;
+  config.returnTargetC = raw.return_target_c;
+  config.returnRestartC = raw.return_restart_c;
+  config.tankOnC = raw.tank_on_c;
+  config.tankOffC = raw.tank_off_c;
+  config.coilStartDeltaC = raw.coil_start_delta_c;
+  config.coilStopDeltaC = raw.coil_stop_delta_c;
+  config.reheatStepMs = raw.reheat_step_ms;
+  return config;
+}
 } // namespace rust_abi
 
 class RustController {
@@ -42,14 +80,7 @@ class RustController {
   void reset() { rust_abi::boiler_heating_init(state_); }
 
   Output tick(uint32_t now, const Config& c, const Inputs& in) {
-    rust_abi::RawConfig config{
-      {}, uint8_t(c.allowAwayDiesel), uint8_t(c.reheat),
-      c.roomOnC, c.roomRadiatorOffC, c.roomOffC,
-      c.supplyTargetC, c.returnTargetC, c.returnRestartC,
-      c.tankOnC, c.tankOffC, c.coilStartDeltaC, c.coilStopDeltaC,
-      c.reheatStepMs
-    };
-    memcpy(config.room_for_loop, c.roomForLoop, sizeof(config.room_for_loop));
+    const auto config = rust_abi::toRaw(c);
     rust_abi::RawInputs inputs{
       {}, in.supplyC, in.returnC, in.tankC, in.coilSupplyC,
       uint8_t(in.presence), uint8_t(in.season), uint8_t(in.diesel), uint8_t(in.electric),

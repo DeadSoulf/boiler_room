@@ -1,6 +1,5 @@
 #include "panel_heating_settings.h"
-#include <math.h>
-#include <stddef.h>
+#include "panel_heating_rust.h"
 #include <string.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -9,17 +8,9 @@
 namespace panel_heating_settings {
 namespace {
 using namespace panel_heating;
-constexpr uint32_t FORMAT=0x48540101;
-constexpr int16_t ABSENT=INT16_MIN;
+using Record = rust_abi::SettingsRecord;
 constexpr const char* SPACE="bp_heating";
 constexpr const char* KEY="settings";
-struct Record {
-  uint32_t format,revision,stepMs;
-  int16_t temperatures[10];
-  uint8_t rooms[14],season,reheat,awayDiesel,reserved[3];
-  uint32_t checksum;
-};
-static_assert(sizeof(Record)==56 && offsetof(Record,checksum)==52,"Heating record layout");
 SemaphoreHandle_t mutex=nullptr;
 bool known=false;
 State current;
@@ -28,55 +19,21 @@ struct Guard {
   ~Guard(){if(held)xSemaphoreGive(mutex);}
 };
 
-uint32_t digest(const Record& r){
-  uint32_t hash=2166136261U;
-  const auto* bytes=reinterpret_cast<const uint8_t*>(&r);
-  for(size_t i=0;i<offsetof(Record,checksum);i++)hash=(hash^bytes[i])*16777619U;
-  return hash;
+bool encode(const State& state, Record& record) {
+  const auto config = rust_abi::toRaw(state.config);
+  return rust_abi::boiler_heating_settings_encode(&config, uint8_t(state.season),
+                                                 state.revision, &record) != 0;
 }
 
-constexpr float Config::* fields[]={
-  &Config::roomOnC,&Config::roomRadiatorOffC,&Config::roomOffC,
-  &Config::supplyTargetC,&Config::returnTargetC,&Config::returnRestartC,
-  &Config::tankOnC,&Config::tankOffC,&Config::coilStartDeltaC,&Config::coilStopDeltaC
-};
-
-bool encode(const State& s,Record& r){
-  r={};r.format=FORMAT;r.revision=s.revision;
-  const auto& c=s.config;
-  if(s.season!=Season::Unknown && s.season!=Season::Summer && s.season!=Season::Winter)return false;
-  if(c.reheat!=Reheat::Unset && c.reheat!=Reheat::All && c.reheat!=Reheat::OneByOne)return false;
-  r.season=uint8_t(s.season);r.reheat=uint8_t(c.reheat);r.awayDiesel=c.allowAwayDiesel?1:0;
-  if(c.reheatStepMs>86400000U || (c.reheat==Reheat::OneByOne && !c.reheatStepMs))return false;
-  r.stepMs=c.reheatStepMs;
-  for(unsigned i=0;i<14;i++){
-    if(c.roomForLoop[i]>14)return false;
-    r.rooms[i]=c.roomForLoop[i];
-  }
-  for(unsigned i=0;i<10;i++){
-    const float v=c.*fields[i];
-    if(isnan(v) && i>=3){r.temperatures[i]=ABSENT;continue;}
-    if(!isfinite(v) || v<(i<8?-55.0f:0.0f) || v>(i<8?125.0f:180.0f))return false;
-    const long scaled=lroundf(v*10);
-    if(fabsf(v-float(scaled)/10.0f)>0.0001f)return false;
-    r.temperatures[i]=int16_t(scaled);
-  }
-  if(!(c.roomOnC<c.roomRadiatorOffC && c.roomRadiatorOffC<c.roomOffC) ||
-     c.returnRestartC>=c.returnTargetC || c.tankOnC>=c.tankOffC ||
-     c.coilStartDeltaC<=c.coilStopDeltaC)return false;
-  r.checksum=digest(r);return true;
-}
-
-bool decode(const Record& r,State& out){
-  if(r.format!=FORMAT || !r.revision || r.checksum!=digest(r))return false;
-  State s{};s.revision=r.revision;s.season=Season(r.season);
-  auto& c=s.config;c.reheat=Reheat(r.reheat);c.reheatStepMs=r.stepMs;
-  c.allowAwayDiesel=r.awayDiesel!=0;
-  memcpy(c.roomForLoop,r.rooms,sizeof(r.rooms));
-  for(unsigned i=0;i<10;i++)c.*fields[i]=r.temperatures[i]==ABSENT?NAN:float(r.temperatures[i])/10.0f;
-  Record checked{};
-  if(!encode(s,checked)||memcmp(&checked,&r,sizeof(r))!=0)return false;
-  out=s;return true;
+bool decode(const Record& record, State& state) {
+  rust_abi::RawConfig config{};
+  uint8_t season;
+  uint32_t revision;
+  if (!rust_abi::boiler_heating_settings_decode(&record, &config, &season, &revision)) return false;
+  state.config = rust_abi::fromRaw(config);
+  state.season = Season(season);
+  state.revision = revision;
+  return true;
 }
 
 bool readState(State& out){
@@ -125,12 +82,13 @@ Result save(uint32_t expectedRevision,const State& next){
   if(!encode(changed,candidate))return Result::Invalid;
   if(!memcmp(&previous,&candidate,sizeof(candidate)))return Result::Saved;
   if(expectedRevision==UINT32_MAX)return Result::Unavailable;
-  candidate.revision++;candidate.checksum=digest(candidate);
+  ++changed.revision;
+  if(!encode(changed,candidate))return Result::Invalid;
   State readback{};
   if(writeRecord(&candidate)&&readState(readback)&&matches(readback,candidate)){
     current=readback;return Result::Saved;
   }
-  known=writeRecord(previous.revision?&previous:nullptr)&&readState(readback)&&matches(readback,previous);
+  known=writeRecord(current.revision?&previous:nullptr)&&readState(readback)&&matches(readback,previous);
   if(known)current=readback;
   return Result::Unavailable;
 }

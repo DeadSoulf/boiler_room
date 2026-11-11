@@ -39,9 +39,10 @@ jobs:
           "$RUNNER_TEMP/heating_logic_tests"
           set -o pipefail
           python3 ci/build_heating_rust.py host
+          cargo +1.88.0 run --release --locked --offline --manifest-path rust/heating-core/Cargo.toml --example heating_cycle
           mkdir -p artifacts
           bash tests/rust_heating_parity.sh .build/heating-rust/host/libheating_core.a | tee artifacts/heating-rust-parity.log
-          python3 tests/heating_settings_tests.py
+          python3 tests/heating_settings_tests.py .build/heating-rust/host/libheating_core.a | tee artifacts/heating-settings.log
           python3 tests/heating_web_commands.py
           python3 tests/boiler_settings_tests.py
           python3 tests/boiler_web_commands.py
@@ -80,6 +81,7 @@ jobs:
             artifacts/boiler-web-review/
             artifacts/heating-web-review/
             artifacts/heating-rust-parity.log
+            artifacts/heating-settings.log
             artifacts/equipment-web-review/
             artifacts/pin-actions-web-review/
           retention-days: 14

@@ -1,5 +1,6 @@
 #include "panel_heating_settings.h"
 #include "heating_settings_stubs.h"
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <iterator>
@@ -94,6 +95,17 @@ static void rebootPhase(const char* path) {
   assert(!ps::begin() && !ps::snapshot(s) && ps::save(0, example()) == ps::Result::Unavailable);
   f::blob = good; f::blob[32] = 15; digest(f::blob);
   assert(!ps::begin() && !ps::snapshot(s));
+  // Checksummed records with noncanonical flag or reserved bytes were
+  // rejected by the v0.11.0 reader. Preserve them for diagnosis.
+  for (unsigned offset : {48u, 49u}) {
+    f::blob = good; f::blob[offset] = 2; digest(f::blob);
+    const auto damaged = f::blob;
+    assert(!ps::begin() && !ps::snapshot(s));
+    assert(ps::save(1, example()) == ps::Result::Unavailable && f::blob == damaged);
+  }
+  // Revision zero represents an empty namespace, never a persisted record.
+  f::blob = good; std::fill_n(f::blob.begin() + 4, 4, 0); digest(f::blob);
+  assert(!ps::begin() && !ps::snapshot(s));
   f::blob = good; f::blob.back() ^= 1;
   assert(!ps::begin() && !ps::snapshot(s));
   f::blob.resize(30);
@@ -102,6 +114,13 @@ static void rebootPhase(const char* path) {
   assert(!ps::begin() && ps::save(1, example()) == ps::Result::Unavailable && !f::writes);
   f::unreadable = false;
   assert(ps::begin() && ps::snapshot(s)); verifyRecord(s);
+  // A saturated revision accepts the same settings but cannot wrap on a change.
+  std::fill_n(f::blob.begin() + 4, 4, 0xff); digest(f::blob);
+  assert(ps::begin() && ps::snapshot(s) && s.revision == UINT32_MAX);
+  assert(ps::save(UINT32_MAX, example()) == ps::Result::Saved);
+  auto altered = example(); altered.season = ph::Season::Summer;
+  assert(ps::save(UINT32_MAX, altered) == ps::Result::Unavailable && !f::writes);
+  f::blob = good;
   auto a = example(), b = a;
   a.config.tankOnC = NAN;
   b.config.returnTargetC = NAN;
@@ -113,6 +132,22 @@ static void rebootPhase(const char* path) {
          (two == ps::Result::Saved && one == ps::Result::Conflict));
   assert(ps::begin() && ps::snapshot(s) && s.revision == 2 && f::writes == 1);
   assert(isnan(s.config.tankOnC) != isnan(s.config.returnTargetC));
+
+  // Signed tenths and the absent marker must survive a read through the
+  // production adapter. Include both limits and a negative fractional value.
+  auto limits = ps::State{};
+  limits.config.roomOnC = -55;
+  limits.config.roomRadiatorOffC = -0.1f;
+  limits.config.roomOffC = 125;
+  limits.config.coilStartDeltaC = 180;
+  limits.config.coilStopDeltaC = 0;
+  assert(ps::save(2, limits) == ps::Result::Saved);
+  assert(ps::begin() && ps::snapshot(s) && s.revision == 3);
+  assert(s.config.roomOnC == -55 && s.config.roomRadiatorOffC == -0.1f && s.config.roomOffC == 125);
+  assert(isnan(s.config.supplyTargetC) && isnan(s.config.tankOnC));
+  assert(s.config.coilStartDeltaC == 180 && s.config.coilStopDeltaC == 0);
+  limits.config.roomRadiatorOffC = -0.16f;
+  assert(ps::save(3, limits) == ps::Result::Invalid);
 }
 
 int main(int argc, char** argv) {

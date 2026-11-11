@@ -33,6 +33,7 @@ host)
  cmake -S tests/calm_ui -B .build/host -DLVGL_DIR="$ROOT/.build/lvgl"
  cmake --build .build/host --parallel 2 2>&1 | tee artifacts/host-build.log
  bash tests/rust_heating_parity.sh "$ROOT/.build/heating-rust/host/libheating_core.a" | tee artifacts/heating-rust-parity.log
+ python3 tests/heating_settings_tests.py .build/heating-rust/host/libheating_core.a | tee artifacts/heating-settings.log
  # Preserve the exact official LVGL inputs for offline reproduction when local network is restricted.
  tar -czf artifacts/lvgl-native-source.tar.gz -C .build/lvgl src lvgl.h lv_conf_template.h LICENCE.txt
  mkdir -p artifacts/host-ui artifacts/host-ui-full-refresh
