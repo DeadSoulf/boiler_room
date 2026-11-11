@@ -324,7 +324,7 @@ void updateRoomGoal(bool recenter){
   adjustingRooms=true;
   lv_slider_set_value(roomGoal,int(lroundf(t[1]*10)),LV_ANIM_OFF);
   adjustingRooms=false;
-  char caption[96];snprintf(caption,sizeof(caption),"Температура в доме: %.1f °C",double(t[1]));
+  char caption[96];snprintf(caption,sizeof(caption),"Желаемая температура: %.1f °C",double(t[1]));
   lv_label_set_text(roomGoalLabel,caption);
 }
 void roomSliderChanged(lv_event_t*){
@@ -348,8 +348,8 @@ void editRoomLimits(){
   dismiss();roomDraft=saved;
   overlay=box(lv_layer_top(),0,0,480,800,BG,0);
   if(page==0){
-    roomNowLabel=label(overlay,"",18,20,254,&boiler_font_19);
-    button(overlay,"Справочная уставка",278,7,184,47,Temp0);
+    roomNowLabel=label(overlay,"",18,20,210,&boiler_font_19);
+    button(overlay,"Справочная уставка",236,7,226,47,Temp0);
     updateRoomObservation();
   }else label(overlay,"Пороги комнат",18,22,430,&boiler_font_25);
   const char* captions[]={"Открыть контуры, °C","Закрыть батарею*, °C","Закрыть все контуры, °C"};
@@ -913,7 +913,8 @@ void updateCanister(){
   lv_label_set_text(fuelCanister.status,status);lv_obj_set_style_text_color(fuelCanister.status,c(ink),0);
 }
 void bindReading(lv_obj_t* object,unsigned channel){
-  lv_obj_add_event_cb(object,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(channel==0?uintptr_t(RoomLimits):uintptr_t(Temp0+channel))));
+  const uintptr_t actionId=channel==0?uintptr_t(RoomLimits):uintptr_t(Temp0+channel);
+  lv_obj_add_event_cb(object,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(actionId));
 }
 void pairedReading(lv_obj_t* card,unsigned channel,int x,int y){
   auto* row=box(card,x,y,206,125,CARD,0);
@@ -999,12 +1000,12 @@ void showHeatingRequests(){
     const unsigned first=view==6?0:8;
     for(unsigned row=0;row<8 && loopRooms[row];row++){
       const unsigned index=first+row,room=s.roomForLoop[index];
-      if(!room || room>ROOM_COUNT)snprintf(text,sizeof(text),"—");
+      if(!room || room>ROOM_COUNT)snprintf(text,sizeof(text),"Без комнаты");
       else if(isfinite(in.roomC[room-1]))snprintf(text,sizeof(text),"%u  /  %.1f °C",room,double(in.roomC[room-1]));
       else snprintf(text,sizeof(text),"%u  /  нет данных",room);
       setLabel(loopRooms[row],text);
       const auto request=out.loop[index];
-      setLabel(loopRequests[row],!room?"—":request==Flag::Yes?"Открыть":request==Flag::No?"Закрыть":"Нет данных");
+      setLabel(loopRequests[row],!room?"-":request==Flag::Yes?"Открыть":request==Flag::No?"Закрыть":"Нет данных");
     }
   }
   if(waterReading){
@@ -1046,10 +1047,10 @@ void heatingLoopsPage(){
     auto* line=box(body,24,y,432,53);
     char number[8];snprintf(number,sizeof(number),"%u",row+1);
     label(line,number,10,13,82,&boiler_font_19);
-    loopRooms[row]=label(line,"—",102,13,185,&boiler_font_19);
-    loopRequests[row]=label(line,"—",292,13,132,&boiler_font_19);
+    loopRooms[row]=label(line,"Без комнаты",102,13,185,&boiler_font_19);
+    loopRequests[row]=label(line,"-",292,13,132,&boiler_font_19);
   }
-  label(body,"Назначения комнат и контуров — в веб-разделе «Автоматика».",24,617,432,&boiler_font_14,MUTED);
+  label(body,"Настройте комнаты и контуры в разделе Автоматика веб-панели.",24,617,432,&boiler_font_14,MUTED);
 }
 void updateEquipmentReadings(){
   showHeatingRequests();
@@ -1115,7 +1116,7 @@ void equipmentPage(){
     dhwRequests=label(body,"",24,230,432,&boiler_font_19,MUTED);
     boilerThresholds(307);
     button(body,"Изменить пороги",24,552,432,64,BoilerEdit);
-    label(body,"Уставки змеевика — в веб-разделе «Автоматика».",24,629,432,&boiler_font_14,MUTED);
+    label(body,"Уставки змеевика задаются в разделе Автоматика веб-панели.",24,629,432,&boiler_font_14,MUTED);
     return;
   }
   if(view==2){
@@ -1133,7 +1134,7 @@ void equipmentPage(){
     electricValues[0]=equipmentInfoCard(list,"Подача",0,136);
     electricValues[1]=equipmentInfoCard(list,"Обратка",148,136);
     electricValues[2]=equipmentInfoCard(list,"Запрос",296,136);
-    label(body,"Уставки подачи и обратки — в веб-разделе «Автоматика».",24,617,432,&boiler_font_14,MUTED);
+    label(body,"Уставки подачи и обратки задаются в разделе Автоматика веб-панели.",24,617,432,&boiler_font_14,MUTED);
     return;
   }
   auto* state=box(body,24,16,432,168);

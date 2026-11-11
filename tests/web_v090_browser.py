@@ -92,8 +92,14 @@ try:
    icon=page.locator(f'svg[data-icon="{kind}"]');expect(icon).to_be_visible()
    assert icon.get_attribute('aria-hidden')=='true'
    box=icon.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
+   if index==0:
+    expect(page.locator('#heat-room-target')).to_be_visible()
+    expect(page.locator('#heat-room-target')).to_be_disabled()
+    expect(dialog).not_to_be_visible()
+    page.locator('#heat-legacy-house').click()
    check_target(index,name)
-   close.click();expect(page.locator(f'#home [data-temp="{index}"]')).to_be_focused()
+   close.click();expect(page.locator('#heat-legacy-house') if index==0 else page.locator('#home [data-temp="1"]')).to_be_focused()
+   if index==0:page.click('.topnav [data-page="home"]')
   coolant=page.get_by_role('region',name='Теплоноситель')
   expect(coolant.get_by_role('heading',name='Теплоноситель')).to_have_count(1)
   expect(coolant.locator('svg[data-icon="radiator"]')).to_have_count(1)
@@ -140,11 +146,12 @@ try:
   page.fill('#paircode','123456');page.click('#pair-submit');expect(page.locator('#pairbox')).not_to_be_visible();expect(page.locator('#logout')).to_be_visible();assert not state['active']
   # A drag changes only the draft; other channels, operator navigation and polling preserve independent values.
   assert not state['writes']
-  for channel,button,key,expected in ((0,page.locator('#home [data-temp="0"]'),'ArrowLeft',21),
+  for channel,button,key,expected in ((0,page.locator('#heat-legacy-house'),'ArrowLeft',21),
                                       (1,page.locator('#home [data-temp="1"]'),'Home',-55),
                                       (2,supply,'ArrowRight',63),(4,returning,'End',125),
                                       (3,tank,'ArrowLeft',34),(5,outlet,'ArrowRight',18)):
    count=len(state['writes'])
+   if channel==0:page.locator('#home-heating').click()
    button.click();expect(slider).to_be_focused();expect(save).to_be_disabled()
    slider.press(key);expect(dialog.locator('#target-value')).to_have_text(f'{expected} °C')
    assert len(state['writes'])==count
@@ -152,6 +159,7 @@ try:
    assert state['writes'][-1]==(channel,expected,0)
    close.click();expect(button).to_be_focused()
    button.click();expect(slider).to_have_value(str(expected));expect(save).to_be_disabled();close.click()
+   if channel==0:page.click('.topnav [data-page="home"]')
   snapshot=copy.deepcopy(fixture['temperature_targets']);count=len(state['writes'])
   page.set_viewport_size({'width':390,'height':844})
   tank.click();box=slider.bounding_box();page.touchscreen.tap(box['x']+box['width']*.53,box['y']+box['height']/2)

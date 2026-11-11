@@ -34,7 +34,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 <div id="update-offer" class="update-offer hidden" role="status"><span id="update-offer-text"></span><button class="ghost" data-page="update">Открыть</button></div>
 <dialog id="pairbox" class="pair-dialog" aria-labelledby="pair-title"><button class="close-modal" data-action="hide-pair" aria-label="Отменить сопряжение">×</button><div class="pair-symbol" aria-hidden="true">⌁</div><h2 id="pair-title">Сопряжение</h2><p id="pair-message">Запрашиваем код на дисплее…</p><form id="pair-form"><label for="paircode">Код с физической панели</label><input id="paircode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="······" required><p id="pair-error" class="error" role="alert"></p><p id="pair-expiry" class="tiny"></p><div class="actions"><button type="button" class="ghost" data-action="pair-retry">Новый код</button><button type="submit" class="primary" id="pair-submit" disabled>Подключить</button></div></form><p class="tiny">Доступ на 1 час. HTTP не шифруется — только доверенная локальная сеть.</p></dialog>
 <section id="home" class="page"><div class="grid">
-<button class="card temp" data-temp="0" aria-controls="temperature-target" aria-haspopup="dialog"><span class="temp-name">В доме</span><span class="temp-value" id="t0">--.- °C</span><svg class="temp-icon" data-icon="house" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><rect x="82" y="16" width="10" height="27" rx="2"/><rect x="24" y="44" width="72" height="56" rx="6"/><polyline points="10,46 60,8 110,46" fill="none"/><rect class="icon-tint" x="56" y="65" width="22" height="35" rx="3"/><rect class="icon-tint" x="35" y="61" width="12" height="14" rx="2"/></g></svg><span class="temp-detail" id="tstate0">Нет данных</span></button>
+<button class="card temp" id="home-heating" aria-controls="heat-config"><span class="temp-name">В доме</span><span class="temp-value" id="t0">--.- °C</span><svg class="temp-icon" data-icon="house" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><rect x="82" y="16" width="10" height="27" rx="2"/><rect x="24" y="44" width="72" height="56" rx="6"/><polyline points="10,46 60,8 110,46" fill="none"/><rect class="icon-tint" x="56" y="65" width="22" height="35" rx="3"/><rect class="icon-tint" x="35" y="61" width="12" height="14" rx="2"/></g></svg><span class="temp-detail" id="tstate0">Нет данных</span></button>
 <button class="card temp" data-temp="1" aria-controls="temperature-target" aria-haspopup="dialog"><span class="temp-name">На улице</span><span class="temp-value" id="t1">--.- °C</span><svg class="temp-icon" data-icon="outdoor" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><circle cx="38" cy="36" r="20"/><path d="M38 3V9M8 36H2M64 10L59 15M10 10L15 15M67 36H74M10 62L15 57" fill="none"/><path d="M34 94C24 94 18 87 18 76C18 66 25 60 34 60C37 43 48 34 65 34C78 34 86 43 88 54C103 52 112 63 112 74C112 87 106 94 96 94Z"/></g></svg><span class="temp-detail" id="tstate1">Нет данных</span></button>
 <section class="card temp temp-coolant" aria-labelledby="coolant-title">
  <div class="temp-heading"><h2 class="temp-name" id="coolant-title">Теплоноситель</h2><svg class="temp-icon" data-icon="radiator" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><path d="M15 40V18H5M105 82H115V98M28 92V100M92 92V100" fill="none"/><rect x="14" y="32" width="92" height="58" rx="7"/><rect class="icon-tint" x="25" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="44" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="63" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="82" y="36" width="12" height="50" rx="4"/></g></svg></div>
@@ -59,7 +59,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <details class="card" id="heat-config"><summary>Настройки автоматики</summary>
  <form id="heat-form" novalidate>
  <fieldset id="heat-fields" disabled><legend>Пороги и оборудование</legend>
- <div class="target-control"><label for="heat-room-target">Температура в доме</label><output id="heat-room-target-value" for="heat-room-target">Нет данных</output>
+ <div id="heat-room-control" class="target-control" tabindex="-1"><label for="heat-room-target">Температура в доме</label><output id="heat-room-target-value" for="heat-room-target">Нет данных</output>
  <input id="heat-room-target" type="range" min="-55" max="125" step="0.1" aria-describedby="heat-room-target-hint" disabled></div>
  <div class="actions"><button type="button" id="heat-colder" aria-label="Снизить все три комнатных порога на 1 °C">−1 °C</button><button type="button" id="heat-warmer" aria-label="Поднять все три комнатных порога на 1 °C">+1 °C</button></div>
  <p class="hint" id="heat-room-target-hint">Цель совпадает с порогом отключения батарей. Бегунок и кнопки сдвигают все три порога вместе. Изменения применятся после сохранения.</p>
@@ -70,7 +70,8 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <label class="stack"><input id="heat-away" type="checkbox">Разрешить резервный дизель в режиме «Никого нет»</label>
  <details class="details"><summary>Помещения и контуры</summary><p class="hint">Выберите помещение для каждого привода. Несколько контуров могут использовать один комнатный датчик.</p><div id="heat-loops"></div></details>
  </fieldset><div class="actions"><button id="heat-save" type="submit" class="primary" disabled>Сохранить настройки</button><button id="heat-reload" type="button" disabled>Перечитать с панели</button></div>
- <p id="heat-feedback" class="hint" role="status"></p></form></details>
+ <p id="heat-feedback" class="hint" role="status"></p></form>
+ <button id="heat-legacy-house" type="button" class="ghost" data-temp="0" aria-controls="temperature-target" aria-haspopup="dialog">Сохранённое значение карточки «В доме»</button></details>
 </section>
 <template id="threshold-controls"><div>
  <div class="row"><span data-part="temperature"></span><strong>Нет данных</strong></div>
@@ -597,6 +598,12 @@ function shiftRoomThresholds(delta){
  for(const input of roomThresholds)input.value=String((Math.round(input.valueAsNumber*10)+delta)/10);
  heatDirty=true;heatControls();
 }
+function openHeatSettings(){
+ page="heating";drawPage();$("heat-config").open=true;
+ const control=$("heat-room-control"),slider=$("heat-room-target");
+ (slider.disabled?control:slider).focus({preventScroll:true});
+ control.scrollIntoView({block:"center"});
+}
 function heatControls(){
  const cfg=heatData?.settings,stale=!!cfg&&heatDirty&&heatRevision!==cfg.revision;
  const locked=!cfg||heatBlock()||heatSaving||heatProblem||stale;
@@ -606,6 +613,7 @@ function heatControls(){
  if(range){slider.min=String(range.min/10);slider.max=String(range.max/10);slider.value=String(range.center/10);}
  const targetText=range?(range.center/10).toLocaleString("ru-RU")+" °C":"Нет данных";
  text("heat-room-target-value",targetText);slider.setAttribute("aria-valuetext",targetText);
+ if(!slider.disabled&&document.activeElement===$("heat-room-control"))slider.focus({preventScroll:true});
  $("heat-colder").disabled=!!locked||!range||range.center-10<range.min;
  $("heat-warmer").disabled=!!locked||!range||range.center+10>range.max;
  $("heat-reheat-seconds").disabled=$("heat-reheat").value!=="2";
@@ -1414,10 +1422,8 @@ $("target-form").addEventListener("submit",saveTarget);
 $("target-range").addEventListener("input",selectTarget);
 $("target-range").addEventListener("pointerup",e=>{if(e.button===0)selectTarget();});
 $("target-close").addEventListener("click",closeTarget);
-$("target-heating-open").addEventListener("click",()=>{
- closeTarget();page="heating";drawPage();$("heat-config").open=true;
- const summary=$("heat-config").querySelector("summary");summary.focus();summary.scrollIntoView({block:"start"});
-});
+$("home-heating").addEventListener("click",openHeatSettings);
+$("target-heating-open").addEventListener("click",()=>{closeTarget();openHeatSettings();});
 $("temperature-target").addEventListener("cancel",e=>{e.preventDefault();closeTarget();});
 $("target-reload").addEventListener("click",()=>{
  if(!targetEditor||$("target-reload").disabled)return;
