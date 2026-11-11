@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.10
+# Boiler Room Touch Panel — v0.10.11
+
+## v0.10.11 — Fuel tank and outlet temperatures
+
+The **Fuel** card on the panel and in the browser shows two readings, **In tank** and **At outlet**. Select a row to see that sensor’s minimum, maximum and history. The canister displays the fuel level from the reed switches. [Panel home screen with test readings](docs/verification/assets/v0.10.11-fuel-card.png).
+
+The previous fuel temperature input keeps its assignment as the tank sensor. To add the second DS18B20, open **Settings → Sensors** in the paired browser, select its GPIO, assign the fuel outlet temperature and save.
 
 ## v0.10.10 — One coolant card for supply and return
 
