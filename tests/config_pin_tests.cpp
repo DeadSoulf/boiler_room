@@ -19,8 +19,8 @@ void validationAndAvailability(){
     bool permitted=false;for(const int candidate:allowed)if(candidate==pin)permitted=true;
     if(permitted)continue;
     assert(setPin(pin,Channel::Room,Type::DS18B20,50,0,saved)==PinResult::Invalid);
-    assert(setPin(pin,Channel::ElectricRelay,Type::Relay,50,0,saved)==PinResult::Invalid);
-    assert(setPin(pin,Channel::DhwRelay,Type::Relay,50,0,saved)==PinResult::Invalid);
+    for(auto relay:{Channel::ElectricRelay,Channel::ElectricRelay2,Channel::ElectricRelay3,Channel::DhwRelay})
+      assert(setPin(pin,relay,Type::Relay,50,0,saved)==PinResult::Invalid);
     assert(clearPin(pin,0,saved)==PinResult::Invalid);
   }
   for(const Type type:{Type::None,Type::RemoteModbus,Type::RemoteMQTT,static_cast<Type>(255)})
@@ -34,7 +34,7 @@ void validationAndAvailability(){
   }
   for(unsigned i=0;i<INPUT_COUNT;i++)
     assert(setPin(52,static_cast<Channel>(i),Type::Relay,50,0,saved)==PinResult::Invalid);
-  for(auto relay:{Channel::ElectricRelay,Channel::DhwRelay}){
+  for(auto relay:{Channel::ElectricRelay,Channel::ElectricRelay2,Channel::ElectricRelay3,Channel::DhwRelay}){
     for(auto type:{Type::DS18B20,Type::RemoteMQTT,Type::RemoteModbus})
       assert(!set(relay,type,type==Type::DS18B20?52:-1,type==Type::RemoteModbus?1:0,50));
     assert(!set(relay,Type::Relay,52,1,50));
@@ -240,7 +240,7 @@ void migrateEightInputsAndReserveRelays(){
     3,0,29,0,0,0,75,0, 2,0,30,0,0,0,80,0,
     1,0,28,0,0,0,50,0, 1,0,49,0,0,0,50,0, 0,0,0,0
   };
-  static_assert(sizeof(bytes)==80 && INPUT_COUNT==8 && COUNT==10);
+  static_assert(sizeof(bytes)==80 && INPUT_COUNT==8 && COUNT==12);
   const uint32_t hash=fnv(bytes,76);memcpy(bytes+76,&hash,4);
   fresh();config_host::nvs["bp_cfg_a"]={bytes,bytes+sizeof(bytes)};
   const auto originals=config_host::nvs;
@@ -272,8 +272,49 @@ void migrateEightInputsAndReserveRelays(){
   assert(set(Channel::ElectricRelay,Type::Relay,50,0,50));
 }
 
+void migrateTenChannelSlots(){
+  // v0.10.13/14 schema 4 holds exactly ten eight-byte assignments.
+  uint8_t bytes[]={
+    0x36,0x43,0x50,0x42,4,0,0,0,36,0,0,0,
+    1,0,52,0,0,0,50,0, 1,0,34,0,0,0,50,0,
+    1,0,51,0,0,0,50,0, 1,0,33,0,0,0,50,0,
+    3,0,29,0,0,0,75,0, 2,0,30,0,0,0,80,0,
+    1,0,28,0,0,0,50,0, 1,0,49,0,0,0,50,0,
+    6,0,32,0,0,0,50,0, 6,0,31,0,0,0,50,0, 0,0,0,0
+  };
+  static_assert(sizeof(bytes)==96 && unsigned(Channel::ElectricRelay)==8 && unsigned(Channel::DhwRelay)==9);
+  const uint32_t hash=fnv(bytes,sizeof(bytes)-4);
+  memcpy(bytes+sizeof(bytes)-4,&hash,4);
+  fresh();config_host::nvs["bp_cfg_b"]={bytes,bytes+sizeof(bytes)};
+  const auto originals=config_host::nvs;
+  reboot();const State migrated=state();
+  assert(migrated.revision==36 && migrated.item[8].type==Type::Relay && migrated.item[8].gpio==32);
+  assert(migrated.item[9].type==Type::Relay && migrated.item[9].gpio==31);
+  for(unsigned i:{10U,11U})assert(migrated.item[i].type==Type::None && migrated.item[i].gpio==-1);
+  assert(config_host::writes==0 && config_host::nvs==originals);
+
+  // A failed first save leaves the old slot intact and neither new element assigned.
+  uint32_t saved=36;
+  config_host::afterWrite=[](){config_host::failRead=true;};
+  assert(setPin(50,Channel::ElectricRelay2,Type::Relay,50,saved,saved)==PinResult::StorageError);
+  assert(config_host::nvs==originals);reboot();unchanged(migrated);
+  assert(setPin(50,Channel::ElectricRelay2,Type::Relay,50,saved,saved)==PinResult::Saved && saved==37);
+  assert(rollback());reboot();assert(state().revision==38 && sameBindings(state(),migrated));
+  assert(rollback());reboot();saved=state().revision;
+  assert(saved==39 && state().item[10].gpio==50);
+  // Reassign the existing room input on GPIO52 to the third element in one revision.
+  assert(setPin(52,Channel::ElectricRelay3,Type::Relay,50,saved,saved)==PinResult::Saved && saved==40);
+  reboot();const State assigned=state();
+  assert(assigned.item[0].gpio==-1 && assigned.item[8].gpio==32 && assigned.item[9].gpio==31);
+  assert(assigned.item[10].gpio==50 && assigned.item[11].gpio==52);
+  for(unsigned i=1;i<INPUT_COUNT;i++)assert(!memcmp(&assigned.item[i],&migrated.item[i],sizeof(Assignment)));
+  assert(clearPin(50,saved,saved)==PinResult::Saved && saved==41);
+  reboot();assert(state().item[10].type==Type::None && state().item[11].gpio==52);
+  assert(state().item[8].gpio==32 && state().item[9].gpio==31);
+}
+
 int main(){
-  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();migrateSevenChannelSlots();migrateEightInputsAndReserveRelays();
+  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();migrateSevenChannelSlots();migrateEightInputsAndReserveRelays();migrateTenChannelSlots();
   powerOff();
   puts("PASS: real config/NVS 11-pin validation, atomic owner replacement/move, remote replacement, clear/no-op, mutex revision race, write/read-back recovery, repeated rollback, transient-fault reboot and revision wrap; persistent cleanup failure boundary demonstrated");
 }

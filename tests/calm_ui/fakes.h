@@ -21,7 +21,11 @@ namespace panel_radio {
  bool submit(const panel::Command& c){if(!accept)return false;last=c;++submitted;return true;}
  const char* zoneName(uint8_t){return "UTC";}
 }
-namespace panel_config {State fixture;bool begin(){return true;}bool snapshot(State& s){s=fixture;return true;}}
+namespace panel_config {
+ State fixture;bool available=true;
+ bool begin(){return true;}
+ bool snapshot(State& s){if(!available)return false;s=fixture;return true;}
+}
 namespace panel_boiler {
  Settings fixture,electric;bool available=true;unsigned attempts=0;
  Settings& settings(Target target){return target==Target::Electric?electric:fixture;}

@@ -359,13 +359,47 @@ int main(int argc,char** argv){
  touch("Назад");assert(!overlay&&!strcmp(lv_label_get_text(boilerOffLabel),"64 °C и выше"));
  touch("<");assert(page==1&&view==0);
  touch("Электрокотёл");assert(page==1&&view==2);
- auto* elements=lv_obj_get_parent(find(body,"Включить ТЭНы"));
- assert(lv_obj_has_state(elements,LV_STATE_DISABLED));
+ const char* heaterNames[]={"ТЭН-1","ТЭН-2","ТЭН-3"};
+ lv_obj_t* heaters[3];
+ const unsigned electricAttempts=panel_boiler::attempts;
+ lv_area_t lastHeater{};
+ for(unsigned i=0;i<3;i++){
+   auto* caption=find(body,heaterNames[i]);assert(caption);
+   heaters[i]=lv_obj_get_parent(caption);
+   assert(lv_obj_check_type(heaters[i],&lv_btn_class)&&lv_obj_has_state(heaters[i],LV_STATE_DISABLED));
+   auto* pin=find(heaters[i],"Без выхода");assert(pin);
+   lv_area_t titleArea,pinArea;
+   lv_obj_get_coords(caption,&titleArea);lv_obj_get_coords(pin,&pinArea);
+   lv_obj_get_coords(heaters[i],&blockedAt);
+   assert(titleArea.y2<pinArea.y1&&(!i||lastHeater.x2<blockedAt.x1));
+   assert(blockedAt.x2-blockedAt.x1>=44&&blockedAt.y2-blockedAt.y1>=44);
+   lastHeater=blockedAt;
+   clickAt((blockedAt.x1+blockedAt.x2)/2,(blockedAt.y1+blockedAt.y2)/2);
+   assert(!overlay&&panel_boiler::attempts==electricAttempts);
+ }
  assert(find(body,"Контур 1")&&find(body,"Контур 2")&&find(body,"Контур 3"));
  assert(!strcmp(lv_label_get_text(boilerOnLabel),"Не задано")&&!strcmp(lv_label_get_text(boilerOffLabel),"Не задано"));
- lv_obj_get_coords(elements,&blockedAt);unsigned electricAttempts=panel_boiler::attempts;
- clickAt((blockedAt.x1+blockedAt.x2)/2,(blockedAt.y1+blockedAt.y2)/2);
- assert(!overlay&&panel_boiler::attempts==electricAttempts);save("electric");
+ save("electric");
+ // The DHW pin is deliberately interleaved in the stored channel map.
+ const auto priorPins=panel_config::fixture;
+ auto bindRelay=[](panel_config::Channel channel,int gpio){
+   auto& assignment=panel_config::fixture.item[unsigned(channel)];
+   assignment.type=panel_config::Type::Relay;assignment.gpio=gpio;
+ };
+ bindRelay(panel_config::Channel::ElectricRelay,52);
+ bindRelay(panel_config::Channel::DhwRelay,31);
+ bindRelay(panel_config::Channel::ElectricRelay2,33);
+ bindRelay(panel_config::Channel::ElectricRelay3,51);
+ ++panel_config::fixture.revision;step(1100);
+ assert(find(heaters[0],"GPIO 52")&&find(heaters[1],"GPIO 33")&&find(heaters[2],"GPIO 51"));
+ assert(!find(body,"GPIO 31"));check();save("electric-three-heaters-fixture");
+ panel_config::fixture.item[unsigned(panel_config::Channel::ElectricRelay2)]={};
+ ++panel_config::fixture.revision;step(1100);
+ assert(find(heaters[0],"GPIO 52")&&find(heaters[1],"Без выхода")&&find(heaters[2],"GPIO 51"));
+ panel_config::available=false;step(1100);
+ for(auto* heater:heaters)assert(find(heater,"Нет данных")&&lv_obj_has_state(heater,LV_STATE_DISABLED));
+ panel_config::fixture=priorPins;panel_config::available=true;step(1100);
+ for(auto* heater:heaters)assert(find(heater,"Без выхода"));
  touch("Изменить пороги");assert(find(overlay,"Пороги электрокотла"));
  assert(!*lv_textarea_get_text(boilerOnField)&&!*lv_textarea_get_text(boilerOffField));
  save("electric-editor");
@@ -376,7 +410,7 @@ int main(int argc,char** argv){
  touch("Подтвердить");assert(!overlay&&panel_boiler::electric.revision==1);
  assert(!strcmp(lv_label_get_text(boilerOnLabel),"42 °C и ниже")&&!strcmp(lv_label_get_text(boilerOffLabel),"58 °C и выше"));
  assert(panel_boiler::fixture.onC==55&&panel_boiler::fixture.offC==64);
- assert(lv_obj_has_state(lv_obj_get_parent(find(body,"Включить ТЭНы")),LV_STATE_DISABLED));
+ for(auto* heater:heaters)assert(lv_obj_has_state(heater,LV_STATE_DISABLED));
  save("electric-setpoints-fixture");
  touch("Изменить пороги");assert(!strcmp(lv_textarea_get_text(boilerOffField),"58"));
  lv_textarea_set_text(boilerOnField,"40");touch("Сохранить");

@@ -553,7 +553,7 @@ void commandRequest() {
     panel_config::PinResult result;
     if(kind=="connection_pin_set"){
       const String channel=server.arg("channel"),type=server.arg("type"),debounce=server.arg("debounce");
-      if(!allDigits(channel,1,1)||asUint(channel)>=panel_config::COUNT||
+      if(!allDigits(channel,1,2)||asUint(channel)>=panel_config::COUNT||
          !allDigits(type,1,1)||!panel_config::isLocal(static_cast<panel_config::Type>(asUint(type)))||
          !allDigits(debounce,1,4)||asUint(debounce)>5000){
         errorResponse(400,"invalid_pin_fields");return;
@@ -577,7 +577,7 @@ void commandRequest() {
   if(kind=="connection_set"){
     const String channel=server.arg("channel"),kindValue=server.arg("type"),
       pinValue=server.arg("gpio"),addrValue=server.arg("address"),debValue=server.arg("debounce");
-    if(!allDigits(channel,1,1)||channel.toInt()>=int(panel_config::COUNT)||
+    if(!allDigits(channel,1,2)||channel.toInt()>=int(panel_config::COUNT)||
        !allDigits(kindValue,1,1)||kindValue.toInt()>int(panel_config::Type::Relay) ||
        pinValue.length()>3||(!pinValue.startsWith("-")&&!allDigits(pinValue,1,2))||
        !allDigits(addrValue,1,3)||!allDigits(debValue,1,4)){

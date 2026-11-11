@@ -50,7 +50,7 @@ def local_item(channel, kind, gpio, debounce=50):
 
 def empty_connections(revision):
     return {"available": True, "revision": revision, "drivers_active": False,
-            "items": [empty_item(channel) for channel in range(10)]}
+            "items": [empty_item(channel) for channel in range(12)]}
 
 
 fixture = {
@@ -224,7 +224,7 @@ class Handler(BaseHTTPRequestHandler):
             channel, kind, debounce = (int(data[key]) for key in ("channel", "type", "debounce"))
             thermometer = channel in (0, 1, 2, 3, 6, 7) and kind == 1 and debounce == 50
             reed = channel in (4, 5) and kind in (2, 3) and 0 <= debounce <= 5000
-            relay = channel in (8, 9) and kind == 6 and debounce == 50
+            relay = channel in (8, 9, 10, 11) and kind == 6 and debounce == 50
             if not (thermometer or reed or relay):
                 return 400, {"error": "invalid_pin_assignment"}
             kind_name = {1: "ds18b20", 2: "reed_no", 3: "reed_nc", 6: "relay"}[kind]
@@ -505,13 +505,14 @@ try:
                    posted_commands=count_commands() - start_count, explicit_no_nc=True,
                    draft_and_focus_preserved=True, geometry=metrics)
 
-        # Existing sensor bindings must survive assigning two separate relay outputs.
+        # Existing sensor bindings must survive all three electric outputs and the separate DHW relay.
         with guard:
             inputs = deepcopy(fixture["connections"]["items"][:8])
-        relay_names = {8: "Реле ТЭНов электрокотла", 9: "Реле бойлера"}
+        relay_names = {8: "Реле ТЭН-1", 10: "Реле ТЭН-2", 11: "Реле ТЭН-3", 9: "Реле бойлера"}
         for width in (320, 1280):
             page.set_viewport_size({"width": width, "height": 900})
-            for owner, gpio in ((8, 31), (9, 32)):
+            relay_pins = ((8, 31), (10, 34), (11, 49), (9, 32))
+            for owner, gpio in relay_pins:
                 pin(gpio).focus()
                 page.keyboard.press("Enter")
                 expect(dialog).to_have_js_property("open", True)
@@ -529,6 +530,17 @@ try:
                 expect_pin(gpio, "busy", "Занят · " + relay_names[owner])
                 close_pin(gpio)
 
+            # Discarding a draft leaves both existing owners and all other channels untouched.
+            before = count_commands()
+            open_pin(49)
+            expect(channel).to_have_value("11")
+            channel.select_option("10")
+            expect(page.locator("#pin-impact")).to_contain_text("с GPIO34 на GPIO49")
+            close_pin(49)
+            assert count_commands() == before
+            for owner, gpio in relay_pins:
+                expect_pin(gpio, "busy", "Занят · " + relay_names[owner])
+
             open_pin(31)
             expect(channel).to_have_value("8")
             expect(page.locator("#pin-current")).to_contain_text(relay_names[8])
@@ -538,7 +550,7 @@ try:
             if width == 1280:
                 page.locator("#jp1-map").screenshot(path=str(out / "jp1-relay-map.png"))
 
-            # Move the electric relay onto the boiler relay's pin. Only the
+            # Move heater 1 onto the DHW relay's pin. Only the
             # chosen owner survives; the old pin is released in the same write.
             open_pin(32)
             expect(channel).to_have_value("9")
@@ -560,9 +572,18 @@ try:
             last_command({"action": "connection_pin_clear", "gpio": 32, "revision": saved_revision})
             expect_pin(32, "free")
             close_pin(32)
+            for owner, gpio in ((10, 34), (11, 49)):
+                expect_pin(gpio, "busy", "Занят · " + relay_names[owner])
+                open_pin(gpio)
+                expect(channel).to_have_value(str(owner))
+                page.once("dialog", lambda prompt: prompt.accept())
+                clear.click()
+                expect(status).to_contain_text("Пин освобождён")
+                expect_pin(gpio, "free")
+                close_pin(gpio)
             with guard:
                 assert fixture["connections"]["items"][:8] == inputs
-            record("independent-relay-output-roles", width=width, existing_inputs_preserved=True)
+            record("independent-relay-output-roles", width=width, electric_outputs=3, existing_inputs_preserved=True)
 
         # Failure/race scenarios use a saved local owner and complete snapshots.
         with guard:

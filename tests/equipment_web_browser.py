@@ -51,7 +51,7 @@ inventory = [{"name": name, "connected": False, "state": "not_connected"} for na
 def empty_connections(revision=0):
     return {"available": True, "revision": revision, "drivers_active": False,
             "items": [{"channel": channel, "type": "none", "gpio": -1, "jp1_pin": 0,
-                       "active": False, "online": False} for channel in range(10)]}
+                       "active": False, "online": False} for channel in range(12)]}
 
 
 def local_assignment(channel, kind, gpio):
@@ -345,6 +345,8 @@ try:
                 saved["items"][4] = local_assignment(4, "reed_nc", 28)
                 saved["items"][8] = local_assignment(8, "relay", 31)
                 saved["items"][9] = local_assignment(9, "relay", 32)
+                saved["items"][10] = local_assignment(10, "relay", 34)
+                saved["items"][11] = local_assignment(11, "relay", 49)
                 saved["items"][2]["type"] = "mqtt"
                 saved["items"][5].update(type="modbus", address=1)
                 with guard:
@@ -355,14 +357,16 @@ try:
                 wait_polls()
                 expect_pin(52, "busy", "Занят · В доме")
                 expect_pin(28, "busy", "Занят · Нижний геркон")
-                expect_pin(31, "busy", "Занят · Реле ТЭНов электрокотла")
+                expect_pin(31, "busy", "Занят · Реле ТЭН-1")
+                expect_pin(34, "busy", "Занят · Реле ТЭН-2")
+                expect_pin(49, "busy", "Занят · Реле ТЭН-3")
                 expect_pin(32, "busy", "Занят · Реле бойлера")
-                expect(page.locator('#jp1-map [data-state="free"]')).to_have_count(7)
+                expect(page.locator('#jp1-map [data-state="free"]')).to_have_count(5)
                 original_pins = page.locator("#jp1-map .jp1-pin").element_handles()
                 advanced = page.locator("#cfg-advanced")
                 if not advanced.evaluate("node => node.open"):
                     advanced.locator("summary").click()
-                for role, title in (("8", "Реле ТЭНов электрокотла"), ("9", "Реле бойлера")):
+                for role, title in (("8", "Реле ТЭН-1"), ("10", "Реле ТЭН-2"), ("11", "Реле ТЭН-3"), ("9", "Реле бойлера")):
                     advanced_channel = page.locator("#cfg-channel")
                     expect(advanced_channel.locator(f'option[value="{role}"]')).to_have_text(title)
                     advanced_channel.select_option(role)
@@ -492,7 +496,10 @@ try:
                     page.screenshot(path=str(out / f"sensor-pinout-unknown-{width}.png"), full_page=True)
                 old_format = deepcopy(assigned)
                 old_format["items"] = old_format["items"][:8]
-                change("snapshot-missing-both-relay-slots", old_format, {"unknown": 11})
+                change("snapshot-before-relay-support", old_format, {"unknown": 11})
+                old_ten_channels = deepcopy(assigned)
+                old_ten_channels["items"] = old_ten_channels["items"][:10]
+                change("snapshot-missing-two-heater-slots", old_ten_channels, {"unknown": 11})
                 partial = empty_connections(1004)
                 partial["items"].pop()
                 change("partial-snapshot", partial, {"unknown": 11})

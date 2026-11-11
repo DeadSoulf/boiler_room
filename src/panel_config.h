@@ -3,9 +3,13 @@
 // JP1 assignments for sensor inputs and reserved relay outputs. Saving a binding does not actuate a relay.
 namespace panel_config {
 enum class Type:uint8_t { None=0,DS18B20=1,ReedNO=2,ReedNC=3,RemoteModbus=4,RemoteMQTT=5,Relay=6 };
-enum class Channel:uint8_t { Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5,CoolantReturn=6,FuelOutlet=7,ElectricRelay=8,DhwRelay=9 };
+enum class Channel:uint8_t {
+  Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5,CoolantReturn=6,FuelOutlet=7,
+  ElectricRelay=8,DhwRelay=9,ElectricRelay2=10,ElectricRelay3=11
+};
+// Channel 8 is the first heating element, including on boards upgraded from schema 4.
 constexpr unsigned INPUT_COUNT=unsigned(Channel::ElectricRelay);
-constexpr unsigned COUNT=unsigned(Channel::DhwRelay)+1;
+constexpr unsigned COUNT=unsigned(Channel::ElectricRelay3)+1;
 // Temperature samples are consecutive in the UI; persisted reed slots keep IDs 4/5.
 constexpr int temperatureIndex(unsigned channel) {
   if(channel<=unsigned(Channel::FuelTemp))return int(channel);

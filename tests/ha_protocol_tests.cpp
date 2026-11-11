@@ -28,6 +28,8 @@ int main(){
  for(auto& in:t.input){in.valid=true;in.updated=1000;in.temperature=-12.25f;}
  assert(!fresh(t,unsigned(panel_config::Channel::ElectricRelay),1000));
  assert(!fresh(t,unsigned(panel_config::Channel::DhwRelay),1000));
+ assert(!fresh(t,unsigned(panel_config::Channel::ElectricRelay2),1000));
+ assert(!fresh(t,unsigned(panel_config::Channel::ElectricRelay3),1000));
  t.input[2].temperature=58.0f;t.input[6].temperature=43.5f;
  t.input[3].temperature=28.5f;t.input[7].temperature=37.0f;
  t.input[4].reached=true;d.wifi=true;d.rssi=-60;d.sdKnown=true;d.sdMounted=true;d.sdFree=62602392064ULL;

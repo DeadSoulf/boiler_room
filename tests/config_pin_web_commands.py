@@ -139,7 +139,7 @@ void badInputs(){
   request();server.args[field]="-1";expectError(400,"invalid_pin_fields");
   request();server.args[field]="1x";expectError(400,"invalid_pin_fields");
  }
- for(const char* channel:{"10","11","255"}){request();server.args["channel"]=channel;expectError(400,"invalid_pin_fields");}
+ for(const char* channel:{"12","13","255"}){request();server.args["channel"]=channel;expectError(400,"invalid_pin_fields");}
  for(const char* type:{"0","4","5","7","9"}){request();server.args["type"]=type;expectError(400,"invalid_pin_fields");}
  request();server.args["debounce"]="5001";expectError(400,"invalid_pin_fields");
  request();server.args["debounce"]="0";expectError(400,"invalid_pin_assignment");
@@ -158,6 +158,16 @@ void badInputs(){
  request("connection_pin_set","4");server.args["channel"]="0";server.args["type"]="6";expectError(400,"invalid_pin_assignment");
  request("connection_pin_clear","4");server.args["gpio"]="34";expectSaved(5);
  assert(state().item[8].type==Type::None&&state().item[9].gpio==51);
+ request("connection_pin_set","5");server.args["channel"]="10";server.args["gpio"]="31";
+ expectError(400,"invalid_pin_assignment");server.args["type"]="6";expectSaved(6);
+ request("connection_pin_set","6");server.args["channel"]="11";server.args["type"]="6";
+ server.args["gpio"]="50";expectSaved(7);
+ request("connection_pin_set","7");server.args["channel"]="8";server.args["type"]="6";
+ server.args["gpio"]="34";expectSaved(8);
+ reboot();assert(state().item[8].gpio==34&&state().item[9].gpio==51);
+ assert(state().item[10].gpio==31&&state().item[11].gpio==50);
+ request("connection_pin_clear","8");server.args["gpio"]="31";expectSaved(9);
+ assert(state().item[8].gpio==34&&state().item[9].gpio==51&&state().item[11].gpio==50);
 }
 void repliesAndAtomicMutation(){
  fresh();request("connection_pin_set","1");expectError(409,"stale_revision");

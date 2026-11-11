@@ -45,6 +45,17 @@ static_assert(sizeof(SENSOR_NAMES)/sizeof(SENSOR_NAMES[0])==CHANNELS,"Home label
 Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sensor events.
 FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
 lv_obj_t *boilerOnLabel=nullptr,*boilerOffLabel=nullptr;
+struct HeaterOutput {
+  const char* name;
+  panel_config::Channel channel;
+};
+constexpr HeaterOutput ELECTRIC_HEATERS[]={
+  {"ТЭН-1",panel_config::Channel::ElectricRelay},
+  {"ТЭН-2",panel_config::Channel::ElectricRelay2},
+  {"ТЭН-3",panel_config::Channel::ElectricRelay3}
+};
+constexpr unsigned HEATER_COUNT=sizeof(ELECTRIC_HEATERS)/sizeof(ELECTRIC_HEATERS[0]);
+lv_obj_t* heaterPinLabels[HEATER_COUNT]={};
 lv_obj_t *boilerOnField=nullptr,*boilerOffField=nullptr,*boilerSaveCaption=nullptr;
 panel_boiler::Target boilerDraftTarget=panel_boiler::Target::Dhw;
 uint32_t boilerDraftRevision=0;
@@ -817,6 +828,18 @@ void home(){
 }
 
 void updateEquipmentReadings(){
+  if(heaterPinLabels[0]){
+    panel_config::State config;
+    const bool known=panel_config::snapshot(config);
+    for(unsigned i=0;i<HEATER_COUNT;i++){
+      const auto& output=config.item[unsigned(ELECTRIC_HEATERS[i].channel)];
+      char pin[32];
+      if(!known)snprintf(pin,sizeof(pin),"Нет данных");
+      else if(output.type==panel_config::Type::Relay)snprintf(pin,sizeof(pin),"GPIO %d",int(output.gpio));
+      else snprintf(pin,sizeof(pin),"Без выхода");
+      if(strcmp(lv_label_get_text(heaterPinLabels[i]),pin))lv_label_set_text(heaterPinLabels[i],pin);
+    }
+  }
   if(boilerOnLabel&&boilerOffLabel){
     panel_boiler::Settings settings;const bool ok=panel_boiler::snapshot(settings,equipmentBoilerTarget());
     char on[80],off[80];
@@ -842,12 +865,13 @@ void fuelTemperatures(int y){
   pairedReading(card,3,0,40);
   pairedReading(card,5,216,40);
 }
-void unavailableHeatButton(const char* caption,int y){
-  auto* heat=button(body,caption,24,y,432,58,0,0x26373B,false);
+lv_obj_t* unavailableHeatButton(const char* caption,int x,int y,int width,int height){
+  auto* heat=button(body,caption,x,y,width,height,0,0x26373B,false);
   // Keep the unavailable action legible without using the active action color.
   lv_obj_set_style_opa(heat,LV_OPA_COVER,LV_STATE_DISABLED);
   lv_obj_set_style_color_filter_opa(heat,LV_OPA_TRANSP,LV_STATE_DISABLED);
   lv_obj_set_style_text_color(lv_obj_get_child(heat,0),c(MUTED),0);
+  return heat;
 }
 void boilerThresholds(int y){
   auto* limits=box(body,24,y,432,210);
@@ -861,15 +885,21 @@ void equipmentPage(){
     auto* water=box(body,24,16,432,120);
     label(water,"Температура воды в бойлере",20,18,390,&boiler_font_19,MUTED);
     label(water,"Нет данных",20,58,390,&boiler_font_25);
-    unavailableHeatButton("Включить бойлер",160);
+    unavailableHeatButton("Включить бойлер",24,160,432,58);
     label(body,"Не подключены датчик воды и контроллер.",24,236,432,&boiler_font_19,MUTED);
     boilerThresholds(307);
     button(body,"Изменить пороги",24,552,432,64,BoilerEdit);
     return;
   }
   if(view==2){
-    unavailableHeatButton("Включить ТЭНы",16);
-    label(body,"Датчик регулирования не назначен.\nКонтроллер ТЭНов не подключён.",24,94,432,&boiler_font_19,MUTED);
+    for(unsigned i=0;i<HEATER_COUNT;i++){
+      auto* heater=unavailableHeatButton(ELECTRIC_HEATERS[i].name,24+int(i)*148,16,136,82);
+      lv_obj_align(lv_obj_get_child(heater,0),LV_ALIGN_TOP_MID,0,8);
+      heaterPinLabels[i]=label(heater,"",0,0,124,&boiler_font_14,MUTED);
+      lv_obj_set_style_text_align(heaterPinLabels[i],LV_TEXT_ALIGN_CENTER,0);
+      lv_obj_align(heaterPinLabels[i],LV_ALIGN_BOTTOM_MID,0,-8);
+    }
+    label(body,"Датчик регулирования не назначен.\nКонтроллер ТЭНов не подключён.",24,109,432,&boiler_font_19,MUTED);
     boilerThresholds(176);
     button(body,"Изменить пороги",24,410,432,58,BoilerEdit);
     auto* list=box(body,24,510,432,88,BG,0);lv_obj_set_style_border_width(list,0,0);
@@ -1182,6 +1212,7 @@ void render(){
   updateCheckButton=updateInstallButton=updateCancelButton=updateRollbackButton=nullptr;
   homeUpdateNotice=homeUpdateText=nullptr;
   boilerOnLabel=boilerOffLabel=nullptr;
+  for(auto& pin:heaterPinLabels)pin=nullptr;
   fuelCardLabels={};fuelCanister={};
   for(auto& icon:tempIcon)icon=nullptr;
   for(unsigned i=0;i<CHANNELS;i++)tempValue[i]=tempState[i]=tempTrend[i]=freshBar[i]=nullptr;

@@ -109,14 +109,17 @@ int main(){
   OneWire32::missingPin=-1;
   while(!wire){mock_now+=45;pollThermometers(mock_now);}
   // The previous conversion is still pending when that GPIO is reassigned to a
-  // relay. The new revision drops the old conversion and queued events. Neither
-  // relay may be polled as a thermometer or configured as a pulled-up reed.
+  // relay. The new revision drops the old conversion and queued events. None of the four
+  // relay outputs may be polled as thermometers or configured as pulled-up reeds.
   const unsigned old=probe;
   const int reserved=driver[old].setting.gpio;
-  const auto opens=OneWire32::opens[reserved],otherOpens=OneWire32::opens[34];
+  const int relays[]={reserved,34,32,28};
+  const unsigned opens[]={OneWire32::opens[reserved],OneWire32::opens[34],OneWire32::opens[32],OneWire32::opens[28]};
   config.item[old]=panel_config::Assignment{};
   config.item[8].gpio=reserved;config.item[8].type=panel_config::Type::Relay;
   config.item[9].gpio=34;config.item[9].type=panel_config::Type::Relay;
+  config.item[10].gpio=32;config.item[10].type=panel_config::Type::Relay;
+  config.item[11].gpio=28;config.item[11].type=panel_config::Type::Relay;
   ++config.revision;
   pollInputs(config); // remaining thermometers start after the new assignment settles
   assert(!wire && !OneWire32::live && !poll(e));
@@ -124,7 +127,9 @@ int main(){
     mock_now+=45;pollInputs(config);
     while(poll(e))assert(e.revision==config.revision&&e.channel<panel_config::INPUT_COUNT&&e.channel!=old);
   }
-  assert(OneWire32::opens[reserved]==opens && OneWire32::opens[34]==otherOpens);
-  assert(!pulls[reserved]&&!pulls[34]&&!reads[reserved]&&!reads[34]);
+  for(unsigned n=0;n<4;n++){
+    const int gpio=relays[n];
+    assert(OneWire32::opens[gpio]==opens[n] && !pulls[gpio] && !reads[gpio]);
+  }
   puts("PASS: real sensor adapter rejects request/poll/scratchpad faults; preserves timestamps; recovers incl. 85C; stale data does not revive");
 }

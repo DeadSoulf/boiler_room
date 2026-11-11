@@ -9,6 +9,7 @@ dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-r
 @media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.temp{min-height:255px}.temp-value{font-size:42px}.header-meta{display:none}}
 @media(max-width:680px){.container{padding:22px 16px}header{align-items:flex-start;gap:16px;margin-bottom:24px}h1{font-size:27px}.toolbar{justify-content:flex-end;gap:8px}.toolbar .tag{display:none}.toolbar button{padding:10px 13px;min-height:44px}.topnav{gap:3px;justify-content:space-between;margin-bottom:24px;padding-bottom:16px}.topnav button{font-size:13px;padding:10px 9px;min-height:44px}.grid{gap:12px}.temp{padding:18px;min-height:245px}.temp-value{font-size:32px}.temp-name{font-size:13px}.canister{height:137px;width:112px}.two,.equip-list,.menu-grid{grid-template-columns:1fr}.card{padding:20px}.temp.card{padding:18px}.menu-item{padding:20px}.subhead{gap:10px;flex-wrap:wrap}.subhead h2{font-size:22px;min-width:0;overflow-wrap:anywhere}.row{gap:12px}.row>:last-child{max-width:60%}.actions button{flex:1 1 auto}footer{font-size:11px}.notice{padding:14px}dialog{padding:24px}.header-time{font-size:13px}}
 @media(max-width:480px){header{flex-wrap:wrap;gap:12px}.toolbar{width:100%;justify-content:flex-start}.topnav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.topnav button{min-width:0}.temp-value{font-size:28px}}
+.heater-outputs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.heater-outputs>div{display:grid;align-content:start;gap:5px;text-align:center}.heater-outputs button{min-width:0;padding-inline:4px}.heater-outputs small{color:var(--muted);overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* Static location pictograms; not weather forecasts or heater status indicators. */
 .temp .temp-value{margin:18px 0 4px}
@@ -49,7 +50,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 <section id="equipment" class="page hidden"><h2>Оборудование</h2><div class="equip-list" id="equipment-list"></div><p class="tiny">Управление появится после подключения и проверки исполнительных контроллеров.</p></section>
 <template id="threshold-controls"><div>
  <div class="row"><span data-part="temperature"></span><strong>Нет данных</strong></div>
- <button type="button" data-part="enable" disabled></button>
+ <div data-part="outputs"></div>
  <p class="hint" data-part="hardware"></p>
  <form data-part="form" novalidate>
  <div class="field"><label data-label="on">Включать при температуре ≤ (°C)</label><input data-part="on" inputmode="numeric" maxlength="2" placeholder="Не задано" disabled></div>
@@ -122,7 +123,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
     <option value="3">Топливо в баке</option><option value="7">Топливо на выходе</option>
     <option value="4">Нижний геркон топлива</option>
     <option value="5">Верхний геркон топлива</option>
-    <option value="8">Реле ТЭНов электрокотла</option><option value="9">Реле бойлера</option>
+    <option value="8">Реле ТЭН-1</option><option value="10">Реле ТЭН-2</option><option value="11">Реле ТЭН-3</option><option value="9">Реле бойлера</option>
   </select></div>
   <div class="field"><label for="cfg-type">Тип подключения</label>
   <select id="cfg-type">
@@ -159,7 +160,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 <div class="card section">
 <h3>Сохранённые назначения</h3>
 <div id="cfg-table" class="feed muted">Нет конфигурации.</div>
-<p class="tiny muted">Поддерживаются реальные входные датчики на JP1: DS18B20 (один на GPIO) и герконы NO/NC. Для ТЭНов и бойлера можно раздельно зарезервировать выходы реле. Состояние нагрузки по назначению GPIO неизвестно. Modbus/MQTT пока только описываются, без работы драйвера.</p>
+<p class="tiny muted">Поддерживаются реальные входные датчики на JP1: DS18B20 (один на GPIO) и герконы NO/NC. Каждому из трёх ТЭНов и бойлеру можно назначить свой выход реле. Состояние нагрузки по назначению GPIO неизвестно. Modbus/MQTT пока только описываются, без работы драйвера.</p>
 </div>
 </section>
 <dialog id="temperature-target" aria-labelledby="target-title">
@@ -180,7 +181,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <form id="pin-form">
   <div class="field"><label for="pin-channel">Назначить на</label><select id="pin-channel" required>
    <option value="">Выберите назначение</option><option value="0">Температура в доме</option><option value="1">Температура улицы</option><option value="2">Температура подачи</option><option value="6">Температура обратки</option><option value="3">Топливо в баке</option><option value="7">Топливо на выходе</option><option value="4">Нижний геркон топлива</option><option value="5">Верхний геркон топлива</option>
-    <option value="8">Реле ТЭНов электрокотла</option><option value="9">Реле бойлера</option>
+    <option value="8">Реле ТЭН-1</option><option value="10">Реле ТЭН-2</option><option value="11">Реле ТЭН-3</option><option value="9">Реле бойлера</option>
   </select></div>
   <p id="pin-temperature" class="tiny hidden">Датчик DS18B20 · отдельная линия OneWire.</p>
   <div id="pin-reed" class="hidden">
@@ -286,10 +287,11 @@ const $=id=>document.getElementById(id);
 const names=["Бойлер косвенного нагрева","Электрокотёл","Контур 1","Контур 2","Контур 3","Дизельный отопитель","Подогрев топлива"];
 const tnames=["В доме","На улице","Подача","Топливо в баке","Обратка","Топливо на выходе"];
 // Preserve saved channel numbers, including the reed inputs at 4 and 5.
-const channelNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",...tnames.slice(4),"Реле ТЭНов электрокотла","Реле бойлера"];
+const channelNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",...tnames.slice(4),"Реле ТЭН-1","Реле бойлера","Реле ТЭН-2","Реле ТЭН-3"];
 const connectionTypes=["none","ds18b20","reed_no","reed_nc","modbus","mqtt","relay"];
 const isReedInput=channel=>channel===4||channel===5;
-const isRelayChannel=channel=>channel===8||channel===9;
+const electricRelayChannels=[8,10,11];
+const isRelayChannel=channel=>channel===9||electricRelayChannels.includes(channel);
 function matchesPinRole(channel,type){
  if(isRelayChannel(channel))return type==="relay";
  if(isReedInput(channel))return type==="reed_no"||type==="reed_nc";
@@ -616,9 +618,9 @@ async function saveTarget(event){
 }
 const heatingSettings={
  boiler:{status:"boiler_settings",action:"boiler_thresholds",temperature:"Температура воды в баке",
-   button:"Включить бойлер",hardware:"Не подключены датчик воды и контроллер нагрева.",unavailable:"Настройки бойлера недоступны."},
+   hardware:"Не подключены датчик воды и контроллер нагрева.",unavailable:"Настройки бойлера недоступны."},
  electric:{status:"electric_settings",action:"electric_thresholds",temperature:"Температура электрокотла",
-   button:"Включить ТЭНы",hardware:"Не подключены датчик температуры электрокотла и контроллер ТЭНов.",unavailable:"Настройки электрокотла недоступны."}
+   hardware:"Не подключены датчик температуры электрокотла и контроллер ТЭНов.",unavailable:"Настройки электрокотла недоступны."}
 };
 // Each equipment card keeps its own draft, original revision and save/readback state.
 const thresholdViews=[];
@@ -635,7 +637,20 @@ function mountThresholdEditor(card,kind){
    part.id=kind+"-"+part.dataset.part;
  }
  for(const label of content.querySelectorAll("[data-label]"))label.htmlFor=fields[label.dataset.label].id;
- fields.enable.textContent=settings.button;fields.enable.setAttribute("aria-describedby",fields.hardware.id);
+ const heaterPins=[];
+ if(kind==="electric"){
+  fields.outputs.className="heater-outputs";
+  electricRelayChannels.forEach((channel,index)=>{
+   const group=document.createElement("div"),button=document.createElement("button"),pin=document.createElement("small");
+   button.type="button";button.disabled=true;button.textContent="ТЭН-"+(index+1);
+   pin.id="electric-pin-"+(index+1);button.setAttribute("aria-describedby",pin.id+" "+fields.hardware.id);
+   group.append(button,pin);fields.outputs.append(group);heaterPins.push({channel,pin});
+  });
+ }else{
+  const button=document.createElement("button");button.type="button";button.disabled=true;
+  button.id="boiler-enable";button.textContent="Включить бойлер";button.setAttribute("aria-describedby",fields.hardware.id);
+  fields.outputs.append(button);
+ }
  fields.hardware.textContent=settings.hardware;fields.temperature.textContent=settings.temperature;
  card.append(content);
  const e={base:null,dirty:false,saving:false,awaiting:null,reloadAfter:null,review:false,message:""};
@@ -650,6 +665,11 @@ function mountThresholdEditor(card,kind){
   return /^\d{1,2}$/.test(on)&&/^\d{1,2}$/.test(off)&&Number(on)<Number(off)?{on:Number(on),off:Number(off)}:null;
  }
  function render(){
+  for(const {channel,pin} of heaterPins){
+    const item=serverOnline&&pinSnapshot?.valid&&!pinSnapshot.conflict?pinSnapshot.items[channel]:null;
+    const label=!item?"Нет данных":item.type==="relay"?"GPIO "+item.gpio:"Выход не назначен";
+    if(pin.textContent!==label)pin.textContent=label;
+  }
   const b=readConfig(),valid=serverOnline&&!!b;
   if(e.reloadAfter!==null&&pinPollSerial>e.reloadAfter){
     e.reloadAfter=null;
