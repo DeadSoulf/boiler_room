@@ -1,4 +1,8 @@
-# Boiler Room Touch Panel — v0.10.9
+# Boiler Room Touch Panel — v0.10.10
+
+## v0.10.10 — One coolant card for supply and return
+
+The panel and browser home screens show **Supply** and **Return** together in the **Coolant** card. Select either row to open that sensor’s reading, minimum, maximum and history. [Home screen with test readings](docs/verification/assets/v0.10.10-coolant-card.png).
 
 ## v0.10.9 — Coolant supply and return
 
