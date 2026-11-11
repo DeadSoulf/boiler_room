@@ -162,7 +162,8 @@ void afterForget(){
  });
 }
 void faults(){
- const auto before=*prefs.blob(BOOK);unsigned n=0,beginCount=0,writes=0;
+ const auto before=*prefs.blob(BOOK);unsigned n=0,beginCount=0,writes=0,disconnects=0;
+ std::vector<unsigned char> beforeForget;
  run([&]{const auto s=shot();switch(n++){
   case 0:assert(s.connected&&s.savedCount==2);beginCount=WiFi.beginCount;
    legacy();writes=prefs.credentialWrites;prefs.failLengthKey=BOOK;assert(!prefs.isKey(BOOK));click(HOME_NET);break;
@@ -176,7 +177,20 @@ void faults(){
    assert(submit(command(Job::Connect,"fixture-extra",BULK_KEY)));break;
   case 3:assert(s.savedCount==2&&saved(s,HOME_NET)&&saved(s,OFFICE)&&!saved(s,"fixture-extra"));
    prefs.failWriteKey.clear();expectBook(before);click(HOME_NET);break;
-  case 4:assert(s.connected&&WiFi.lastBeginPassword==HOME_KEY);throw EndWorker{};
+  case 4:assert(s.connected&&s.autoConnect&&WiFi.lastBeginSsid==HOME_NET&&WiFi.lastBeginPassword==HOME_KEY);
+   beforeForget=*prefs.blob(BOOK);beginCount=WiFi.beginCount;disconnects=WiFi.disconnectCount;writes=prefs.credentialWrites;
+   prefs.failLengthKey=BOOK;assert(submit(command(Job::Forget,OFFICE)));break;
+  case 5: // An unreadable inactive profile must not disturb this working link or its policy.
+   expectBook(beforeForget);assert(s.connected&&s.autoConnect&&prefs.autoValue&&s.savedCount==2);
+   assert(WiFi.beginCount==beginCount&&WiFi.disconnectCount==disconnects&&prefs.credentialWrites==writes);
+   assert(submit(command(Job::Forget,HOME_NET)));break;
+  case 6: // An unreadable ACTIVE profile cannot be claimed deleted or automatically rejoined.
+   expectBook(beforeForget);assert(!s.connected&&!s.autoConnect&&!prefs.autoValue&&s.savedCount==2);
+   assert(saved(s,HOME_NET)&&saved(s,OFFICE)&&std::strstr(s.wifiMessage,"Не удалось"));
+   assert(WiFi.disconnectCount==disconnects+1&&prefs.credentialWrites==writes);
+   prefs.failLengthKey.clear();fakeMillis+=310000U;break;
+  case 7:assert(!s.connected&&WiFi.beginCount==beginCount&&prefs.credentialWrites==writes);
+   expectBook(beforeForget);throw EndWorker{};
   default:assert(false);
  }});
 }

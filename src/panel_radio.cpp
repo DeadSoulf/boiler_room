@@ -756,6 +756,15 @@ bool dropLink() {
 #endif
   return true;
 }
+#if PANEL_WIFI
+bool currentProfile(const char* ssid,bool open,bool legacy) {
+  if(!wifiStarted || WiFi.status()!=WL_CONNECTED || strcmp(WiFi.SSID().c_str(),ssid))return false;
+  if(!strcmp(lastGood.ssid,ssid))return lastGood.open==open;
+  if(legacy)return true; // the old unnamed command can only target one profile
+  wifi_ap_record_t link={};
+  return esp_wifi_sta_get_ap_info(&link)==ESP_OK && (link.authmode==WIFI_AUTH_OPEN)==open;
+}
+#endif
 void disconnectWifi(bool forget,const char* ssid=nullptr,bool open=false) {
   const bool named=ssid && ssid[0];
   bool drop=!forget,disable=!forget,forgotten=!forget,cleanupOK=true,hadCanonical=false,resumeAfterDelete=false;
@@ -763,8 +772,12 @@ void disconnectWifi(bool forget,const char* ssid=nullptr,bool open=false) {
   int pos=-1;
   if(forget) {
     if(!loadProfiles(before,&hadCanonical)) {
-      if(named){message("Не удалось прочитать сохранённые сети");return;}
-      drop=disable=true; // legacy explicit stop also inhibits retries on read failure
+      bool affectsActive=!named;
+#if PANEL_WIFI
+      if(named)affectsActive=currentProfile(ssid,open,false);
+#endif
+      if(!affectsActive){message("Не удалось прочитать сохранённые сети");return;}
+      drop=disable=true; // the current link must not rejoin after an unconfirmed removal
     } else {
       if(!named && before.count>1){message("Выберите сеть для удаления");return;}
       pos=named?profileIndex(before,ssid,open):(before.count==1?0:-1);
@@ -772,14 +785,7 @@ void disconnectWifi(bool forget,const char* ssid=nullptr,bool open=false) {
       if(pos>=0) {
 #if PANEL_WIFI
         const auto& c=before.items[pos];
-        if(wifiStarted && WiFi.status()==WL_CONNECTED && !strcmp(WiFi.SSID().c_str(),c.ssid)) {
-          if(!strcmp(lastGood.ssid,c.ssid))drop=lastGood.open==bool(c.open);
-          else if(!named)drop=true; // compatibility with the old single-profile command
-          else {
-            wifi_ap_record_t link={};
-            drop=esp_wifi_sta_get_ap_info(&link)==ESP_OK && (link.authmode==WIFI_AUTH_OPEN)==bool(c.open);
-          }
-        }
+        drop=currentProfile(c.ssid,c.open!=0,!named);
 #endif
         disable=drop || before.count==1;
 #if PANEL_WIFI
@@ -808,7 +814,6 @@ void disconnectWifi(bool forget,const char* ssid=nullptr,bool open=false) {
       roundOffset=0;
       if(!strcmp(lastGood.ssid,before.items[pos].ssid) && lastGood.open==bool(before.items[pos].open))lastGood=SavedNetwork{};
       if(resumeAfterDelete){disable=false;resetReconnect(true,true);} // only confirmed remaining profiles
-
 #endif
     } else if(resumeAfterDelete) {
       // Do not retry the profile whose removal failed, even if NVS is unhealthy.
