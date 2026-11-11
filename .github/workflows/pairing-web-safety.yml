@@ -29,7 +29,8 @@ jobs:
       - name: Browser dependencies (isolated fixture tests)
         run: |
           python3 -m pip install playwright==1.64.1
-          python3 -m playwright install --with-deps chromium
+          # The hosted Ubuntu image supplies Chromium's system libraries and Cyrillic fonts.
+          python3 -m playwright install chromium
       - name: Actual embedded page on desktop and mobile
         run: python3 tests/web_v090_browser.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

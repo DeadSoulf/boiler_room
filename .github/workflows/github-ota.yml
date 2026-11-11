@@ -47,7 +47,8 @@ jobs:
       - name: Browser dependencies for the isolated embedded-page fixture
         run: |
           python3 -m pip install playwright==1.64.1
-          python3 -m playwright install --with-deps chromium
+          # The hosted Ubuntu image supplies Chromium's system libraries and Cyrillic fonts.
+          python3 -m playwright install chromium
       - name: Update confirmation, progress, cancellation and reconnect
         run: python3 tests/update_web_browser.py
       - name: Boiler temperature thresholds in the embedded equipment card
