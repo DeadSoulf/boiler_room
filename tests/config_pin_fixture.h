@@ -4,7 +4,7 @@
 namespace config_test {
 using namespace panel_config;
 inline void powerOff(){
-  delete lock;lock=nullptr;ready=false;current=State{};activeSlot=0;sawInvalidStored=false;
+  delete sensorIo;sensorIo=nullptr;delete lock;lock=nullptr;ready=false;current=State{};activeSlot=0;sawInvalidStored=false;
 }
 inline void reboot(){powerOff();assert(begin());}
 inline void fresh(){

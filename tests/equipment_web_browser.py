@@ -51,13 +51,13 @@ inventory = [{"name": name, "connected": False, "state": "not_connected"} for na
 def empty_connections(revision=0):
     return {"available": True, "revision": revision, "drivers_active": False,
             "items": [{"channel": channel, "type": "none", "gpio": -1, "jp1_pin": 0,
-                       "active": False, "online": False} for channel in range(8)]}
+                       "active": False, "online": False} for channel in range(10)]}
 
 
 def local_assignment(channel, kind, gpio):
     # A saved assignment reserves its GPIO even while no sensor can be read.
     return {"channel": channel, "type": kind, "gpio": gpio, "jp1_pin": sensor_pins[gpio],
-            "active": False, "online": False, "status": "Sensor not found"}
+            "active": False, "online": False, "status": "Assigned" if kind == "relay" else "Sensor not found"}
 
 
 fixture = {
@@ -343,6 +343,8 @@ try:
                 saved = empty_connections(width)
                 saved["items"][0] = local_assignment(0, "ds18b20", 52)
                 saved["items"][4] = local_assignment(4, "reed_nc", 28)
+                saved["items"][8] = local_assignment(8, "relay", 31)
+                saved["items"][9] = local_assignment(9, "relay", 32)
                 saved["items"][2]["type"] = "mqtt"
                 saved["items"][5].update(type="modbus", address=1)
                 with guard:
@@ -353,11 +355,18 @@ try:
                 wait_polls()
                 expect_pin(52, "busy", "Занят · В доме")
                 expect_pin(28, "busy", "Занят · Нижний геркон")
-                expect(page.locator('#jp1-map [data-state="free"]')).to_have_count(9)
+                expect_pin(31, "busy", "Занят · Реле ТЭНов электрокотла")
+                expect_pin(32, "busy", "Занят · Реле бойлера")
+                expect(page.locator('#jp1-map [data-state="free"]')).to_have_count(7)
                 original_pins = page.locator("#jp1-map .jp1-pin").element_handles()
                 advanced = page.locator("#cfg-advanced")
                 if not advanced.evaluate("node => node.open"):
                     advanced.locator("summary").click()
+                for role, title in (("8", "Реле ТЭНов электрокотла"), ("9", "Реле бойлера")):
+                    advanced_channel = page.locator("#cfg-channel")
+                    expect(advanced_channel.locator(f'option[value="{role}"]')).to_have_text(title)
+                    advanced_channel.select_option(role)
+                    expect(page.locator("#cfg-type")).to_have_value("6")
                 for name in ("cfg-channel", "cfg-type", "cfg-gpio"):
                     page.locator("#" + name).select_option(pin_draft[name])
                 page.locator("#cfg-debounce").fill(pin_draft["cfg-debounce"])
@@ -481,6 +490,9 @@ try:
                     page.set_viewport_size({"width": width, "height": 900})
                     pinout_geometry(width, "unknown")
                     page.screenshot(path=str(out / f"sensor-pinout-unknown-{width}.png"), full_page=True)
+                old_format = deepcopy(assigned)
+                old_format["items"] = old_format["items"][:8]
+                change("snapshot-missing-both-relay-slots", old_format, {"unknown": 11})
                 partial = empty_connections(1004)
                 partial["items"].pop()
                 change("partial-snapshot", partial, {"unknown": 11})

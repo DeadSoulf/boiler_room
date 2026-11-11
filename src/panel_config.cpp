@@ -1,5 +1,5 @@
 // Versioned dual NVS slots; all changes validated and read back before activation.
-// GPIO assignments always belong to physically mapped JP1 sensor pins.
+// GPIO assignments always belong to physically mapped JP1 pins.
 #include <Arduino.h>
 #include <Preferences.h>
 #include <freertos/FreeRTOS.h>
@@ -17,7 +17,7 @@ template<unsigned N> struct StoredConfig {
 };
 using Persist=StoredConfig<COUNT>;
 constexpr uint32_t MAGIC=0x42504336U;
-SemaphoreHandle_t lock=nullptr;
+SemaphoreHandle_t lock=nullptr, sensorIo=nullptr;
 State current;
 uint8_t activeSlot=0;
 bool ready=false;
@@ -28,8 +28,8 @@ uint32_t fnv(const uint8_t* p,size_t n){
   return h;
 }
 bool allowedType(Channel ch,Type t){
-  if(uint8_t(t)>uint8_t(Type::RemoteMQTT))return false;
   if(t==Type::None)return true;
+  if(ch==Channel::ElectricRelay||ch==Channel::DhwRelay)return t==Type::Relay;
   const bool temperature=temperatureIndex(unsigned(ch))>=0;
   return temperature?
     (t==Type::DS18B20||t==Type::RemoteModbus||t==Type::RemoteMQTT):
@@ -66,7 +66,9 @@ bool readSlot(unsigned slot,Persist& entry){
   const size_t size=prefs.getBytesLength("config");
   bool ok=false;
   if(size==sizeof(Persist)){
-    ok=readRecord(prefs,3,entry);
+    ok=readRecord(prefs,4,entry);
+  }else if(size==sizeof(StoredConfig<8>)){
+    ok=readPrevious<8>(prefs,3,entry);
   }else if(size==sizeof(StoredConfig<7>)){
     ok=readPrevious<7>(prefs,2,entry);
   }else if(size==sizeof(StoredConfig<6>)){
@@ -76,12 +78,12 @@ bool readSlot(unsigned slot,Persist& entry){
 }
 bool writeSlot(unsigned slot,const State& next){
   Persist entry{};
-  entry.magic=MAGIC;entry.schema=3;entry.revision=next.revision;
+  entry.magic=MAGIC;entry.schema=4;entry.revision=next.revision;
   for(unsigned i=0;i<COUNT;i++)entry.item[i]=next.item[i];
   entry.hash=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
   Preferences prefs;
   if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false))return false;
-  // Keep the exact previous bytes, including records from either older schema.
+  // Keep the exact previous bytes, including records from older schemas.
   uint8_t previous[sizeof(Persist)];
   const size_t previousSize=prefs.getBytesLength("config");
   if(previousSize>sizeof(previous) ||
@@ -104,12 +106,15 @@ bool writeSlot(unsigned slot,const State& next){
   }
   return false;
 }
-bool commit(const State& next){
+PinResult commit(const State& next){
+  // Wait for an in-flight sensor transaction before handing its GPIO to a new
+  // owner. Status snapshots do not need this second mutex during normal polling.
+  if(xSemaphoreTake(sensorIo,pdMS_TO_TICKS(200))!=pdTRUE)return PinResult::Unavailable;
   const unsigned target=activeSlot^1U;
-  if(!writeSlot(target,next))return false;
-  current=next;
-  activeSlot=target;
-  return true;
+  const bool verified=writeSlot(target,next);
+  if(verified){current=next;activeSlot=target;}
+  xSemaphoreGive(sensorIo);
+  return verified?PinResult::Saved:PinResult::StorageError;
 }
 PinResult changePin(int16_t gpio,unsigned channel,const Assignment* assignment,
                     uint32_t expectedRevision,uint32_t& savedRevision){
@@ -134,7 +139,8 @@ PinResult changePin(int16_t gpio,unsigned channel,const Assignment* assignment,
     ++next.revision;
     snprintf(next.message,sizeof(next.message),"NVS saved and verified (rev %lu)",
       (unsigned long)next.revision);
-    if(!commit(next)){xSemaphoreGive(lock);return PinResult::StorageError;}
+    const auto result=commit(next);
+    if(result!=PinResult::Saved){xSemaphoreGive(lock);return result;}
   }
   savedRevision=current.revision;
   xSemaphoreGive(lock);return PinResult::Saved;
@@ -142,7 +148,7 @@ PinResult changePin(int16_t gpio,unsigned channel,const Assignment* assignment,
 } // namespace
 
 bool isLocal(Type type){
-  return type==Type::DS18B20||type==Type::ReedNO||type==Type::ReedNC;
+  return type==Type::DS18B20||type==Type::ReedNO||type==Type::ReedNC||type==Type::Relay;
 }
 const char* pinRestriction(int gpio){
   const char* restricted=panel_pins::blockReason(gpio);
@@ -153,7 +159,7 @@ bool isValid(Channel ch,const Assignment& a){
   if(a.debounceMs>5000 || a.busAddress>247)return false;
   if(isLocal(a.type)){
     if(!panel_pins::sensorPin(a.gpio) || a.busAddress!=0)return false;
-    if(a.type==Type::DS18B20 && a.debounceMs!=50)return false;
+    if((a.type==Type::DS18B20||a.type==Type::Relay) && a.debounceMs!=50)return false;
     return true;
   }
   if(a.gpio!=-1)return false;
@@ -168,13 +174,15 @@ const char* typeName(Type type){
     case Type::ReedNC:return "reed_nc";
     case Type::RemoteModbus:return "modbus";
     case Type::RemoteMQTT:return "mqtt";
+    case Type::Relay:return "relay";
     default:return "invalid";
   }
 }
 bool begin(){
   if(ready)return true;
-  lock=xSemaphoreCreateMutex();
-  if(!lock)return false;
+  if(!lock)lock=xSemaphoreCreateMutex();
+  if(!sensorIo)sensorIo=xSemaphoreCreateMutex();
+  if(!lock||!sensorIo)return false;
   Persist a{},b{};
   const bool okA=readSlot(0,a),okB=readSlot(1,b);
   if(okA||okB){
@@ -186,7 +194,7 @@ bool begin(){
       (unsigned long)current.revision);
   }else{
     current=State{};
-    snprintf(current.message,sizeof(current.message),"No validated sensor connections in NVS");
+    snprintf(current.message,sizeof(current.message),"No validated JP1 assignments in NVS");
   }
   ready=true;
   return true;
@@ -194,6 +202,11 @@ bool begin(){
 bool snapshot(State& out){
   if(!ready||xSemaphoreTake(lock,pdMS_TO_TICKS(10))!=pdTRUE)return false;
   out=current;xSemaphoreGive(lock);return true;
+}
+void withSensorAssignments(void (*sample)(const State&)){
+  if(!ready||xSemaphoreTake(sensorIo,pdMS_TO_TICKS(10))!=pdTRUE)return;
+  sample(current);
+  xSemaphoreGive(sensorIo);
 }
 bool set(Channel ch,Type type,int16_t gpio,uint8_t address,uint16_t debounceMs){
   if(!ready)return false;
@@ -214,7 +227,7 @@ bool set(Channel ch,Type type,int16_t gpio,uint8_t address,uint16_t debounceMs){
   ++next.revision;
   snprintf(next.message,sizeof(next.message),"NVS saved and verified (rev %lu)",
        (unsigned long)next.revision);
-  const bool ok=commit(next);
+  const bool ok=commit(next)==PinResult::Saved;
   xSemaphoreGive(lock);
   return ok;
 }
@@ -243,7 +256,7 @@ bool rollback(){
   for(unsigned i=0;i<COUNT;i++)restored.item[i]=previous.item[i];
   ++restored.revision;
   snprintf(restored.message,sizeof(restored.message),"Restored previous NVS configuration");
-  const bool ok=commit(restored);
+  const bool ok=commit(restored)==PinResult::Saved;
   xSemaphoreGive(lock);return ok;
 }
 } // namespace panel_config

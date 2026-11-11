@@ -19,6 +19,8 @@ void validationAndAvailability(){
     bool permitted=false;for(const int candidate:allowed)if(candidate==pin)permitted=true;
     if(permitted)continue;
     assert(setPin(pin,Channel::Room,Type::DS18B20,50,0,saved)==PinResult::Invalid);
+    assert(setPin(pin,Channel::ElectricRelay,Type::Relay,50,0,saved)==PinResult::Invalid);
+    assert(setPin(pin,Channel::DhwRelay,Type::Relay,50,0,saved)==PinResult::Invalid);
     assert(clearPin(pin,0,saved)==PinResult::Invalid);
   }
   for(const Type type:{Type::None,Type::RemoteModbus,Type::RemoteMQTT,static_cast<Type>(255)})
@@ -29,6 +31,14 @@ void validationAndAvailability(){
       for(const Type type:{Type::ReedNO,Type::ReedNC})
         assert(setPin(52,ch,type,50,0,saved)==PinResult::Invalid);
     }else assert(setPin(52,ch,Type::DS18B20,50,0,saved)==PinResult::Invalid);
+  }
+  for(unsigned i=0;i<INPUT_COUNT;i++)
+    assert(setPin(52,static_cast<Channel>(i),Type::Relay,50,0,saved)==PinResult::Invalid);
+  for(auto relay:{Channel::ElectricRelay,Channel::DhwRelay}){
+    for(auto type:{Type::DS18B20,Type::RemoteMQTT,Type::RemoteModbus})
+      assert(!set(relay,type,type==Type::DS18B20?52:-1,type==Type::RemoteModbus?1:0,50));
+    assert(!set(relay,Type::Relay,52,1,50));
+    assert(setPin(52,relay,Type::Relay,10,0,saved)==PinResult::Invalid);
   }
   assert(setPin(52,static_cast<Channel>(COUNT),Type::DS18B20,50,0,saved)==PinResult::Invalid);
   assert(setPin(52,static_cast<Channel>(255),Type::DS18B20,50,0,saved)==PinResult::Invalid);
@@ -221,8 +231,49 @@ void migrateSevenChannelSlots(){
                 "tank and outlet temperatures have distinct destinations");
 }
 
+void migrateEightInputsAndReserveRelays(){
+  // Byte layout of an existing v0.10.11/12 installation, schema 3.
+  uint8_t bytes[]={
+    0x36,0x43,0x50,0x42,3,0,0,0,24,0,0,0,
+    1,0,52,0,0,0,50,0, 1,0,34,0,0,0,50,0,
+    1,0,51,0,0,0,50,0, 1,0,33,0,0,0,50,0,
+    3,0,29,0,0,0,75,0, 2,0,30,0,0,0,80,0,
+    1,0,28,0,0,0,50,0, 1,0,49,0,0,0,50,0, 0,0,0,0
+  };
+  static_assert(sizeof(bytes)==80 && INPUT_COUNT==8 && COUNT==10);
+  const uint32_t hash=fnv(bytes,76);memcpy(bytes+76,&hash,4);
+  fresh();config_host::nvs["bp_cfg_a"]={bytes,bytes+sizeof(bytes)};
+  const auto originals=config_host::nvs;
+  reboot();const State old=state();
+  assert(old.revision==24 && old.item[7].gpio==49 && old.item[8].gpio==-1 && old.item[9].gpio==-1);
+  assert(config_host::nvs==originals && config_host::writes==0);
+  uint32_t saved=0;
+  // A sensor transaction cannot straddle a successful change of pin owner.
+  withSensorAssignments([](const State& previous){
+    assert(previous.revision==24 && previous.item[0].gpio==52);
+    uint32_t rev=24;
+    assert(setPin(52,Channel::ElectricRelay,Type::Relay,50,rev,rev)==PinResult::Unavailable);
+    assert(previous.item[8].gpio==-1);
+  });
+  assert(config_host::nvs==originals);
+  assert(setPin(52,Channel::ElectricRelay,Type::Relay,50,24,saved)==PinResult::Saved && saved==25);
+  assert(setPin(31,Channel::DhwRelay,Type::Relay,50,25,saved)==PinResult::Saved && saved==26);
+  const State pinned=state();
+  reboot();unchanged(pinned);
+  assert(pinned.item[0].gpio==-1 && pinned.item[8].gpio==52 && pinned.item[9].gpio==31);
+  for(unsigned i=1;i<INPUT_COUNT;i++)assert(!memcmp(&pinned.item[i],&old.item[i],sizeof(Assignment)));
+  assert(setPin(31,Channel::ElectricRelay,Type::Relay,50,26,saved)==PinResult::Saved && saved==27);
+  assert(state().item[8].gpio==31 && state().item[9].gpio==-1);
+  assert(rollback());reboot();assert(sameBindings(state(),pinned));
+  assert(clearPin(52,28,saved)==PinResult::Saved && saved==29);
+  assert(state().item[8].gpio==-1 && state().item[9].gpio==31);
+  // The legacy advanced editor cannot silently replace the other relay.
+  assert(!set(Channel::ElectricRelay,Type::Relay,31,0,50));
+  assert(set(Channel::ElectricRelay,Type::Relay,50,0,50));
+}
+
 int main(){
-  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();migrateSevenChannelSlots();
+  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();migrateSevenChannelSlots();migrateEightInputsAndReserveRelays();
   powerOff();
   puts("PASS: real config/NVS 11-pin validation, atomic owner replacement/move, remote replacement, clear/no-op, mutex revision race, write/read-back recovery, repeated rollback, transient-fault reboot and revision wrap; persistent cleanup failure boundary demonstrated");
 }

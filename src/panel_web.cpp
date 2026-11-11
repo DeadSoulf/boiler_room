@@ -323,6 +323,7 @@ void statusRequest() {
   j+=",\"message\":";
   jsonQuote(j,"JP1 sensor drivers activate only on validated NVS assignments; other controllers remain offline");
   j+=",\"items\":[";
+  const panel_sensors::ChannelState inactive{};
   for(unsigned i=0;i<panel_config::COUNT;i++){
     if(i)j+=',';
     const auto& a=cfg.item[i];
@@ -331,8 +332,9 @@ void statusRequest() {
     j+=",\"gpio\":";j+=String(a.gpio);
     j+=",\"address\":";j+=String(a.busAddress);
     j+=",\"debounce_ms\":";j+=String(a.debounceMs);
-    const auto& st=sensors.channels[i];
-    const bool fresh=hasSensors && sensors.configRevision==cfg.revision;
+    const bool input=i<panel_config::INPUT_COUNT;
+    const auto& st=input?sensors.channels[i]:inactive;
+    const bool fresh=input && hasConfig && hasSensors && sensors.configRevision==cfg.revision;
     j+=",\"active\":";j+=(fresh&&st.active)?"true":"false";
     j+=",\"online\":";j+=(fresh&&st.valid)?"true":"false";
     j+=",\"jp1_pin\":";j+=String(panel_pins::connectorPin(a.gpio));
@@ -340,7 +342,8 @@ void statusRequest() {
     j+=",\"errors\":";j+=String(fresh?st.errors:0);
     j+=",\"found\":";j+=String(fresh?st.found:0);
     j+=",\"rom\":";jsonQuote(j,fresh?st.rom:"");
-    j+=",\"status\":";jsonQuote(j,fresh?st.status:"Awaiting sensor worker");
+    j+=",\"status\":";if(input)jsonQuote(j,fresh?st.status:"Awaiting sensor worker");
+    else jsonQuote(j,a.type==panel_config::Type::Relay?"Relay GPIO reserved; output inactive":"Not assigned");
     j+='}';
   }
   j+="]}";
@@ -506,7 +509,7 @@ void commandRequest() {
     if(kind=="connection_pin_set"){
       const String channel=server.arg("channel"),type=server.arg("type"),debounce=server.arg("debounce");
       if(!allDigits(channel,1,1)||asUint(channel)>=panel_config::COUNT||
-         !allDigits(type,1,1)||asUint(type)<1||asUint(type)>3||
+         !allDigits(type,1,1)||!panel_config::isLocal(static_cast<panel_config::Type>(asUint(type)))||
          !allDigits(debounce,1,4)||asUint(debounce)>5000){
         errorResponse(400,"invalid_pin_fields");return;
       }
@@ -530,7 +533,7 @@ void commandRequest() {
     const String channel=server.arg("channel"),kindValue=server.arg("type"),
       pinValue=server.arg("gpio"),addrValue=server.arg("address"),debValue=server.arg("debounce");
     if(!allDigits(channel,1,1)||channel.toInt()>=int(panel_config::COUNT)||
-       !allDigits(kindValue,1,1)||kindValue.toInt()>5 ||
+       !allDigits(kindValue,1,1)||kindValue.toInt()>int(panel_config::Type::Relay) ||
        pinValue.length()>3||(!pinValue.startsWith("-")&&!allDigits(pinValue,1,2))||
        !allDigits(addrValue,1,3)||!allDigits(debValue,1,4)){
       errorResponse(400,"invalid_connection_fields");return;

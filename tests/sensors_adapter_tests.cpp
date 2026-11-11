@@ -5,9 +5,9 @@ uint32_t mock_now=0;
 #include "../src/panel_sensors.cpp"
 #include "panel_types.h"
 namespace panel_config {
-bool isLocal(Type t){return t==Type::DS18B20||t==Type::ReedNO||t==Type::ReedNC;}
+bool isLocal(Type t){return t==Type::DS18B20||t==Type::ReedNO||t==Type::ReedNC||t==Type::Relay;}
 bool isValid(Channel,const Assignment&){return true;}
-bool snapshot(State&){return false;}
+void withSensorAssignments(void (*)(const State&)){}
 }
 int main(){
   using namespace panel_sensors;
@@ -108,8 +108,23 @@ int main(){
   assert(seen[3]<=tankSamples+1 && seen[7]>=outletSamples+2);
   OneWire32::missingPin=-1;
   while(!wire){mock_now+=45;pollThermometers(mock_now);}
+  // The previous conversion is still pending when that GPIO is reassigned to a
+  // relay. The new revision drops the old conversion and queued events. Neither
+  // relay may be polled as a thermometer or configured as a pulled-up reed.
+  const unsigned old=probe;
+  const int reserved=driver[old].setting.gpio;
+  const auto opens=OneWire32::opens[reserved],otherOpens=OneWire32::opens[34];
+  config.item[old]=panel_config::Assignment{};
+  config.item[8].gpio=reserved;config.item[8].type=panel_config::Type::Relay;
+  config.item[9].gpio=34;config.item[9].type=panel_config::Type::Relay;
   ++config.revision;
-  reconfigure(config);
+  pollInputs(config); // remaining thermometers start after the new assignment settles
   assert(!wire && !OneWire32::live && !poll(e));
+  for(unsigned tick=0;tick<300;tick++){
+    mock_now+=45;pollInputs(config);
+    while(poll(e))assert(e.revision==config.revision&&e.channel<panel_config::INPUT_COUNT&&e.channel!=old);
+  }
+  assert(OneWire32::opens[reserved]==opens && OneWire32::opens[34]==otherOpens);
+  assert(!pulls[reserved]&&!pulls[34]&&!reads[reserved]&&!reads[34]);
   puts("PASS: real sensor adapter rejects request/poll/scratchpad faults; preserves timestamps; recovers incl. 85C; stale data does not revive");
 }

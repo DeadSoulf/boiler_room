@@ -139,8 +139,8 @@ void badInputs(){
   request();server.args[field]="-1";expectError(400,"invalid_pin_fields");
   request();server.args[field]="1x";expectError(400,"invalid_pin_fields");
  }
- for(const char* channel:{"8","9","255"}){request();server.args["channel"]=channel;expectError(400,"invalid_pin_fields");}
- for(const char* type:{"0","4","5","9"}){request();server.args["type"]=type;expectError(400,"invalid_pin_fields");}
+ for(const char* channel:{"10","11","255"}){request();server.args["channel"]=channel;expectError(400,"invalid_pin_fields");}
+ for(const char* type:{"0","4","5","7","9"}){request();server.args["type"]=type;expectError(400,"invalid_pin_fields");}
  request();server.args["debounce"]="5001";expectError(400,"invalid_pin_fields");
  request();server.args["debounce"]="0";expectError(400,"invalid_pin_assignment");
  request();server.args["type"]="2";expectError(400,"invalid_pin_assignment");
@@ -149,6 +149,15 @@ void badInputs(){
  request();server.args["channel"]="6";expectSaved(1);assert(state().item[6].gpio==52);
  request("connection_pin_set","1");server.args["channel"]="7";server.args["gpio"]="33";
  expectSaved(2);assert(state().item[7].gpio==33&&state().item[6].gpio==52);
+ request("connection_pin_set","2");server.args["channel"]="8";expectError(400,"invalid_pin_assignment");
+ server.args["gpio"]="34";server.args["type"]="6";expectSaved(3);
+ request("connection_pin_set","3");server.args["channel"]="9";server.args["type"]="6";server.args["gpio"]="35";
+ expectError(400,"invalid_pin_assignment");
+ server.args["gpio"]="51";expectSaved(4);reboot();assert(state().item[8].gpio==34&&state().item[9].gpio==51);
+ request("connection_pin_set","3");server.args["channel"]="9";server.args["type"]="6";expectError(409,"stale_revision");
+ request("connection_pin_set","4");server.args["channel"]="0";server.args["type"]="6";expectError(400,"invalid_pin_assignment");
+ request("connection_pin_clear","4");server.args["gpio"]="34";expectSaved(5);
+ assert(state().item[8].type==Type::None&&state().item[9].gpio==51);
 }
 void repliesAndAtomicMutation(){
  fresh();request("connection_pin_set","1");expectError(409,"stale_revision");

@@ -94,13 +94,13 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 </section>
 <section id="connections" class="page hidden">
 <div class="subhead"><button data-action="settings-root">‹ Настройки</button><h2>Датчики</h2></div>
-<div class="notice warn">Настройка входных датчиков на JP1. Подключайте только согласованные цепи 3,3 В. Управляющие выходы не подключены.</div>
+<div class="notice warn">На JP1 можно назначить вход датчика или выход для реле. GPIO рассчитаны на согласованные цепи 3,3 В. Назначение выхода резервирует контакт. Физическое управление реле пока недоступно.</div>
 <div class="card">
   <div class="row"><span>Ревизия конфигурации</span><strong id="cfg-revision">0</strong></div>
   <div class="row"><span>Применение GPIO</span><strong id="cfg-state">Не активировано</strong></div>
   <section class="jp1-section" aria-labelledby="jp1-title">
     <h3 id="jp1-title">Схема контактов JP1</h3>
-    <p class="tiny">Нажмите GPIO, чтобы назначить датчик, изменить подключение или освободить пин. Занятость показана по сохранённым назначениям. Ориентация — как на фото ниже.</p>
+    <p class="tiny">Нажмите GPIO, чтобы назначить датчик или реле, изменить назначение или освободить пин. Занятость показана по сохранённым назначениям. Ориентация — как на фото ниже.</p>
     <div class="jp1-legend" aria-label="Обозначения"><span class="jp1-free">Свободен</span><span class="jp1-busy">Занят</span><span class="muted">Служебный / питание</span></div>
     <div id="jp1-map" class="jp1-map" role="group" aria-label="Разъём JP1, 26 контактов в двух колонках"></div>
     <p id="jp1-state" class="tiny muted" role="status">Ожидаем назначения с панели.</p>
@@ -113,7 +113,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
     </figure></details>
   </section>
   <details id="cfg-advanced" class="details"><summary>Дополнительные настройки источников</summary>
-  <p class="tiny">Для локального датчика выберите GPIO на схеме. Здесь также доступны описания удалённых источников Modbus/MQTT и возврат прошлой конфигурации.</p>
+  <p class="tiny">Для датчика или реле выберите GPIO на схеме. Здесь также доступны описания удалённых источников Modbus/MQTT и возврат прошлой конфигурации.</p>
   <div class="field"><label for="cfg-channel">Канал / назначение</label>
   <select id="cfg-channel">
     <option value="0">Температура в доме</option>
@@ -122,8 +122,9 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
     <option value="3">Топливо в баке</option><option value="7">Топливо на выходе</option>
     <option value="4">Нижний геркон топлива</option>
     <option value="5">Верхний геркон топлива</option>
+    <option value="8">Реле ТЭНов электрокотла</option><option value="9">Реле бойлера</option>
   </select></div>
-  <div class="field"><label for="cfg-type">Тип датчика/источника</label>
+  <div class="field"><label for="cfg-type">Тип подключения</label>
   <select id="cfg-type">
     <option value="0">Не назначено</option>
     <option value="1">DS18B20 / OneWire (только температура)</option>
@@ -131,8 +132,9 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
     <option value="3">Геркон NC: разомкнут = достигнут</option>
     <option value="4">Modbus RTU / RS-485 (требует контроллер)</option>
     <option value="5">MQTT (требует настроенный брокер)</option>
+    <option value="6" disabled>Выход для реле</option>
   </select></div>
-  <div class="field"><label for="cfg-gpio">GPIO ESP32-P4 (для локального датчика)</label>
+  <div class="field"><label for="cfg-gpio">GPIO ESP32-P4</label>
   <select id="cfg-gpio">
    <option value="-1">Без GPIO (не назначено / удалённый источник)</option>
    <option value="52">GPIO52 — JP1 контакт 7</option>
@@ -150,14 +152,14 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
   <p class="tiny muted">Только физические выводы JP1. GPIO35 — BOOT, его использовать нельзя. Датчики DS18B20 подключаются по одному на линию с внешней подтяжкой 4,7 кОм к 3,3 В. Герконы — контакт GPIO ↔ GND; обрыв провода обычным входом не диагностируется.</p></div>
   <div class="field"><label for="cfg-address">Адрес Modbus (0–247)</label><input id="cfg-address" type="number" min="0" max="247" value="0"></div>
   <div class="field"><label for="cfg-debounce">Подавление дребезга геркона, мс</label><input id="cfg-debounce" type="number" min="0" max="5000" value="50"></div>
-  <div class="actions"><button class="primary" data-action="connection_set" data-write="1">Применить реальное подключение</button><button class="ghost" data-action="connection_reset" data-write="1">Отключить канал</button><button class="ghost" data-action="connection_rollback" data-write="1">Вернуть прошлую конфигурацию</button></div>
+  <div class="actions"><button class="primary" data-action="connection_set" data-write="1">Сохранить назначение</button><button class="ghost" data-action="connection_reset" data-write="1">Отключить канал</button><button class="ghost" data-action="connection_rollback" data-write="1">Вернуть прошлую конфигурацию</button></div>
   <p id="cfg-message" class="hint"></p>
   </details>
 </div>
 <div class="card section">
 <h3>Сохранённые назначения</h3>
 <div id="cfg-table" class="feed muted">Нет конфигурации.</div>
-<p class="tiny muted">Поддерживаются реальные входные датчики на JP1: DS18B20 (один на GPIO) и герконы NO/NC. До подключения датчика статус «Не найден». Modbus/MQTT пока только описываются, без работы драйвера. Реле, котлы и нагреватели не управляются.</p>
+<p class="tiny muted">Поддерживаются реальные входные датчики на JP1: DS18B20 (один на GPIO) и герконы NO/NC. Для ТЭНов и бойлера можно раздельно зарезервировать выходы реле. Состояние нагрузки по назначению GPIO неизвестно. Modbus/MQTT пока только описываются, без работы драйвера.</p>
 </div>
 </section>
 <dialog id="pin-dialog" class="pin-dialog" aria-labelledby="pin-title" aria-describedby="pin-current pin-dialog-status">
@@ -166,6 +168,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <form id="pin-form">
   <div class="field"><label for="pin-channel">Назначить на</label><select id="pin-channel" required>
    <option value="">Выберите назначение</option><option value="0">Температура в доме</option><option value="1">Температура улицы</option><option value="2">Температура подачи</option><option value="6">Температура обратки</option><option value="3">Топливо в баке</option><option value="7">Топливо на выходе</option><option value="4">Нижний геркон топлива</option><option value="5">Верхний геркон топлива</option>
+    <option value="8">Реле ТЭНов электрокотла</option><option value="9">Реле бойлера</option>
   </select></div>
   <p id="pin-temperature" class="tiny hidden">Датчик DS18B20 · отдельная линия OneWire.</p>
   <div id="pin-reed" class="hidden">
@@ -270,12 +273,19 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 const $=id=>document.getElementById(id);
 const names=["Бойлер косвенного нагрева","Электрокотёл","Контур 1","Контур 2","Контур 3","Дизельный отопитель","Подогрев топлива"];
 const tnames=["В доме","На улице","Подача","Топливо в баке","Обратка","Топливо на выходе"];
-// Saved input IDs 4 and 5 are reed switches. Appended temperatures follow them.
-const inputNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",...tnames.slice(4)];
+// Preserve saved channel numbers, including the reed inputs at 4 and 5.
+const channelNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",...tnames.slice(4),"Реле ТЭНов электрокотла","Реле бойлера"];
+const connectionTypes=["none","ds18b20","reed_no","reed_nc","modbus","mqtt","relay"];
 const isReedInput=channel=>channel===4||channel===5;
+const isRelayChannel=channel=>channel===8||channel===9;
+function matchesPinRole(channel,type){
+ if(isRelayChannel(channel))return type==="relay";
+ if(isReedInput(channel))return type==="reed_no"||type==="reed_nc";
+ return type==="ds18b20";
+}
 function selectedPinChannel(){
  const value=$("pin-channel").value,channel=Number(value);
- return value!==""&&Number.isInteger(channel)&&channel>=0&&channel<inputNames.length?channel:-1;
+ return value!==""&&Number.isInteger(channel)&&channel>=0&&channel<channelNames.length?channel:-1;
 }
 // Physical JP1 order; assignable GPIOs match panel_pin_profile.h.
 const jp1Pins=[
@@ -317,23 +327,26 @@ function numeric(n){return Number.isFinite(Number(n))?Number(n):0}
 function apiHeaders(){const h={};if(token)h.Authorization="Bearer "+token;return h}
 function readPinSnapshot(cfg){
  const seen=new Set(),assigned=new Map(),items=[];
- let valid=!!cfg&&cfg.available===true&&Number.isInteger(cfg.revision)&&cfg.revision>=0&&cfg.revision<=4294967295&&Array.isArray(cfg.items)&&cfg.items.length===inputNames.length;
+ let valid=!!cfg&&cfg.available===true&&Number.isInteger(cfg.revision)&&cfg.revision>=0&&cfg.revision<=4294967295&&Array.isArray(cfg.items)&&cfg.items.length===channelNames.length;
  if(valid)for(const item of cfg.items){
-  if(!item||!Number.isInteger(item.channel)||item.channel<0||item.channel>=inputNames.length||seen.has(item.channel)){valid=false;break;}
+  if(!item||!Number.isInteger(item.channel)||item.channel<0||item.channel>=channelNames.length||seen.has(item.channel)){valid=false;break;}
   seen.add(item.channel);items[item.channel]=item;
-  if(["ds18b20","reed_no","reed_nc"].includes(item.type)){
+  if(matchesPinRole(item.channel,item.type)){
    const pin=jp1Nodes.find(node=>node.kind==="gpio"&&node.value===item.gpio);
-   if(!pin||item.jp1_pin!==pin.index+1||(item.type==="ds18b20")!==(!isReedInput(item.channel))){valid=false;break;}
+   if(!pin||item.jp1_pin!==pin.index+1){valid=false;break;}
    if(!assigned.has(item.gpio))assigned.set(item.gpio,[]);
    assigned.get(item.gpio).push(item);
-  }else if(!["none","modbus","mqtt"].includes(item.type)||item.gpio!==-1){valid=false;break;}
+  }else{
+   const remote=!isRelayChannel(item.channel)&&(item.type==="modbus"||item.type==="mqtt");
+   if((item.type!=="none"&&!remote)||item.gpio!==-1){valid=false;break;}
+  }
  }
  const conflict=valid&&Array.from(assigned.values()).some(owners=>owners.length>1);
  // Occupancy needs the GPIO/type mapping; editing also needs every saved field.
  const editable=valid&&!conflict&&items.every(item=>Number.isInteger(item.debounce_ms)&&item.debounce_ms>=0&&item.debounce_ms<=5000&&
   Number.isInteger(item.address)&&item.address>=0&&item.address<=247&&
   (item.type==="modbus"?item.address>=1:item.address===0)&&
-  (item.type!=="ds18b20"||item.debounce_ms===50)&&
+  (!["ds18b20","relay"].includes(item.type)||item.debounce_ms===50)&&
   (item.gpio>=0||item.jp1_pin===0));
  return {valid,conflict,editable,assigned,items,revision:valid?cfg.revision:null};
 }
@@ -357,7 +370,7 @@ function renderPinout(cfg){
  const {valid,conflict,assigned}=pinSnapshot;
  for(const node of jp1Nodes){
   if(node.kind!=="gpio")continue;
-  const owners=(assigned.get(node.value)||[]).map(item=>inputNames[item.channel]);
+  const owners=(assigned.get(node.value)||[]).map(item=>channelNames[item.channel]);
   let state="unknown",label=lastServerError&&!serverOnline?"Нет связи":"Нет данных";
   if(serverOnline&&valid){
    if(conflict){if(owners.length>1){state="conflict";label="Конфликт · "+owners.join(" / ");}}
@@ -375,7 +388,7 @@ function renderPinout(cfg){
 function copyPinItems(items){return items.map(item=>({channel:item.channel,type:item.type,gpio:item.gpio,address:item.address,debounce_ms:item.debounce_ms}));}
 function samePinItems(left,right){return left.length===right.length&&left.every((item,i)=>["channel","type","gpio","address","debounce_ms"].every(key=>item[key]===right[i][key]));}
 function pinOwner(editor){return editor.base?.items.find(item=>item.gpio===editor.gpio)||null;}
-function pinTypeLabel(type){return ({ds18b20:"DS18B20",reed_no:"Геркон NO",reed_nc:"Геркон NC",mqtt:"MQTT",modbus:"Modbus"})[type]||"Не назначено";}
+function pinTypeLabel(type){return ({ds18b20:"DS18B20",relay:"Выход для реле",reed_no:"Геркон NO",reed_nc:"Геркон NC",mqtt:"MQTT",modbus:"Modbus"})[type]||"Не назначено";}
 function loadPinDraft(editor){
  editor.base=pinSnapshot?.editable&&serverOnline?{revision:pinSnapshot.revision,items:copyPinItems(pinSnapshot.items)}:null;
  editor.stale=false;editor.needsReload=false;editor.awaiting=null;editor.reloadAfter=null;
@@ -399,6 +412,7 @@ function closePinEditor(){
 function pinDraft(){
  const channel=selectedPinChannel();
  if(channel<0)return null;
+ if(isRelayChannel(channel))return {channel,type:6,debounce:50};
  if(!isReedInput(channel))return {channel,type:1,debounce:50};
  const type=Number($("pin-type").value),raw=$("pin-debounce").value;
  if(![2,3].includes(type)||!/^\d+$/.test(raw)||Number(raw)>5000)return null;
@@ -431,18 +445,18 @@ function renderPinEditor(){
   }
  }
  if(!editor.pending&&!editor.awaiting&&editor.base&&pinSnapshot?.editable&&pinSnapshot.revision!==editor.base.revision)editor.stale=true;
- const owner=pinOwner(editor),channel=selectedPinChannel(),reed=isReedInput(channel);
- text("pin-current",editor.base?(owner?"Занят: "+inputNames[owner.channel]+" · "+pinTypeLabel(owner.type):"Свободен — датчик не назначен"):"Занятость не подтверждена");
+ const owner=pinOwner(editor),channel=selectedPinChannel(),reed=isReedInput(channel),relay=isRelayChannel(channel);
+ text("pin-current",editor.base?(owner?"Занят: "+channelNames[owner.channel]+" · "+pinTypeLabel(owner.type):"Свободен"):"Занятость не подтверждена");
  text("pin-base-revision",editor.base?"Снимок назначений · ревизия "+editor.base.revision:"");
- show("pin-temperature",channel>=0&&!reed);show("pin-reed",reed);
- text("pin-wiring",channel<0?"Выберите, показания какого датчика получать с этого GPIO.":reed?"Геркон подключается между выбранным GPIO и GND. Выберите NO/NC по схеме вашего датчика; обрыв провода отдельно не определяется.":"DS18B20: один датчик на GPIO, внешняя подтяжка 4,7 кОм к 3,3 В. Питание и GND — по схеме JP1.");
+ show("pin-temperature",channel>=0&&!reed&&!relay);show("pin-reed",reed);
+ text("pin-wiring",channel<0?"Выберите функцию этого GPIO.":relay?"Выход для реле. Панель сохраняет назначение. GPIO не переключается.":reed?"Геркон подключается между выбранным GPIO и GND. Выберите NO/NC по схеме вашего датчика; обрыв провода отдельно не определяется.":"DS18B20: один датчик на GPIO, внешняя подтяжка 4,7 кОм к 3,3 В. Питание и GND — по схеме JP1.");
  const impact=[];
  if(channel>=0&&editor.base){
   const target=editor.base.items[channel];
-  if(owner&&owner.channel!==channel)impact.push("«"+inputNames[owner.channel]+"» будет отключён от GPIO"+editor.gpio+".");
-  if(target.gpio>=0&&target.gpio!==editor.gpio)impact.push("«"+inputNames[channel]+"» перейдёт с GPIO"+target.gpio+" на GPIO"+editor.gpio+". GPIO"+target.gpio+" освободится.");
-  else if(["modbus","mqtt"].includes(target.type))impact.push("Источник "+pinTypeLabel(target.type)+" для «"+inputNames[channel]+"» будет заменён датчиком на GPIO"+editor.gpio+".");
-  else impact.push("Назначение: «"+inputNames[channel]+"» → GPIO"+editor.gpio+".");
+  if(owner&&owner.channel!==channel)impact.push("«"+channelNames[owner.channel]+"» будет отключён от GPIO"+editor.gpio+".");
+  if(target.gpio>=0&&target.gpio!==editor.gpio)impact.push("«"+channelNames[channel]+"» перейдёт с GPIO"+target.gpio+" на GPIO"+editor.gpio+". GPIO"+target.gpio+" освободится.");
+  else if(["modbus","mqtt"].includes(target.type))impact.push("Источник "+pinTypeLabel(target.type)+" для «"+channelNames[channel]+"» будет заменён датчиком на GPIO"+editor.gpio+".");
+  else impact.push("Назначение: «"+channelNames[channel]+"» → GPIO"+editor.gpio+".");
  }
  text("pin-impact",impact.join("\n"));show("pin-impact",impact.length>0);
  const working=editor.pending||!!editor.awaiting||editor.reloadAfter!=null,blocked=pinBlockReason(editor),draft=pinDraft();
@@ -480,10 +494,10 @@ async function savePin(clear=false){
  const editor=pinEditor;if(!editor||editor.pending||editor.awaiting||editor.reloadAfter!=null)return;
  renderPinEditor();if(pinBlockReason(editor))return;
  const owner=pinOwner(editor),draft=pinDraft();if(clear?!owner:!draft)return;
- if(clear&&!confirm("Освободить GPIO"+editor.gpio+"? Назначение «"+inputNames[owner.channel]+"» будет отключено."))return;
+ if(clear&&!confirm("Освободить GPIO"+editor.gpio+"? Назначение «"+channelNames[owner.channel]+"» будет отключено."))return;
  const items=copyPinItems(editor.base.items);
  for(let i=0;i<items.length;i++)if(items[i].gpio===editor.gpio)items[i]={channel:i,type:"none",gpio:-1,address:0,debounce_ms:50};
- if(!clear)items[draft.channel]={channel:draft.channel,type:["none","ds18b20","reed_no","reed_nc"][draft.type],gpio:editor.gpio,address:0,debounce_ms:draft.debounce};
+ if(!clear)items[draft.channel]={channel:draft.channel,type:connectionTypes[draft.type],gpio:editor.gpio,address:0,debounce_ms:draft.debounce};
  const data={action:clear?"connection_pin_clear":"connection_pin_set",gpio:editor.gpio,revision:editor.base.revision};
  if(!clear)Object.assign(data,draft);
  editor.pending=true;editor.message="";editor.problem=false;renderPinEditor();
@@ -748,7 +762,7 @@ async function request(path,options){
   const body=await response.text();return {response,body};
  }finally{clearTimeout(timer);}
 }
-function errorText(code){return ({wifi_profile_changed:"Сохранённая сеть изменилась. Выберите её снова.",stale_revision:"Назначения изменились. Перечитайте их перед сохранением.",invalid_pin_fields:"Проверьте поля назначения пина.",invalid_pin_assignment:"Этот датчик нельзя назначить на выбранный пин.",configuration_unavailable:"Назначения временно недоступны. Перечитайте их.",configuration_write_failed:"Сохранение не подтверждено. Перечитайте назначения.",same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера",update_busy:"Дождитесь завершения обновления панели",update_unavailable:"Обновление пока недоступно",update_state_unavailable:"Состояние обновления временно недоступно. Повторите запрос.",update_confirmation_required:"Подтвердите выбранную версию ещё раз",update_version_changed:"Доступная версия изменилась. Проверьте сведения и подтвердите нужную версию.",update_not_ready:"Обновление не принято. Проверьте состояние панели.",update_cancel_unavailable:"На этом этапе отмена уже недоступна"})[code]||code;}
+function errorText(code){return ({wifi_profile_changed:"Сохранённая сеть изменилась. Выберите её снова.",stale_revision:"Назначения изменились. Перечитайте их перед сохранением.",invalid_pin_fields:"Проверьте поля назначения пина.",invalid_pin_assignment:"Это назначение недоступно для выбранного пина.",configuration_unavailable:"Назначения временно недоступны. Перечитайте их.",configuration_write_failed:"Сохранение не подтверждено. Перечитайте назначения.",same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера",update_busy:"Дождитесь завершения обновления панели",update_unavailable:"Обновление пока недоступно",update_state_unavailable:"Состояние обновления временно недоступно. Повторите запрос.",update_confirmation_required:"Подтвердите выбранную версию ещё раз",update_version_changed:"Доступная версия изменилась. Проверьте сведения и подтвердите нужную версию.",update_not_ready:"Обновление не принято. Проверьте состояние панели.",update_cancel_unavailable:"На этом этапе отмена уже недоступна"})[code]||code;}
 function updateCanister(f){
  let state="unknown",title="Нет данных",height=0,symbol="?";
  if(f?.lower?.valid&&f?.upper?.valid){
@@ -830,9 +844,12 @@ function updateView(){
     for(const item of (Array.isArray(cfg.items)?cfg.items:[])){
       if(!item||typeof item!=="object")continue;
       const row=document.createElement("div");row.className="row";
-      const title=document.createElement("span");title.textContent=inputNames[item.channel]||"Канал";
+      const title=document.createElement("span");title.textContent=channelNames[item.channel]||"Канал";
       const detail=document.createElement("span");
-      detail.textContent=(item.type||"none")+" · "+
+      if(isRelayChannel(item.channel)){
+        detail.textContent=!serverOnline||!pinSnapshot?.valid||pinSnapshot.conflict?"Нет данных":item.type==="relay"&&item.gpio>=0?"Назначение сохранено · GPIO "+item.gpio+" / JP1-"+item.jp1_pin:
+          item.type==="none"?"Не назначено":"Нет данных";
+      }else detail.textContent=(item.type||"none")+" · "+
         (item.gpio>=0?"GPIO "+item.gpio+" / JP1-"+(item.jp1_pin||"?"):"удалённый вход")+
         (item.active?(item.online?" · показания получены":" · ожидание датчика"):" · неактивно")+
         (item.rom?" · ROM "+item.rom:"")+
@@ -856,8 +873,9 @@ function updateView(){
    const wifiAction=b.dataset.action&&b.dataset.action.startsWith("wifi_");
    const bleAction=b.dataset.action==="ble_scan";
    const needsTouch=b.dataset.action==="screen"&&numeric($("screen-select").value)>0;
+   const relayEdit=["connection_set","connection_reset"].includes(b.dataset.action)&&isRelayChannel(Number($("cfg-channel").value));
    b.disabled=!serverOnline || !d.authorized || !!d.update?.busy || !!d.update?.boot_pending || !!pendingUpdate || updateRequestInFlight || (wifi.busy&&(wifiAction||bleAction||b.dataset.action==="zone"||b.dataset.action==="clock"||b.dataset.action==="screen"))
-     || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction)
+     || (relayEdit&&!pinSnapshot?.editable) || (needsTouch&&!screen.touch_ready) || (!wifi.supported&&wifiAction) || (!ble.supported&&bleAction)
      || (b.dataset.action==="sd_format_prepare" && (!!sd.format_attempted || formatActive));
  }
  renderAP();renderBLE();renderEquipment();renderHA();updateCanister(d.fuel);
@@ -1070,6 +1088,9 @@ function handleAction(b){
  if(action==="zone"){command("zone",{value:$("zone-select").value});return}
  if(action==="clock"){command("clock",{value:$("manual-clock").value.trim()});return}
  if(action==="screen"){command("screen",{value:$("screen-select").value});return}
+ if((action==="connection_set"||action==="connection_reset")&&isRelayChannel(Number($("cfg-channel").value))&&!pinSnapshot?.editable){
+   notice("Для назначения реле нужен полный снимок конфигурации панели.",true);return;
+ }
  if(action==="connection_set"){
    command("connection_set",{
      channel:$("cfg-channel").value,type:$("cfg-type").value,
@@ -1078,7 +1099,7 @@ function handleAction(b){
    });return;
  }
  if(action==="connection_rollback"){
-   if(confirm("Восстановить предыдущую сохранённую конфигурацию датчиков?"))
+   if(confirm("Восстановить предыдущие сохранённые назначения GPIO?"))
      command("connection_rollback");
    return;
  }
@@ -1118,15 +1139,29 @@ $("pin-reload").addEventListener("click",reloadPinEditor);
 $("pin-dialog").addEventListener("cancel",e=>{e.preventDefault();closePinEditor();});
 $("ha-form").addEventListener("input",()=>{haDirty=true;});
 $("ha-form").addEventListener("submit",saveHA);
-$("cfg-type").addEventListener("change",e=>{
- const t=Number(e.target.value);
+function updateConfigFields(){
+ const t=Number($("cfg-type").value);
  $("cfg-gpio").disabled=t===0||t===4||t===5;
  if($("cfg-gpio").disabled)$("cfg-gpio").value="-1";
  $("cfg-address").disabled=t!==4;
  $("cfg-address").value=t===4?"1":"0";
  $("cfg-debounce").disabled=t!==2&&t!==3;
  $("cfg-debounce").value="50";
-});
+}
+function updateConfigTypes(){
+ const channel=Number($("cfg-channel").value),select=$("cfg-type");
+ for(const option of select.options){
+   const type=connectionTypes[Number(option.value)];
+   const remote=type==="modbus"||type==="mqtt";
+   option.disabled=type!=="none"&&!matchesPinRole(channel,type)&&!(remote&&!isRelayChannel(channel));
+ }
+ if(isRelayChannel(channel))select.value="6";
+ else if(select.selectedOptions[0]?.disabled)select.value="0";
+ updateConfigFields();
+}
+$("cfg-channel").addEventListener("change",()=>{updateConfigTypes();updateView();});
+$("cfg-type").addEventListener("change",updateConfigFields);
+updateConfigTypes();
 $("wifi-profile").addEventListener("change",renderAP);
 $("wifi-edit-password").addEventListener("click",()=>{
  const n=selectedProfile();if(!wifiReady()||!n||n.open)return;

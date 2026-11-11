@@ -45,12 +45,12 @@ def empty_item(channel):
 def local_item(channel, kind, gpio, debounce=50):
     return {"channel": channel, "type": kind, "gpio": gpio, "jp1_pin": pins[gpio],
             "address": 0, "debounce_ms": debounce, "active": False, "online": False,
-            "status": "Sensor not found"}
+            "status": "Assigned" if kind == "relay" else "Sensor not found"}
 
 
 def empty_connections(revision):
     return {"available": True, "revision": revision, "drivers_active": False,
-            "items": [empty_item(channel) for channel in range(8)]}
+            "items": [empty_item(channel) for channel in range(10)]}
 
 
 fixture = {
@@ -222,10 +222,13 @@ class Handler(BaseHTTPRequestHandler):
                 items[channel] = empty_item(channel)
         if action == "connection_pin_set":
             channel, kind, debounce = (int(data[key]) for key in ("channel", "type", "debounce"))
-            if not (0 <= channel <= 7 and 0 <= debounce <= 5000 and
-                    ((channel in (0, 1, 2, 3, 6, 7) and kind == 1 and debounce == 50) or (channel in (4, 5) and kind in (2, 3)))):
+            thermometer = channel in (0, 1, 2, 3, 6, 7) and kind == 1 and debounce == 50
+            reed = channel in (4, 5) and kind in (2, 3) and 0 <= debounce <= 5000
+            relay = channel in (8, 9) and kind == 6 and debounce == 50
+            if not (thermometer or reed or relay):
                 return 400, {"error": "invalid_pin_assignment"}
-            items[channel] = local_item(channel, {1: "ds18b20", 2: "reed_no", 3: "reed_nc"}[kind], gpio, debounce)
+            kind_name = {1: "ds18b20", 2: "reed_no", 3: "reed_nc", 6: "relay"}[kind]
+            items[channel] = local_item(channel, kind_name, gpio, debounce)
         fields = ("type", "gpio", "address", "debounce_ms")
         changed = any(a[key] != b[key] for a, b in zip(items, fixture["connections"]["items"]) for key in fields)
         if changed:
@@ -502,6 +505,65 @@ try:
                    posted_commands=count_commands() - start_count, explicit_no_nc=True,
                    draft_and_focus_preserved=True, geometry=metrics)
 
+        # Existing sensor bindings must survive assigning two separate relay outputs.
+        with guard:
+            inputs = deepcopy(fixture["connections"]["items"][:8])
+        relay_names = {8: "Реле ТЭНов электрокотла", 9: "Реле бойлера"}
+        for width in (320, 1280):
+            page.set_viewport_size({"width": width, "height": 900})
+            for owner, gpio in ((8, 31), (9, 32)):
+                pin(gpio).focus()
+                page.keyboard.press("Enter")
+                expect(dialog).to_have_js_property("open", True)
+                for role, name in relay_names.items():
+                    expect(channel.locator(f'option[value="{role}"]')).to_have_text(name)
+                channel.select_option(str(owner))
+                expect(page.locator("#pin-temperature")).to_be_hidden()
+                expect(page.locator("#pin-reed")).to_be_hidden()
+                expect(page.locator("#pin-debounce")).to_be_disabled()
+                expect_pin(gpio, "free")
+                saved_revision = revision()
+                click_save()
+                last_command({"action": "connection_pin_set", "gpio": gpio, "channel": owner,
+                              "type": 6, "debounce": 50, "revision": saved_revision})
+                expect_pin(gpio, "busy", "Занят · " + relay_names[owner])
+                close_pin(gpio)
+
+            open_pin(31)
+            expect(channel).to_have_value("8")
+            expect(page.locator("#pin-current")).to_contain_text(relay_names[8])
+            if width == 1280:
+                dialog.screenshot(path=str(out / "jp1-relay-assignment.png"))
+            close_pin(31)
+            if width == 1280:
+                page.locator("#jp1-map").screenshot(path=str(out / "jp1-relay-map.png"))
+
+            # Move the electric relay onto the boiler relay's pin. Only the
+            # chosen owner survives; the old pin is released in the same write.
+            open_pin(32)
+            expect(channel).to_have_value("9")
+            channel.select_option("8")
+            expect(page.locator("#pin-impact")).to_contain_text(relay_names[9])
+            expect(page.locator("#pin-impact")).to_contain_text("с GPIO31 на GPIO32")
+            saved_revision = revision()
+            click_save()
+            last_command({"action": "connection_pin_set", "gpio": 32, "channel": 8,
+                          "type": 6, "debounce": 50, "revision": saved_revision})
+            expect_pin(31, "free")
+            expect_pin(32, "busy", "Занят · " + relay_names[8])
+            with guard:
+                assert fixture["connections"]["items"][9] == empty_item(9)
+            page.once("dialog", lambda prompt: prompt.accept())
+            saved_revision = revision()
+            clear.click()
+            expect(status).to_contain_text("Пин освобождён")
+            last_command({"action": "connection_pin_clear", "gpio": 32, "revision": saved_revision})
+            expect_pin(32, "free")
+            close_pin(32)
+            with guard:
+                assert fixture["connections"]["items"][:8] == inputs
+            record("independent-relay-output-roles", width=width, existing_inputs_preserved=True)
+
         # Failure/race scenarios use a saved local owner and complete snapshots.
         with guard:
             fixture["connections"] = empty_connections(20000)
@@ -661,7 +723,7 @@ try:
         with guard:
             state["next_mode"] = "invalid"
         save.click()
-        expect(status).to_contain_text("Этот датчик нельзя назначить")
+        expect(status).to_contain_text("Это назначение недоступно")
         expect(channel).to_have_value("2")
         expect_pin(52, "busy", "Занят · В доме")
         assert count_commands() == before + 1
@@ -816,6 +878,8 @@ try:
         assert not result["external_requests"], result["external_requests"]
         with guard:
             assert len(result["client_command_requests"]) == len(state["commands"])
+            assert all(entry["data"]["action"] in ("connection_pin_set", "connection_pin_clear")
+                       for entry in state["commands"]), "Configuring a pin sent a non-assignment command"
         result["result"] = "PASS"
         browser.close()
 except BaseException as error:

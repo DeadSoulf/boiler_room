@@ -2,7 +2,8 @@
 // JC4880P443C-I-W, JP1 external 2x13 header, manufacturer pin definitions.
 // Source: b5463/kino-d4 docs/HARDWARE.md (measured pin 7 and pin 13),
 // cross-checked with ultramcu/guition-jc4880p443c-i-w schematic sheet 03.
-// No GPIO outside this list may be assigned to local sensors.
+// These routed ESP32-P4 GPIOs are input/output capable (ESP-IDF soc_caps.h).
+// Other pins are unavailable for both sensor and relay assignments.
 #include <stdint.h>
 
 namespace panel_pins {

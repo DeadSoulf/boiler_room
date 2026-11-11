@@ -279,7 +279,7 @@ void publish(const panel::Measurement (&temps)[panel::CHANNELS],const panel::Fue
   if(!readings)return;
   Telemetry t;t.received=true;t.captured=now;
   // Propagate sticky model expiration, not historical sample validity.
-  for(unsigned channel=0;channel<panel_config::COUNT;channel++){
+  for(unsigned channel=0;channel<panel_config::INPUT_COUNT;channel++){
     const int index=panel_config::temperatureIndex(channel);
     if(index<0)continue;
     const auto& measurement=temps[index];

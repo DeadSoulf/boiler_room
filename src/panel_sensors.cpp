@@ -26,7 +26,7 @@ struct Driver {
   uint32_t rawChangedAt=0;
   bool raw=false,debounced=false,haveRaw=false,haveStable=false;
 };
-Driver driver[panel_config::COUNT];
+Driver driver[panel_config::INPUT_COUNT];
 // All temperature sensor pins share one RMT TX/RX pair. Keep the same bus from the
 // conversion request to its completion poll, then advance to the next due pin.
 std::optional<OneWire32> wire;
@@ -95,14 +95,14 @@ void destroy(unsigned i){
 void reconfigure(const panel_config::State& config){
   releaseWire();
   probe=0;
-  for(unsigned i=0;i<panel_config::COUNT;i++)destroy(i);
+  for(unsigned i=0;i<panel_config::INPUT_COUNT;i++)destroy(i);
   if(samples)xQueueReset(samples);
   if(guard&&xSemaphoreTake(guard,pdMS_TO_TICKS(30))==pdTRUE){
     state=Snapshot{};state.started=true;state.configRevision=config.revision;
     xSemaphoreGive(guard);
   }
   activeRevision=config.revision;
-  for(unsigned i=0;i<panel_config::COUNT;i++){
+  for(unsigned i=0;i<panel_config::INPUT_COUNT;i++){
     const auto a=config.item[i];
     if(!panel_config::isValid(static_cast<panel_config::Channel>(i),a)){
       status(i,"Invalid GPIO assignment ignored",false);continue;
@@ -208,11 +208,11 @@ void pollThermometers(uint32_t now){
     if(!due(now,driver[probe].due))return;
     finishConversion(probe);
     releaseWire();
-    probe=(probe+1)%panel_config::COUNT;
+    probe=(probe+1)%panel_config::INPUT_COUNT;
     return;
   }
-  for(unsigned offset=0;offset<panel_config::COUNT;offset++){
-    const unsigned i=(probe+offset)%panel_config::COUNT;
+  for(unsigned offset=0;offset<panel_config::INPUT_COUNT;offset++){
+    const unsigned i=(probe+offset)%panel_config::INPUT_COUNT;
     Driver& d=driver[i];
     if(d.setting.type!=panel_config::Type::DS18B20 || !due(now,d.due))continue;
     probe=i;
@@ -220,25 +220,25 @@ void pollThermometers(uint32_t now){
     if(!startConversion(i)){
       d.due=millis()+RETRY_MS;
       releaseWire();
-      probe=(i+1)%panel_config::COUNT;
+      probe=(i+1)%panel_config::INPUT_COUNT;
     }
     return;
+  }
+}
+void pollInputs(const panel_config::State& config){
+  if(config.revision!=activeRevision)reconfigure(config);
+  pollThermometers(millis());
+  const uint32_t now=millis();
+  for(unsigned i=0;i<panel_config::INPUT_COUNT;i++){
+    const auto type=driver[i].setting.type;
+    if(type==panel_config::Type::ReedNO||
+       type==panel_config::Type::ReedNC)reed(i,now);
   }
 }
 void worker(void*){
   vTaskDelay(pdMS_TO_TICKS(1800));
   for(;;){
-    panel_config::State config;
-    if(panel_config::snapshot(config)){
-      if(config.revision!=activeRevision)reconfigure(config);
-      pollThermometers(millis());
-      const uint32_t now=millis();
-      for(unsigned i=0;i<panel_config::COUNT;i++){
-        const auto type=driver[i].setting.type;
-        if(type==panel_config::Type::ReedNO||
-           type==panel_config::Type::ReedNC)reed(i,now);
-      }
-    }
+    panel_config::withSensorAssignments(pollInputs);
     vTaskDelay(pdMS_TO_TICKS(45));
   }
 }

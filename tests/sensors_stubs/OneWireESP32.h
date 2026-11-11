@@ -10,10 +10,10 @@ struct OneWire32 {
   inline static unsigned failWrite=0;
   inline static uint8_t completion=1,tempError=0;
   inline static float scratchpad=85.0f;
-  inline static unsigned live=0;
+  inline static unsigned live=0, opens[55]={};
   inline static int missingPin=-1;
   const uint8_t pin;
-  explicit OneWire32(uint8_t gpio):pin(gpio){assert(live==0);++live;}
+  explicit OneWire32(uint8_t gpio):pin(gpio){assert(live==0);++live;++opens[gpio];}
   ~OneWire32(){assert(live==1);--live;}
   uint8_t search(uint64_t* devices,uint8_t){if(pin==missingPin)return 0;devices[0]=rom;return 1;}
   bool reset(){writes=0;return resetOk;}

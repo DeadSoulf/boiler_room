@@ -1,11 +1,11 @@
 #pragma once
 #include <stdint.h>
-// Persistent channel bindings. Real sensor inputs are restricted to
-// externally routed, validated JP1 GPIOs. Never controls actuator outputs.
+// JP1 assignments for sensor inputs and reserved relay outputs. Saving a binding does not actuate a relay.
 namespace panel_config {
-enum class Type:uint8_t { None=0,DS18B20=1,ReedNO=2,ReedNC=3,RemoteModbus=4,RemoteMQTT=5 };
-enum class Channel:uint8_t { Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5,CoolantReturn=6,FuelOutlet=7 };
-constexpr unsigned COUNT=8;
+enum class Type:uint8_t { None=0,DS18B20=1,ReedNO=2,ReedNC=3,RemoteModbus=4,RemoteMQTT=5,Relay=6 };
+enum class Channel:uint8_t { Room=0,Outside=1,Coolant=2,FuelTemp=3,FuelLower=4,FuelUpper=5,CoolantReturn=6,FuelOutlet=7,ElectricRelay=8,DhwRelay=9 };
+constexpr unsigned INPUT_COUNT=unsigned(Channel::ElectricRelay);
+constexpr unsigned COUNT=unsigned(Channel::DhwRelay)+1;
 // Temperature samples are consecutive in the UI; persisted reed slots keep IDs 4/5.
 constexpr int temperatureIndex(unsigned channel) {
   if(channel<=unsigned(Channel::FuelTemp))return int(channel);
@@ -30,6 +30,8 @@ struct State {
 };
 bool begin();
 bool snapshot(State& out);
+// A sensor I/O pass and a configuration commit cannot overlap.
+void withSensorAssignments(void (*sample)(const State&));
 bool set(Channel channel,Type type,int16_t gpio,uint8_t address,uint16_t debounceMs);
 bool reset(Channel channel);
 bool rollback();

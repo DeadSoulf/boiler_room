@@ -44,7 +44,7 @@ struct Input {
   uint32_t updated=0;
 };
 struct Telemetry {
-  Input input[panel_config::COUNT];
+  Input input[panel_config::INPUT_COUNT];
   uint32_t captured=0;
   bool received=false;
 };
@@ -55,7 +55,7 @@ struct Diagnostics {
   bool wifi=false,sdKnown=false,sdMounted=false;
 };
 inline bool fresh(const Telemetry& t,unsigned i,uint32_t now){
-  return i<panel_config::COUNT&&t.received&&uint32_t(now-t.captured)<SOURCE_TTL_MS&&t.input[i].valid&&
+  return i<panel_config::INPUT_COUNT&&t.received&&uint32_t(now-t.captured)<SOURCE_TTL_MS&&t.input[i].valid&&
     uint32_t(now-t.input[i].updated)<SAMPLE_TTL_MS&&
     (panel_config::temperatureIndex(i)<0||(isfinite(t.input[i].temperature)&&t.input[i].temperature>=-55&&t.input[i].temperature<=125));
 }
@@ -118,7 +118,7 @@ inline bool discovery(char* out,size_t cap,const char* id,const char* version,un
 }
 inline bool statePayload(char* out,size_t cap,const Telemetry& t,const Diagnostics& d,uint32_t now){
   Json j(out,cap);j.add("{");
-  for(unsigned i=0;i<panel_config::COUNT;i++){
+  for(unsigned i=0;i<panel_config::INPUT_COUNT;i++){
     const bool valid=fresh(t,i,now);
     if(i){j.add(",");}
     j.add("\"%s\":",ENTITIES[i].key);
