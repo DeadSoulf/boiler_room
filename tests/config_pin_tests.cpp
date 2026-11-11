@@ -25,12 +25,12 @@ void validationAndAvailability(){
     assert(setPin(52,Channel::Room,type,50,0,saved)==PinResult::Invalid);
   for(unsigned channel=0;channel<COUNT;channel++){
     const auto ch=static_cast<Channel>(channel);
-    if(channel<4){
+    if(channel<4||ch==Channel::CoolantReturn){
       for(const Type type:{Type::ReedNO,Type::ReedNC})
         assert(setPin(52,ch,type,50,0,saved)==PinResult::Invalid);
     }else assert(setPin(52,ch,Type::DS18B20,50,0,saved)==PinResult::Invalid);
   }
-  assert(setPin(52,static_cast<Channel>(6),Type::DS18B20,50,0,saved)==PinResult::Invalid);
+  assert(setPin(52,static_cast<Channel>(COUNT),Type::DS18B20,50,0,saved)==PinResult::Invalid);
   assert(setPin(52,static_cast<Channel>(255),Type::DS18B20,50,0,saved)==PinResult::Invalid);
   for(const unsigned debounce:{0U,49U,51U,5000U})
     assert(setPin(52,Channel::Room,Type::DS18B20,debounce,0,saved)==PinResult::Invalid);
@@ -136,7 +136,7 @@ void persistentFaultBoundaryAndWrap(){
   // Failed restoration leaves a newer candidate in NVS; it cannot become a rollback.
   assert(!rollback());unchanged(y);
   config_host::resetFaults();reboot();
-  // Deliberately document the schema-1 limit: after permanent cleanup failure,
+  // Deliberately document the dual-slot recovery limit: after permanent cleanup failure,
   // reboot can select that candidate. This is not a durable commit protocol.
   assert(state().revision==3&&state().item[2].gpio==28);
   fresh();current.revision=std::numeric_limits<uint32_t>::max()-2;
@@ -154,8 +154,43 @@ void persistentFaultBoundaryAndWrap(){
   assert(!rollback());unchanged(before);
 }
 
+void migrateLegacySlots(){
+  // Exact schema-1 layout: six 8-byte assignments, then a 32-bit FNV checksum.
+  auto legacy=[](uint32_t revision){
+    uint8_t raw[]={
+      0x36,0x43,0x50,0x42,1,0,0,0,0,0,0,0,
+      1,0,52,0,0,0,50,0, 0,0,255,255,0,0,50,0,
+      1,0,51,0,0,0,50,0, 5,0,255,255,0,0,50,0,
+      3,0,29,0,0,0,75,0, 2,0,30,0,0,0,80,0, 0,0,0,0
+    };
+    static_assert(sizeof(raw)==64,"legacy ESP32 config size");
+    memcpy(raw+8,&revision,4);
+    const uint32_t hash=fnv(raw,60);
+    memcpy(raw+60,&hash,4);
+    return std::vector<uint8_t>(raw,raw+sizeof(raw));
+  };
+  fresh();config_host::nvs["bp_cfg_a"]=legacy(7);config_host::nvs["bp_cfg_b"]=legacy(6);
+  const auto originals=config_host::nvs;reboot();const auto before=state();
+  assert(before.revision==7&&before.item[0].gpio==52&&before.item[2].gpio==51);
+  assert(before.item[3].type==Type::RemoteMQTT&&before.item[1].type==Type::None);
+  assert(before.item[4].type==Type::ReedNC&&before.item[4].gpio==29&&before.item[4].debounceMs==75);
+  assert(before.item[5].type==Type::ReedNO&&before.item[5].gpio==30&&before.item[5].debounceMs==80);
+  assert(before.item[6].type==Type::None&&before.item[6].gpio==-1&&config_host::nvs==originals);
+  config_host::afterWrite=[](){config_host::failRead=true;};
+  uint32_t saved=0;
+  assert(setPin(28,Channel::CoolantReturn,Type::DS18B20,50,7,saved)==PinResult::StorageError);
+  assert(config_host::nvs==originals);reboot();unchanged(before);
+  assert(setPin(28,Channel::CoolantReturn,Type::DS18B20,50,7,saved)==PinResult::Saved&&saved==8);
+  reboot();assert(state().revision==8&&state().item[2].gpio==51&&state().item[6].gpio==28);
+  assert(rollback());reboot();assert(state().revision==9&&sameBindings(state(),before));
+  config_host::nvs=originals;config_host::nvs["bp_cfg_a"][27]^=0x80;
+  reboot();assert(state().revision==6&&sameBindings(state(),before));
+  static_assert(temperatureIndex(2)==2&&temperatureIndex(6)==4&&temperatureIndex(4)==-1&&temperatureIndex(5)==-1,
+                "supply, return and float switches have distinct destinations");
+}
+
 int main(){
-  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();
+  validationAndAvailability();atomicOwnersAndRevision();storageRecovery();persistentFaultBoundaryAndWrap();migrateLegacySlots();
   powerOff();
   puts("PASS: real config/NVS 11-pin validation, atomic owner replacement/move, remote replacement, clear/no-op, mutex revision race, write/read-back recovery, repeated rollback, transient-fault reboot and revision wrap; persistent cleanup failure boundary demonstrated");
 }

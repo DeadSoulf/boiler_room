@@ -279,7 +279,14 @@ void publish(const panel::Measurement (&temps)[panel::CHANNELS],const panel::Fue
   if(!readings)return;
   Telemetry t;t.received=true;t.captured=now;
   // Propagate sticky model expiration, not historical sample validity.
-  for(unsigned i=0;i<4;i++){t.input[i].valid=temps[i].fresh(now);t.input[i].temperature=temps[i].value;t.input[i].updated=temps[i].updated;}
+  for(unsigned channel=0;channel<panel_config::COUNT;channel++){
+    const int index=panel_config::temperatureIndex(channel);
+    if(index<0)continue;
+    const auto& measurement=temps[index];
+    t.input[channel].valid=measurement.fresh(now);
+    t.input[channel].temperature=measurement.value;
+    t.input[channel].updated=measurement.updated;
+  }
   t.input[4].valid=fuel.lower.fresh(now);t.input[4].reached=fuel.lower.reached;t.input[4].updated=fuel.lower.updated;
   t.input[5].valid=fuel.upper.fresh(now);t.input[5].reached=fuel.upper.reached;t.input[5].updated=fuel.upper.updated;
   xQueueOverwrite(readings,&t);

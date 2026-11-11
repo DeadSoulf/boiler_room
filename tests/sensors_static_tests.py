@@ -23,9 +23,9 @@ assert "if(h!=entry.hash || !checked(entry.item))return false;" in config
 assert "bp_cfg_a" in config and "bp_cfg_b" in config
 assert "bool rollback()" in config
 assert "OneWire32" in sensors
-assert "d.bus->search(devices,2)" in sensors
+assert "wire->search(devices,2)" in sensors
 assert "crc8(rom,7)!=rom[7]" in sensors
-assert "d.bus->getTemp(d.rom,c)" in sensors
+assert "wire->getTemp(d.rom,c)" in sensors
 assert "CONVERSION_MS=850" in sensors
 assert "gpio_set_level" not in sensors and "digitalWrite(" not in sensors
 assert "pinMode(a.gpio,INPUT_PULLUP)" in sensors
@@ -36,7 +36,8 @@ assert "xQueueSend(samples,&e,0)" in sensors
 assert "if(config.revision!=activeRevision)reconfigure(config)" in sensors
 assert "panel_sensors::poll(sensorEvent)" in main
 assert "fuelLevel.lower.put(" in main and "fuelLevel.upper.put(" in main
-assert "measurements[sensorEvent.channel].put" in main
+assert "panel_config::temperatureIndex(sensorEvent.channel)" in main
+assert "measurements[temperatureChannel].put" in main
 assert "panel_storage::measurements(measurements,millis())" in main
 assert "panel_sensors::begin()" in main
 assert "panel_sensors::snapshot(sensors)" in web

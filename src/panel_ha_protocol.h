@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
+#include "panel_config.h"
 
 namespace panel_ha {
 constexpr uint32_t SAMPLE_TTL_MS=30000, SOURCE_TTL_MS=5000, PUBLISH_MS=5000;
@@ -43,7 +44,7 @@ struct Input {
   uint32_t updated=0;
 };
 struct Telemetry {
-  Input input[6];
+  Input input[panel_config::COUNT];
   uint32_t captured=0;
   bool received=false;
 };
@@ -54,18 +55,19 @@ struct Diagnostics {
   bool wifi=false,sdKnown=false,sdMounted=false;
 };
 inline bool fresh(const Telemetry& t,unsigned i,uint32_t now){
-  return i<6&&t.received&&uint32_t(now-t.captured)<SOURCE_TTL_MS&&t.input[i].valid&&
+  return i<panel_config::COUNT&&t.received&&uint32_t(now-t.captured)<SOURCE_TTL_MS&&t.input[i].valid&&
     uint32_t(now-t.input[i].updated)<SAMPLE_TTL_MS&&
-    (i>=4||(isfinite(t.input[i].temperature)&&t.input[i].temperature>=-55&&t.input[i].temperature<=125));
+    (panel_config::temperatureIndex(i)<0||(isfinite(t.input[i].temperature)&&t.input[i].temperature>=-55&&t.input[i].temperature<=125));
 }
 struct Entity {const char* key;const char* name;const char* kind;const char* deviceClass;const char* unit;bool diagnostic;};
 constexpr Entity ENTITIES[]={
   {"room","Температура в доме","sensor","temperature","°C",false},
   {"outside","Температура на улице","sensor","temperature","°C",false},
-  {"coolant","Температура теплоносителя","sensor","temperature","°C",false},
+  {"coolant","Теплоноситель: подача","sensor","temperature","°C",false},
   {"fuel_temp","Температура топлива","sensor","temperature","°C",false},
   {"fuel_lower","Нижний уровень топлива достигнут","binary_sensor","","",false},
   {"fuel_upper","Верхний уровень топлива достигнут","binary_sensor","","",false},
+  {"coolant_return","Теплоноситель: обратка","sensor","temperature","°C",false},
   {"fuel_level","Уровень топлива","sensor","","",false},
   {"wifi_rssi","Сигнал Wi-Fi","sensor","signal_strength","dBm",true},
   {"uptime","Время работы","sensor","duration","s",true},
@@ -115,12 +117,12 @@ inline bool discovery(char* out,size_t cap,const char* id,const char* version,un
 }
 inline bool statePayload(char* out,size_t cap,const Telemetry& t,const Diagnostics& d,uint32_t now){
   Json j(out,cap);j.add("{");
-  for(unsigned i=0;i<6;i++){
+  for(unsigned i=0;i<panel_config::COUNT;i++){
     const bool valid=fresh(t,i,now);
     if(i){j.add(",");}
     j.add("\"%s\":",ENTITIES[i].key);
     if(!valid)j.add("null");
-    else if(i<4)j.add("%.2f",double(t.input[i].temperature));
+    else if(panel_config::temperatureIndex(i)>=0)j.add("%.2f",double(t.input[i].temperature));
     else j.quote(t.input[i].reached?"ON":"OFF");
     j.add(",\"%s_valid\":%s",ENTITIES[i].key,valid?"true":"false");
   }

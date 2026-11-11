@@ -45,6 +45,16 @@ int main(){
  fuel.clear();fuel.upper.put(true,2000);publish(temps,fuel,2000+STALE_MS);
  fuel.lower.put(true,2001);publish(temps,fuel,2001);
  assert(latest.lowerValid&&!latest.upperValid&&latest.fuelStatus==uint8_t(FuelLevelStatus::Stale));
+ // Historical indices remain stable; missing or stale return affects only return.
+ static_assert(CHANNELS==5);
+ temps[2].put(63.5f,60000);temps[3].put(28.0f,60000);
+ publish(temps,fuel,60000);
+ assert(latest.temp[2].value==63.5f&&latest.temp[3].value==28.0f&&!latest.temp[4].ever);
+ temps[4].put(49.0f,60000);temps[4].put(50.0f,61000);
+ temps[2].put(65.0f,62000);publish(temps,fuel,62000);
+ assert(latest.temp[2].count==2&&latest.temp[2].history[0]==63.5f);
+ assert(latest.temp[4].count==2&&latest.temp[4].history[0]==49.0f&&latest.temp[4].maximum==50.0f);
+ publish(temps,fuel,61000+STALE_MS);assert(latest.temp[2].valid&&!latest.temp[4].valid);
  puts("PASS: actual web telemetry, fresh/stale/missing, exact expiry, full-wrap persistence and recovery");
 }
 '''.replace("SHARED_SOURCE", shared).replace("PUBLISH_SOURCE", publish)

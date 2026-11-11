@@ -5,7 +5,6 @@
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 #include <new>
-#include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -22,14 +21,17 @@ QueueHandle_t samples=nullptr;
 TaskHandle_t task=nullptr;
 struct Driver {
   panel_config::Assignment setting;
-  OneWire32* bus=nullptr;
   uint64_t rom=0;
   uint32_t due=0;
   uint32_t rawChangedAt=0;
-  bool converting=false;
   bool raw=false,debounced=false,haveRaw=false,haveStable=false;
 };
 Driver driver[panel_config::COUNT];
+// Five sensor pins share one RMT TX/RX pair. Keep the same bus from the
+// conversion request to its completion poll, then advance to the next due pin.
+alignas(OneWire32) uint8_t wireStorage[sizeof(OneWire32)];
+OneWire32* wire=nullptr;
+unsigned probe=0;
 uint32_t activeRevision=0xffffffffU;
 uint8_t crc8(const uint8_t* data,unsigned len){
   uint8_t crc=0;
@@ -80,14 +82,21 @@ void publish(unsigned i,uint32_t when,float temperature,bool reached){
 bool due(uint32_t now,uint32_t target){
   return int32_t(now-target)>=0;
 }
+void releaseWire(){
+  if(!wire)return;
+  wire->~OneWire32();
+  wire=nullptr;
+  pinMode(driver[probe].setting.gpio,INPUT);
+}
 void destroy(unsigned i){
   Driver& d=driver[i];
-  if(d.bus){d.bus->~OneWire32();free(d.bus);d.bus=nullptr;}
   if(panel_config::isLocal(d.setting.type) &&
      panel_pins::sensorPin(d.setting.gpio))pinMode(d.setting.gpio,INPUT);
   d=Driver{};
 }
 void reconfigure(const panel_config::State& config){
+  releaseWire();
+  probe=0;
   for(unsigned i=0;i<panel_config::COUNT;i++)destroy(i);
   if(samples)xQueueReset(samples);
   if(guard&&xSemaphoreTake(guard,pdMS_TO_TICKS(30))==pdTRUE){
@@ -117,11 +126,8 @@ void reconfigure(const panel_config::State& config){
       fail(i,"GPIO is not routed to verified JP1");continue;
     }
     if(a.type==panel_config::Type::DS18B20){
-      void* memory=calloc(1,sizeof(OneWire32));
-      if(!memory){fail(i,"OneWire memory allocation failed");continue;}
-      driver[i].bus=new(memory) OneWire32(uint8_t(a.gpio));
       driver[i].due=millis()+1000U;
-      status(i,"OneWire RMT started; awaiting sensor",false);
+      status(i,"Awaiting OneWire sample",false);
     }else{
       pinMode(a.gpio,INPUT_PULLUP);
       driver[i].haveRaw=false;
@@ -152,66 +158,77 @@ void setRom(unsigned i,uint64_t rom){
            "%016llX",(unsigned long long)rom);
   xSemaphoreGive(guard);
 }
-void thermometer(unsigned i,uint32_t now){
+bool startConversion(unsigned i){
   Driver& d=driver[i];
-  if(!d.bus){
-    if(due(now,d.due)){
-      fail(i,"RMT bus not available");
-      d.due=now+RETRY_MS;
-    }
-    return;
-  }
-  if(!due(now,d.due))return;
-  if(d.converting){
-    // A CRC-correct scratchpad alone can still contain the previous conversion.
-    // Poll before getTemp(), whose reset ends the conversion-poll transaction.
-    uint8_t complete=0;
-    if(!d.bus->read(complete,1) || complete!=1){
-      d.converting=false;
-      d.due=millis()+RETRY_MS;
-      fail(i,"DS18B20 conversion not confirmed");
-      return;
-    }
-    float c=NAN;
-    const uint8_t err=d.bus->getTemp(d.rom,c);
-    d.converting=false;
-    d.due=millis()+PERIOD_MS;
-    if(err==0 && isfinite(c)&&c>=-55.0f&&c<=125.0f){
-      const uint32_t sampled=millis();
-      publish(i,sampled,c,false);
-      success(i,"DS18B20 temperature CRC verified",sampled);
-    }else{
-      fail(i,err==1?"DS18B20 scratchpad CRC failure":
-               err==3?"DS18B20 no response":
-               err==4?"RMT driver not ready":"DS18B20 invalid conversion");
-    }
-    return;
-  }
   uint64_t devices[2]={};
-  const uint8_t count=d.bus->search(devices,2);
+  const uint8_t count=wire->search(devices,2);
   if(count!=1){
     fail(i,count?"More than one sensor: assign individual GPIO":
                  "DS18B20 not found; check 4.7 kOhm to 3V3",count);
-    d.due=millis()+RETRY_MS;return;
+    return false;
   }
   uint8_t rom[8];
   for(unsigned n=0;n<8;n++)rom[n]=uint8_t(devices[0]>>(n*8));
   if(rom[0]!=0x28||crc8(rom,7)!=rom[7]){
     fail(i,"Unknown 1-Wire device or ROM CRC failure",count);
-    d.due=millis()+RETRY_MS;return;
+    return false;
   }
   d.rom=devices[0];
   setRom(i,d.rom);
-  // Pinned OneWire32::request() discards reset/write failures. Check every
-  // command instead. Search above guarantees one device and an initialized bus.
-  if(!d.bus->reset() || !d.bus->write(0xCC) || !d.bus->write(0x44)){
-    d.converting=false;
-    d.due=millis()+RETRY_MS;
+  // request() discards reset/write failures. Verify the complete transaction.
+  if(!wire->reset() || !wire->write(0xCC) || !wire->write(0x44)){
     fail(i,"DS18B20 conversion request failed");
+    return false;
+  }
+  d.due=millis()+CONVERSION_MS;
+  return true;
+}
+void finishConversion(unsigned i){
+  Driver& d=driver[i];
+  // A CRC-correct scratchpad can still contain the previous conversion.
+  uint8_t complete=0;
+  if(!wire->read(complete,1) || complete!=1){
+    d.due=millis()+RETRY_MS;
+    fail(i,"DS18B20 conversion not confirmed");
     return;
   }
-  d.converting=true;
-  d.due=millis()+CONVERSION_MS;
+  float c=NAN;
+  const uint8_t err=wire->getTemp(d.rom,c);
+  const uint32_t sampled=millis();
+  d.due=sampled+PERIOD_MS;
+  if(err==0 && isfinite(c)&&c>=-55.0f&&c<=125.0f){
+    publish(i,sampled,c,false);
+    success(i,"DS18B20 temperature CRC verified",sampled);
+  }else{
+    fail(i,err==1?"DS18B20 scratchpad CRC failure":
+           err==3?"DS18B20 no response":
+           err==4?"RMT driver not ready":"DS18B20 invalid conversion");
+  }
+}
+void pollThermometers(uint32_t now){
+  if(wire){
+    if(!due(now,driver[probe].due))return;
+    finishConversion(probe);
+    releaseWire();
+    probe=(probe+1)%panel_config::COUNT;
+    return;
+  }
+  for(unsigned offset=0;offset<panel_config::COUNT;offset++){
+    const unsigned i=(probe+offset)%panel_config::COUNT;
+    Driver& d=driver[i];
+    if(d.setting.type!=panel_config::Type::DS18B20 || !due(now,d.due))continue;
+    probe=i;
+    // The pinned driver may return early from its constructor. Zero its handles
+    // before construction so its destructor can release partial allocations.
+    memset(wireStorage,0,sizeof(wireStorage));
+    wire=new(wireStorage) OneWire32(uint8_t(d.setting.gpio));
+    if(!startConversion(i)){
+      d.due=millis()+RETRY_MS;
+      releaseWire();
+      probe=(i+1)%panel_config::COUNT;
+    }
+    return;
+  }
 }
 void worker(void*){
   vTaskDelay(pdMS_TO_TICKS(1800));
@@ -219,10 +236,10 @@ void worker(void*){
     panel_config::State config;
     if(panel_config::snapshot(config)){
       if(config.revision!=activeRevision)reconfigure(config);
+      pollThermometers(millis());
       const uint32_t now=millis();
       for(unsigned i=0;i<panel_config::COUNT;i++){
         const auto type=driver[i].setting.type;
-        if(type==panel_config::Type::DS18B20)thermometer(i,now);
         if(type==panel_config::Type::ReedNO||
            type==panel_config::Type::ReedNC)reed(i,now);
       }

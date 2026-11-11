@@ -51,7 +51,7 @@ inventory = [{"name": name, "connected": False, "state": "not_connected"} for na
 def empty_connections(revision=0):
     return {"available": True, "revision": revision, "drivers_active": False,
             "items": [{"channel": channel, "type": "none", "gpio": -1, "jp1_pin": 0,
-                       "active": False, "online": False} for channel in range(6)]}
+                       "active": False, "online": False} for channel in range(7)]}
 
 
 def local_assignment(channel, kind, gpio):
@@ -71,7 +71,7 @@ fixture = {
     "time": {"zone": 0, "zone_name": "UTC"},
     "service": {"free_heap": 180000, "first_frame_ms": 480, "display_ms": 320,
                 "lvgl_ms": 2, "touch_ms": 80},
-    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(4)],
+    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(5)],
     "fuel": {"lower": {"valid": False}, "upper": {"valid": False}},
     "fuel_level_text": "Нет данных", "equipment": deepcopy(inventory),
     "connections": empty_connections(),
@@ -246,7 +246,7 @@ try:
                 (out / f"home-font-{case}-{width}-metrics.json").write_text(
                     json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 page.screenshot(path=str(out / f"home-font-{case}-{width}.png"), full_page=True)
-                assert len(metrics) == 4
+                assert len(metrics) == 5
                 # Preserve the existing large sizes of the first three cards.
                 expected_font = {320: 28, 390: 28, 768: 42, 1280: 39.68}[width]
                 for item in metrics:
@@ -504,7 +504,7 @@ try:
                     fixture["equipment"] = deepcopy(inventory)
                     fixture["equipment"][1]["connected"] = connected
                     fixture["equipment"][2].update(name="Контур 1 · гостевая", connected=True)
-                    fixture["temperatures"] = [{"valid": False, "ever": False, "history": []} for _ in range(4)]
+                    fixture["temperatures"] = [{"valid": False, "ever": False, "history": []} for _ in range(5)]
                 for index in range(4):
                     expect(cards.nth(index)).to_have_js_property("open", False)
                 # Mouse opens the first card. Native Tab/Enter/Space open the others.
@@ -547,9 +547,9 @@ try:
                 expect(rows.nth(0).locator("span").nth(0)).to_have_text("Контур 1")
                 expect(rows.nth(0).locator("span").nth(1)).to_have_text("Нет данных")
                 page.click('.topnav [data-page="home"]')
-                home_temperatures(width, "no-data", [None] * 4)
-                for case, values in (("negative", [-55.0] * 4), ("three-digit", [125.0] * 4),
-                                     ("mixed", [-55.0, 0.0, 125.0, 34.8])):
+                home_temperatures(width, "no-data", [None] * 5)
+                for case, values in (("negative", [-55.0] * 5), ("three-digit", [125.0] * 5),
+                                     ("mixed", [-55.0, 0.0, 125.0, 34.8, 46.2])):
                     with guard:
                         fixture["temperatures"] = [
                             {"valid": True, "ever": True, "value": value, "minimum": value,
@@ -595,7 +595,7 @@ try:
                 "null entries and missing tail preserve stable API types and unknown data",
                 "restored inventory refreshes values", "page navigation retains user disclosure",
                 "four responsive widths and minimum 44px summary targets",
-                "four equal Home temperature font sizes without reducing the original large sizes",
+                "five Home temperatures with equal font sizes at every viewport",
                 "no-data, negative, three-digit and mixed readings on all four widths",
                 "single-line numbers, wrapping units when necessary, no text clipping or icon overlap",
                 "supplied JP1 JPEG served from the actual embedded bytes without external requests",

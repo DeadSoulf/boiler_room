@@ -51,12 +51,18 @@ void homeTemperatureChecks(){
    auto* tile=lv_obj_get_parent(value);auto* unit=find(tile,"°C");assert(unit);
    lv_point_t textSize;lv_txt_get_size(&textSize,lv_label_get_text(value),&boiler_font_55,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
    assert(textSize.x<=lv_obj_get_width(value)&&lv_obj_get_height(value)==boiler_font_55.line_height);
-   lv_area_t titleBox,valueBox,unitBox,iconBox,statusBox,cardBox;
+   lv_area_t titleBox,valueBox,unitBox,statusBox,cardBox;
    lv_obj_get_coords(find(tile,SENSOR_NAMES[i]),&titleBox);lv_obj_get_coords(value,&valueBox);
-   lv_obj_get_coords(unit,&unitBox);lv_obj_get_coords(i==3?fuelCanister.root:tempIcon[i],&iconBox);
-   lv_obj_get_coords(i==3?fuelCanister.status:tempState[i],&statusBox);lv_obj_get_coords(tile,&cardBox);
-   assert(titleBox.y2<valueBox.y1&&valueBox.y2<unitBox.y1&&unitBox.y2<iconBox.y1&&iconBox.y2<statusBox.y1);
-   assert(valueBox.x1>=cardBox.x1&&valueBox.x2<=cardBox.x2&&iconBox.x1>=cardBox.x1&&iconBox.x2<=cardBox.x2&&statusBox.y2<cardBox.y2);
+   lv_obj_get_coords(unit,&unitBox);lv_obj_get_coords(tile,&cardBox);
+   lv_obj_get_coords(i==3?fuelCanister.status:tempState[i],&statusBox);
+   assert(titleBox.y2<valueBox.y1&&valueBox.x1>=cardBox.x1&&valueBox.x2<=cardBox.x2&&statusBox.y2<cardBox.y2);
+   if(i==2||i==4){
+     assert(titleBox.x2<unitBox.x1&&unitBox.y2<valueBox.y1&&valueBox.y2<statusBox.y1);
+   }else{
+     lv_area_t iconBox;lv_obj_get_coords(i==3?fuelCanister.root:tempIcon[i],&iconBox);
+     assert(valueBox.y2<unitBox.y1&&unitBox.y2<iconBox.y1&&iconBox.y2<statusBox.y1);
+     assert(iconBox.x1>=cardBox.x1&&iconBox.x2<=cardBox.x2);
+   }
  }
 }
 void homeHeaderChecks(){
@@ -203,7 +209,7 @@ int main(int argc,char** argv){
  for(unsigned i=0;i<CHANNELS;i++){assert(tempValue[i]&&strstr(lv_label_get_text(tempValue[i]),"--"));assert(lv_obj_get_style_text_font(tempValue[i],0)==&boiler_font_55);assert(!freshBar[i]&&!tempTrend[i]);}
  homeTemperatureChecks();
  assert(!strcmp(SENSOR_NAMES[0],"В доме")&&find(body,"В доме")&&!find(body,"В котельной"));
- for(unsigned i=0;i<3;i++){
+ for(unsigned i=0;i<2;i++){
    assert(tempIcon[i]&&!lv_obj_has_flag(tempIcon[i],LV_OBJ_FLAG_CLICKABLE));
    auto* tile=lv_obj_get_parent(tempIcon[i]);lv_area_t pict,value,status,card;
    lv_obj_get_coords(tile,&card);lv_obj_get_coords(tempIcon[i],&pict);lv_obj_get_coords(tempValue[i],&value);lv_obj_get_coords(tempState[i],&status);
@@ -220,6 +226,20 @@ int main(int argc,char** argv){
    clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);assert(overlay&&detailChannel==int(i));
    assert(find(overlay,SENSOR_NAMES[i]));touch("Назад");assert(!overlay&&page==0);
  }
+ // Exercise the real sensor-event route, including the non-contiguous return input.
+ auto sensorReading=[](uint8_t channel,float value){
+   panel_sensors::Event event{};event.revision=panel_config::fixture.revision;
+   event.channel=channel;event.temperature=value;event.atMs=millis();
+   panel_sensors::queue.push_back(event);
+ };
+ sensorReading(2,60.5f);step(1100);
+ assert(!strcmp(lv_label_get_text(tempValue[2]),"60.5")&&!strcmp(lv_label_get_text(tempValue[4]),"--.-"));
+ sensorReading(6,40.0f);sensorReading(6,44.5f);step(1100);
+ assert(measurements[2].count==1&&measurements[4].count==2&&!measurements[3].count);
+ touch("Подача");assert(detailChannel==2&&find(overlay,"60.5 °C")&&find(overlay,"Пока нет истории"));touch("Назад");
+ touch("Обратка");assert(detailChannel==4&&find(overlay,"44.5 °C")&&find(overlay,"Последние измерения"));touch("Назад");
+ step(31000);sensorReading(2,61.5f);step(1100);
+ assert(!strcmp(lv_label_get_text(tempState[2]),"")&&!strcmp(lv_label_get_text(tempState[4]),"Устарело"));
  for(float value:{-55.0f,0.0f,125.0f}){
    for(unsigned i=0;i<CHANNELS;i++){measurements[i].put(value,millis());}step(1100);check();homeTemperatureChecks();
    save(value<0?"home-font-negative-fixture":value>=100?"home-font-three-digit-fixture":"home-font-zero-fixture");
@@ -227,7 +247,7 @@ int main(int argc,char** argv){
  for(auto& reading:measurements){reading=Measurement{};}step(1100);check();homeTemperatureChecks();save("home-font-no-data-fixture");save("home-icons-no-data");
  assert(tempValue[3]&&fuelCanister.temperature==tempValue[3]&&fuelCanister.root);
  assert(lv_obj_get_style_text_font(fuelCanister.temperature,0)==&boiler_font_55);
- assert(lv_obj_get_child_cnt(body)==4&&!find(body,"Уровень топлива"));
+ assert(lv_obj_get_child_cnt(body)==5&&!find(body,"Уровень топлива"));
  assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.-"));
  assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
  touch("Топливо");assert(page==2&&!overlay);touch("Температура топлива");assert(overlay&&detailChannel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);
@@ -372,8 +392,8 @@ int main(int argc,char** argv){
  assert(!overlay&&panel_radio::submitted==sent+1&&panel_radio::last.job==Job::Connect);
  assert(panel_radio::last.useSaved&&!panel_radio::last.open&&!strcmp(panel_radio::last.ssid,"Example-WiFi")&&!panel_radio::last.password[0]);
  clickAt(150,375);assert(overlay&&ssidLocked&&openNetwork&&panel_radio::submitted==sent+1);dismiss();
- go(0);const float values[]={22.4f,-8.2f,61.7f,34.8f};for(unsigned i=0;i<4;i++)measurements[i].put(values[i],millis());fuelLevel.put(true,false,millis());step(1100);save("home-values-fixture");check();
- for(unsigned i=0;i<3;i++)assert(!strcmp(lv_label_get_text(tempState[i]),""));
+ go(0);const float values[CHANNELS]={22.4f,-8.2f,61.7f,34.8f,47.3f};for(unsigned i=0;i<CHANNELS;i++)measurements[i].put(values[i],millis());fuelLevel.put(true,false,millis());step(1100);save("home-values-fixture");check();
+ for(unsigned i:{0U,1U,2U,4U})assert(!strcmp(lv_label_get_text(tempState[i]),""));
  assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"34.8"));homeTemperatureChecks();
  go(2);save("fuel-values-fixture");go(0);step(31000);assert(!strcmp(lv_label_get_text(tempState[0]),"Устарело"));save("home-stale-fixture");
  // Screen wake consumes the first touch rather than activating the underlying tile.
@@ -391,7 +411,7 @@ int main(int argc,char** argv){
    }
    measurements[3].put(34.8f,millis());step(1100);check();
  };
- for(unsigned i=0;i<4;i++)measurements[i].put(values[i],millis());
+ for(unsigned i=0;i<CHANNELS;i++)measurements[i].put(values[i],millis());
  contacts(false,false);save("home-icons-values-fixture");assert(fuelLevel.status(millis())==FuelLevelStatus::UpperReached);
  assert(lv_obj_get_height(fuelCanister.fill)==CANISTER_FILL_HEIGHT&&!lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN));
  assert(!strcmp(lv_label_get_text(fuelCanister.glyph),""));save("canister-full-fixture");

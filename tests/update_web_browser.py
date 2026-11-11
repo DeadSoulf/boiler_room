@@ -35,7 +35,7 @@ fixture = {
     "time": {"zone": 0, "zone_name": "UTC"},
     "service": {"free_heap": 180000, "first_frame_ms": 480, "display_ms": 320,
                 "lvgl_ms": 2, "touch_ms": 80},
-    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(4)],
+    "temperatures": [{"valid": False, "ever": False, "history": []} for _ in range(5)],
     "fuel": {"lower": {"valid": False}, "upper": {"valid": False}},
     "fuel_level_text": "Нет данных", "equipment": [],
     "connections": {"revision": 0, "drivers_active": False, "items": []},

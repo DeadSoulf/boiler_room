@@ -14,16 +14,16 @@ int main(){
   uint8_t rom[8]={0x28,1,2,3,4,5,6,0};rom[7]=crc8(rom,7);
   for(unsigned i=0;i<8;i++)OneWire32::rom|=uint64_t(rom[i])<<(8*i);
   guard=xSemaphoreCreateMutex();samples=xQueueCreate(24,sizeof(Event));activeRevision=7;
-  OneWire32 bus(52);driver[0].bus=&bus;driver[0].setting.type=panel_config::Type::DS18B20;
+  driver[0].setting.gpio=52;driver[0].setting.type=panel_config::Type::DS18B20;
   panel::Measurement model;
   Event e;
-  auto step=[](){mock_now=driver[0].due;thermometer(0,mock_now);};
+  auto step=[](){mock_now=driver[0].due;pollThermometers(mock_now);};
   auto good=[&](float value){
     OneWire32::scratchpad=value;
-    step();assert(driver[0].converting);const auto reads=OneWire32::reads;
-    mock_now=driver[0].due-1;thermometer(0,mock_now);
+    step();assert(wire);const auto reads=OneWire32::reads;
+    mock_now=driver[0].due-1;pollThermometers(mock_now);
     assert(!poll(e)&&OneWire32::reads==reads);
-    step();assert(!driver[0].converting);assert(poll(e));
+    step();assert(!wire);assert(poll(e));
     assert(e.revision==7&&e.atMs==mock_now&&e.temperature==value);
     model.put(e.temperature,e.atMs);assert(model.fresh(mock_now));
     Snapshot s;assert(snapshot(s));assert(s.channels[0].valid&&s.channels[0].lastGoodMs==mock_now);
@@ -31,7 +31,7 @@ int main(){
   good(25.0f);
   const uint32_t original=model.updated;
   auto rejected=[&](){
-    assert(!driver[0].converting&&!poll(e));
+    assert(!wire&&!poll(e));
     Snapshot s;assert(snapshot(s));assert(!s.channels[0].valid);
     assert(s.channels[0].lastGoodMs==original&&model.updated==original);
   };
@@ -46,7 +46,7 @@ int main(){
   // Timeout / incomplete conversion must not read the retained scratchpad.
   for(unsigned fault=0;fault<2;fault++){
     OneWire32::readOk=fault!=0;OneWire32::completion=fault==0?1:0;
-    step();assert(driver[0].converting);
+    step();assert(wire);
     const auto temperatures=OneWire32::temperatures;
     step();rejected();assert(OneWire32::temperatures==temperatures);
   }
@@ -69,5 +69,41 @@ int main(){
   assert(!model.fresh(mock_now));
   mock_now=uint32_t(uint64_t(last)+(1ULL<<32)+1);
   assert(snapshot(s)&&!s.channels[0].valid&&!model.fresh(mock_now));
+  // Five separately wired sensors must work with only a single RMT pair.
+  // A missing supply sensor must not prevent return or fuel readings.
+  panel_config::State config;
+  const unsigned ids[]={0,1,2,3,6};
+  const uint8_t pins[]={52,33,51,31,50};
+  config.revision=8;
+  for(unsigned n=0;n<5;n++){
+    config.item[ids[n]].type=panel_config::Type::DS18B20;
+    config.item[ids[n]].gpio=pins[n];
+  }
+  mock_now=1000;reconfigure(config);
+  unsigned seen[panel_config::COUNT]={};
+  uint32_t first[panel_config::COUNT]={};
+  auto runUntil=[&](uint32_t end){
+    for(;mock_now<end;mock_now+=45){
+      if(wire)OneWire32::scratchpad=float(wire->pin);
+      pollThermometers(mock_now);
+      while(poll(e)){
+        assert(e.channel<panel_config::COUNT && e.revision==config.revision);
+        assert(e.temperature==config.item[e.channel].gpio);
+        if(!seen[e.channel])first[e.channel]=e.atMs;
+        ++seen[e.channel];
+      }
+    }
+  };
+  OneWire32::missingPin=51;
+  runUntil(13000);
+  assert(seen[2]==0 && seen[6]>=2 && seen[3]>=2);
+  OneWire32::missingPin=-1;
+  runUntil(28000);
+  for(unsigned id:ids)assert(seen[id]>=2 && first[id]<panel::STALE_MS);
+  assert(!seen[4]&&!seen[5]);
+  while(!wire){mock_now+=45;pollThermometers(mock_now);}
+  ++config.revision;
+  reconfigure(config);
+  assert(!wire && !OneWire32::live && !poll(e));
   puts("PASS: real sensor adapter rejects request/poll/scratchpad faults; preserves timestamps; recovers incl. 85C; stale data does not revive");
 }

@@ -10,11 +10,13 @@
 
 namespace panel_config {
 namespace {
-struct Persist {
-  uint32_t magic=0,schema=1,revision=0;
-  Assignment item[COUNT];
+template<unsigned N> struct StoredConfig {
+  uint32_t magic=0,schema=0,revision=0;
+  Assignment item[N];
   uint32_t hash=0;
 };
+using LegacyConfig=StoredConfig<6>;
+using Persist=StoredConfig<COUNT>;
 constexpr uint32_t MAGIC=0x42504336U;
 SemaphoreHandle_t lock=nullptr;
 State current;
@@ -29,43 +31,58 @@ uint32_t fnv(const uint8_t* p,size_t n){
 bool allowedType(Channel ch,Type t){
   if(uint8_t(t)>uint8_t(Type::RemoteMQTT))return false;
   if(t==Type::None)return true;
-  const bool temperature=uint8_t(ch)<4;
+  const bool temperature=temperatureIndex(unsigned(ch))>=0;
   return temperature?
     (t==Type::DS18B20||t==Type::RemoteModbus||t==Type::RemoteMQTT):
     (t==Type::ReedNO||t==Type::ReedNC||t==Type::RemoteModbus||t==Type::RemoteMQTT);
 }
-bool checked(const Assignment (&list)[COUNT]){
-  for(unsigned i=0;i<COUNT;i++){
+template<unsigned N> bool checked(const Assignment (&list)[N]){
+  for(unsigned i=0;i<N;i++){
     if(!isValid(static_cast<Channel>(i),list[i]))return false;
     if(list[i].gpio<0)continue;
-    for(unsigned j=i+1;j<COUNT;j++){
+    for(unsigned j=i+1;j<N;j++){
       if(list[i].gpio==list[j].gpio)return false;
     }
   }
   return true;
 }
-bool readSlot(unsigned slot,Persist& entry){
-  Preferences prefs;
-  if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",true))return false;
-  const bool have=prefs.getBytesLength("config")==sizeof(entry) &&
-    prefs.getBytes("config",&entry,sizeof(entry))==sizeof(entry);
-  prefs.end();
-  if(!have)return false;
-  if(entry.magic!=MAGIC||entry.schema!=1)return false;
+template<unsigned N> bool readRecord(Preferences& prefs,uint32_t schema,StoredConfig<N>& entry){
+  if(prefs.getBytes("config",&entry,sizeof(entry))!=sizeof(entry))return false;
+  if(entry.magic!=MAGIC||entry.schema!=schema)return false;
   const uint32_t h=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
   if(h!=entry.hash || !checked(entry.item))return false;
   return true;
 }
+bool readSlot(unsigned slot,Persist& entry){
+  Preferences prefs;
+  if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",true))return false;
+  const size_t size=prefs.getBytesLength("config");
+  bool ok=false;
+  if(size==sizeof(Persist)){
+    ok=readRecord(prefs,2,entry);
+  }else if(size==sizeof(LegacyConfig)){
+    LegacyConfig previous{};
+    ok=readRecord(prefs,1,previous);
+    if(ok){
+      entry=Persist{};
+      entry.revision=previous.revision;
+      for(unsigned i=0;i<6;i++)entry.item[i]=previous.item[i];
+    }
+  }
+  prefs.end();return ok;
+}
 bool writeSlot(unsigned slot,const State& next){
   Persist entry{};
-  entry.magic=MAGIC;entry.schema=1;entry.revision=next.revision;
+  entry.magic=MAGIC;entry.schema=2;entry.revision=next.revision;
   for(unsigned i=0;i<COUNT;i++)entry.item[i]=next.item[i];
   entry.hash=fnv(reinterpret_cast<const uint8_t*>(&entry),sizeof(entry)-sizeof(entry.hash));
   Preferences prefs;
   if(!prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false))return false;
-  Persist previous{};
-  const bool hadPrevious=prefs.getBytesLength("config")==sizeof(previous);
-  if(hadPrevious&&prefs.getBytes("config",&previous,sizeof(previous))!=sizeof(previous)){
+  // Keep the exact previous bytes, including an older six-channel record.
+  uint8_t previous[sizeof(Persist)];
+  const size_t previousSize=prefs.getBytesLength("config");
+  if(previousSize>sizeof(previous) ||
+     (previousSize && prefs.getBytes("config",previous,previousSize)!=previousSize)){
     prefs.end();return false;
   }
   const bool stored=prefs.putBytes("config",&entry,sizeof(entry))==sizeof(entry);
@@ -78,7 +95,7 @@ bool writeSlot(unsigned slot,const State& next){
   // A failed read-back must not leave a newer candidate for rollback/reboot.
   // Recovery is best effort: a persistent NVS write fault can also prevent it.
   if(prefs.begin(slot?"bp_cfg_b":"bp_cfg_a",false)){
-    if(hadPrevious)prefs.putBytes("config",&previous,sizeof(previous));
+    if(previousSize)prefs.putBytes("config",previous,previousSize);
     else prefs.remove("config");
     prefs.end();
   }

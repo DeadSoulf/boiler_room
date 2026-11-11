@@ -26,6 +26,7 @@ int main(){
  assert(statePayload(payload,sizeof(payload),t,d,1000));std::cout<<"EMPTY "<<payload<<"\n";
  t.received=true;t.captured=1000;
  for(auto& in:t.input){in.valid=true;in.updated=1000;in.temperature=-12.25f;}
+ t.input[2].temperature=58.0f;t.input[6].temperature=43.5f;
  t.input[4].reached=true;d.wifi=true;d.rssi=-60;d.sdKnown=true;d.sdMounted=true;d.sdFree=62602392064ULL;
  assert(fresh(t,0,1000)&&fresh(t,0,5999)&&!fresh(t,0,6000));
  assert(statePayload(payload,sizeof(payload),t,d,1000));std::cout<<"LIVE "<<payload<<"\n";
@@ -35,7 +36,7 @@ int main(){
  t.input[0].temperature=0;assert(fresh(t,0,1000));
  t.captured=31000;assert(!fresh(t,0,31000));assert(statePayload(payload,sizeof(payload),t,d,31000));std::cout<<"STALE "<<payload<<"\n";
  t.captured=UINT32_MAX-500;for(auto& in:t.input)in.updated=t.captured;
- assert(fresh(t,0,499));assert(!fresh(t,0,5000));assert(!fresh(t,6,0));
+ assert(fresh(t,0,499));assert(!fresh(t,0,5000));assert(fresh(t,6,0));assert(!fresh(t,7,0));
  assert(!statePayload(small,sizeof(small),t,d,499));
  std::cout<<"PASS: bounded JSON, discovery, nulls, freshness, rollover, credential/host validation\n";
 }

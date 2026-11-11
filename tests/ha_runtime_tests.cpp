@@ -31,10 +31,11 @@ int main(){
  mqttEvent(nullptr,nullptr,MQTT_EVENT_DATA,&event);assert(!announce.load());
  event.current_data_offset=0;mqttEvent(nullptr,nullptr,MQTT_EVENT_DATA,&event);assert(announce.load());
  assert(sendState(t,radio));assert(sent.back().qos==0&&sent.back().retain==0&&!sent.back().queued);assert(!strstr(sent.back().payload.c_str(),c.password));
- panel::Measurement values[4];panel::FuelLevel fuel;values[0].put(23.5f,1000);publish(values,fuel,1000);
+ panel::Measurement values[panel::CHANNELS];panel::FuelLevel fuel;values[0].put(23.5f,1000);publish(values,fuel,1000);
  Telemetry captured;assert(xQueueReceive(readings,&captured,0)==pdTRUE&&captured.input[0].valid&&!captured.input[1].valid);
  // Exercise actual publish -> queue -> MQTT JSON with original model objects.
  // main.cpp invokes publish(measurements,fuelLevel,millis()) every second.
+ values[2].put(64.5f,1000);values[4].put(41.5f,1000);
  fuel.put(true,true,1000);
  auto capture=[&](uint32_t now){
    fakeMillis=now;publish(values,fuel,now);
@@ -42,6 +43,9 @@ int main(){
    assert(sendState(captured,radio));
  };
  capture(1000);
+ assert(captured.input[2].valid&&captured.input[2].temperature==64.5f);
+ assert(captured.input[6].valid&&captured.input[6].temperature==41.5f);
+ assert(sent.back().payload.find("\"coolant_return\":41.50")!=std::string::npos);
  assert(captured.input[0].valid&&captured.input[4].valid&&captured.input[5].valid);
  capture(31000); // The adapter must propagate expiration, not just valid/history.
  assert(!captured.input[0].valid&&!captured.input[4].valid&&!captured.input[5].valid);

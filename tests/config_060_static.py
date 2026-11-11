@@ -34,4 +34,4 @@ js=html.split("<script>",1)[1].split("</script>",1)[0]
 with tempfile.TemporaryDirectory() as tmp:
  p=Path(tmp)/"app.js";p.write_text(js,encoding="utf-8")
  subprocess.run(["node","--check",str(p)],check=True)
-print(f"PASS: {release_version} grouped navigation, web clock, six-channel NVS dual slots, pin guards, no physical commands")
+print(f"PASS: {release_version} grouped navigation, web clock, sensor configuration NVS dual slots, pin guards, no physical commands")

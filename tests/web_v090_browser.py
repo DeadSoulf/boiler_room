@@ -16,7 +16,7 @@ fixture={
  'ble':{'supported':True,'message':'','devices':[]},'screen':{'timeout_s':60,'touch_ready':True,'message':''},
  'time':{'zone':0,'zone_name':'UTC','message':''},'service':{'free_heap':180000,'first_frame_ms':480,'display_ms':320,'lvgl_ms':2,'touch_ms':80},
  'host_version':'2.9.6','c6_version':'2.9.6',
- 'temperatures':[{'valid':True,'ever':True,'value':v,'minimum':v,'maximum':v,'trend':None,'age_s':0,'history':[]} for v in (22.4,-8.2,61.7,34.8)],
+ 'temperatures':[{'valid':True,'ever':True,'value':v,'minimum':v,'maximum':v,'trend':None,'age_s':0,'history':[]} for v in (22.4,-8.2,61.7,34.8,43.2)],
  'fuel':{'lower':{'valid':True,'reached':True,'age_s':0},'upper':{'valid':True,'reached':True,'age_s':0}},'fuel_level_text':'Полная',
  'storage':{'started':True,'mounted':True,'logging':True,'card_bytes':64000000000,'total_bytes':62602396160,'used_bytes':6000,'free_bytes':62602390160,'format_attempted':False,'format_state':0},
  'connections':{'revision':0,'drivers_active':False,'items':[],'message':''},
@@ -68,13 +68,14 @@ try:
   page.goto(base);expect(page.locator('#version')).to_have_text(version);expect(page.locator('#fuel-canister')).to_have_attribute('data-state','full')
   assert len(page.locator('.topnav button').all())==4
   expect(page.locator('#home .temp-name').first).to_have_text('В доме')
-  assert page.locator('#home svg.temp-icon').count()==3
-  for index,kind in enumerate(('house','outdoor','radiator')):
+  assert page.locator('#home svg.temp-icon').count()==4
+  for kind,index,name in [('house',0,'В доме'),('outdoor',1,'На улице'),('radiator',2,'Подача'),('return',4,'Обратка')]:
    icon=page.locator(f'svg[data-icon="{kind}"]');expect(icon).to_be_visible()
    assert icon.get_attribute('aria-hidden')=='true'
    box=icon.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
    expect(page.locator('#temperature-detail')).to_be_visible()
-   expect(page.locator('#detail-title')).to_have_text(('В доме','На улице','Теплоноситель')[index]+' — подробности')
+   expect(page.locator('#detail-title')).to_have_text(name+' — подробности')
+   expect(page.locator('#detail-stats')).to_contain_text('Минимум: '+str(fixture['temperatures'][index]['minimum'])+' °C')
    page.click('[data-action="close-detail"]')
   page.screenshot(path=str(out/'desktop-home.png'),full_page=True)
   page.click('#pairbutton');expect(page.locator('#pairbox')).to_be_visible();expect(page.locator('#pair-submit')).to_be_enabled()

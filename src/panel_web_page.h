@@ -4,7 +4,7 @@ static const char kBoilerWebPage[] PROGMEM = R"BPHTML(<!doctype html><html lang=
 :root{color-scheme:dark;--bg:#101719;--card:#1b2528;--line:#304044;--ink:#eff5f3;--muted:#a1b3b5;--accent:#76d6c3;--warn:#e7bb78;--red:#ef9f9a;font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;font-size:16px}
 *{box-sizing:border-box}html{background:var(--bg);color:var(--ink)}body{margin:0;min-width:320px}button,input,select{font:inherit}button{color:var(--ink);background:#26373b;border:1px solid transparent;border-radius:12px;padding:12px 18px;min-height:46px;cursor:pointer;transition:background .15s}button:hover{background:#33494e}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:#245d55;border-color:#3b8b7c}.primary:hover{background:#30786b}.danger{background:#593738;border-color:#825453}.ghost{background:transparent;border-color:var(--line)}.hidden{display:none!important}
 .container{max-width:1180px;margin:0 auto;padding:32px 28px 26px}header{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:32px}h1{margin:0;font-size:32px;font-weight:600;letter-spacing:-.025em}h2{margin:0 0 24px;font-size:24px;font-weight:550}h3{font-size:18px;font-weight:550;margin:0 0 18px}p{color:var(--muted);line-height:1.55;margin:12px 0}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.header-meta{display:flex;align-items:center;gap:14px}.header-time{font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}.status,.badge,.tag{font-size:12px;color:var(--muted);padding:6px 0}.status.ok,.good{color:var(--accent)}.tag{border-left:1px solid var(--line);padding-left:14px}.toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.topnav{display:flex;gap:8px;padding-bottom:22px;margin-bottom:30px;border-bottom:1px solid var(--line)}.topnav button{background:transparent;color:var(--muted);padding:12px 20px}.topnav button.active{color:var(--ink);background:#26373b}.topnav button:hover{color:var(--ink)}.page{animation:appear .16s ease-out}@keyframes appear{from{opacity:.4;transform:translateY(3px)}to{opacity:1;transform:none}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px;min-width:0}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}.temp{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-height:290px;padding:24px;border:1px solid var(--line);background:var(--card)}.temp:hover{background:#233136;border-color:#52766d}.temp-name{color:var(--muted);font-size:15px;font-weight:400}.temp-value{font-size:clamp(30px,3.1vw,43px);font-weight:500;letter-spacing:-.04em;white-space:normal;max-width:100%;line-height:1.2;margin:auto 0 12px;font-variant-numeric:tabular-nums}.temp-detail{color:var(--muted);font-size:12px;min-height:18px}.temp-fuel .temp-detail{margin-top:auto}.canister{height:152px;width:130px;align-self:center;color:var(--muted);margin:6px 0}.canister[data-state=full]{color:var(--accent)}.canister[data-state=half]{color:var(--warn)}.canister[data-state=empty],.canister[data-state=invalid]{color:var(--red)}.can-fill{fill:currentColor}.can-outline{stroke:currentColor;fill:none;stroke-width:3}.can-symbol{fill:currentColor;font-size:42px;font-weight:550}.can-cross{stroke:var(--bg);stroke-width:3;fill:none}.section{margin-top:24px}.row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid var(--line);font-size:14px}.row:last-child{border-bottom:0}.row>span:first-child{color:var(--muted)}.row>:last-child{text-align:right;overflow-wrap:anywhere}.stack,.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.actions{margin:20px 0 8px}.actions button{max-width:100%}.field{margin:20px 0}label{display:block;color:var(--muted);font-size:13px;margin-bottom:8px}input,select{display:block;background:#101b1e;border:1px solid #40575c;border-radius:10px;color:var(--ink);width:100%;max-width:100%;min-height:46px;padding:12px}input[type=checkbox]{width:20px;min-height:20px;accent-color:var(--accent);flex-shrink:0}.stack select{flex:1;min-width:160px}.tiny,small{font-size:12px;line-height:1.55}.muted,.hint{color:var(--muted)}.hint{font-size:13px}.hint:empty{display:none}.notice,.footnote{font-size:13px;line-height:1.6;color:var(--muted);padding:16px 18px;background:#182528;border:1px solid var(--line);border-radius:12px;margin:20px 0}.warn{color:#eacfa8;border-color:#66543d;background:#29251f}.error{color:var(--red)}.details{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:20px}summary{cursor:pointer;color:var(--ink);padding:6px 0;line-height:1.5}details>summary{min-height:40px}.danger-zone{border-color:#73484a}details[open]>summary{margin-bottom:14px}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.menu-item{display:grid;grid-template-columns:1fr auto;gap:9px;text-align:left;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:17px}.menu-item strong{font-size:18px;font-weight:500}.menu-item span{font-size:13px;color:var(--muted);grid-row:2}.menu-item b{grid-column:2;grid-row:1/3;align-self:center;color:var(--muted);font-weight:400}.subhead{display:flex;align-items:center;gap:18px;margin:0 0 24px}.subhead h2{margin:0}.subhead button{background:transparent;border:1px solid var(--line)}.tab-row{display:none}.feed{max-height:320px;overflow:auto}.feed>button{min-height:56px}.equip-list{display:grid;grid-template-columns:1fr 1fr;gap:16px}.equip{padding:24px}.equip h3{margin-bottom:10px}.equip p{font-size:13px;margin:0}.equip .error{color:var(--muted)}.equip .tiny{display:none}.detail-chart{display:block;width:100%;height:140px;background:#122025;border-radius:12px;margin:20px 0}.fuel-summary-value{font-size:30px;font-weight:500}.service-grid{margin-top:20px}code{overflow-wrap:anywhere;font-size:12px;color:#b9ded7}footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:38px;padding-top:20px;font-size:12px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px;min-width:0}.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}.temp{display:flex;flex-direction:column;align-items:flex-start;text-align:left;min-height:290px;padding:24px;border:1px solid var(--line);background:var(--card)}.temp:hover{background:#233136;border-color:#52766d}.temp-name{color:var(--muted);font-size:15px;font-weight:400}.temp-value{font-size:clamp(30px,3.1vw,43px);font-weight:500;letter-spacing:-.04em;white-space:normal;max-width:100%;line-height:1.2;margin:auto 0 12px;font-variant-numeric:tabular-nums}.temp-detail{color:var(--muted);font-size:12px;min-height:18px}.temp-fuel .temp-detail{margin-top:auto}.canister{height:152px;width:130px;align-self:center;color:var(--muted);margin:6px 0}.canister[data-state=full]{color:var(--accent)}.canister[data-state=half]{color:var(--warn)}.canister[data-state=empty],.canister[data-state=invalid]{color:var(--red)}.can-fill{fill:currentColor}.can-outline{stroke:currentColor;fill:none;stroke-width:3}.can-symbol{fill:currentColor;font-size:42px;font-weight:550}.can-cross{stroke:var(--bg);stroke-width:3;fill:none}.section{margin-top:24px}.row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid var(--line);font-size:14px}.row:last-child{border-bottom:0}.row>span:first-child{color:var(--muted)}.row>:last-child{text-align:right;overflow-wrap:anywhere}.stack,.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.actions{margin:20px 0 8px}.actions button{max-width:100%}.field{margin:20px 0}label{display:block;color:var(--muted);font-size:13px;margin-bottom:8px}input,select{display:block;background:#101b1e;border:1px solid #40575c;border-radius:10px;color:var(--ink);width:100%;max-width:100%;min-height:46px;padding:12px}input[type=checkbox]{width:20px;min-height:20px;accent-color:var(--accent);flex-shrink:0}.stack select{flex:1;min-width:160px}.tiny,small{font-size:12px;line-height:1.55}.muted,.hint{color:var(--muted)}.hint{font-size:13px}.hint:empty{display:none}.notice,.footnote{font-size:13px;line-height:1.6;color:var(--muted);padding:16px 18px;background:#182528;border:1px solid var(--line);border-radius:12px;margin:20px 0}.warn{color:#eacfa8;border-color:#66543d;background:#29251f}.error{color:var(--red)}.details{border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:20px}summary{cursor:pointer;color:var(--ink);padding:6px 0;line-height:1.5}details>summary{min-height:40px}.danger-zone{border-color:#73484a}details[open]>summary{margin-bottom:14px}.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.menu-item{display:grid;grid-template-columns:1fr auto;gap:9px;text-align:left;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:17px}.menu-item strong{font-size:18px;font-weight:500}.menu-item span{font-size:13px;color:var(--muted);grid-row:2}.menu-item b{grid-column:2;grid-row:1/3;align-self:center;color:var(--muted);font-weight:400}.subhead{display:flex;align-items:center;gap:18px;margin:0 0 24px}.subhead h2{margin:0}.subhead button{background:transparent;border:1px solid var(--line)}.tab-row{display:none}.feed{max-height:320px;overflow:auto}.feed>button{min-height:56px}.equip-list{display:grid;grid-template-columns:1fr 1fr;gap:16px}.equip{padding:24px}.equip h3{margin-bottom:10px}.equip p{font-size:13px;margin:0}.equip .error{color:var(--muted)}.equip .tiny{display:none}.detail-chart{display:block;width:100%;height:140px;background:#122025;border-radius:12px;margin:20px 0}.fuel-summary-value{font-size:30px;font-weight:500}.service-grid{margin-top:20px}code{overflow-wrap:anywhere;font-size:12px;color:#b9ded7}footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:38px;padding-top:20px;font-size:12px;color:var(--muted)}
 dialog{color:var(--ink);background:var(--card);border:1px solid #49625f;border-radius:22px;padding:30px;width:min(460px,calc(100% - 32px));max-height:90vh;overflow:auto}dialog::backdrop{background:#050a0dd9;backdrop-filter:blur(4px)}dialog h2{margin-bottom:12px}.pair-dialog input{text-align:center;font-size:30px;letter-spacing:.28em;font-variant-numeric:tabular-nums}.pair-dialog .actions button{flex:1}.pair-dialog .close-modal{float:right;min-height:40px;padding:8px 12px;background:transparent}.pair-symbol{height:44px;width:44px;border:1px solid #3a7167;border-radius:12px;display:grid;place-items:center;margin-bottom:22px;color:var(--accent)}#pair-error{min-height:20px;font-size:13px}.pair-dialog .tiny{margin-bottom:0}#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);padding:14px 20px;border:1px solid #42625a;background:#203c35;color:var(--ink);border-radius:12px;max-width:calc(100% - 32px);z-index:100;box-shadow:0 5px 25px #0006;text-align:center;font-size:14px;pointer-events:none}
 @media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.temp{min-height:255px}.temp-value{font-size:42px}.header-meta{display:none}}
 @media(max-width:680px){.container{padding:22px 16px}header{align-items:flex-start;gap:16px;margin-bottom:24px}h1{font-size:27px}.toolbar{justify-content:flex-end;gap:8px}.toolbar .tag{display:none}.toolbar button{padding:10px 13px;min-height:44px}.topnav{gap:3px;justify-content:space-between;margin-bottom:24px;padding-bottom:16px}.topnav button{font-size:13px;padding:10px 9px;min-height:44px}.grid{gap:12px}.temp{padding:18px;min-height:245px}.temp-value{font-size:32px}.temp-name{font-size:13px}.canister{height:137px;width:112px}.two,.equip-list,.menu-grid{grid-template-columns:1fr}.card{padding:20px}.temp.card{padding:18px}.menu-item{padding:20px}.subhead{gap:10px;flex-wrap:wrap}.subhead h2{font-size:22px;min-width:0;overflow-wrap:anywhere}.row{gap:12px}.row>:last-child{max-width:60%}.actions button{flex:1 1 auto}footer{font-size:11px}.notice{padding:14px}dialog{padding:24px}.header-time{font-size:13px}}
@@ -28,7 +28,8 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 <section id="home" class="page"><div class="grid">
 <button class="card temp" data-temp="0"><span class="temp-name">В доме</span><span class="temp-value" id="t0">--.- °C</span><svg class="temp-icon" data-icon="house" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><rect x="82" y="16" width="10" height="27" rx="2"/><rect x="24" y="44" width="72" height="56" rx="6"/><polyline points="10,46 60,8 110,46" fill="none"/><rect class="icon-tint" x="56" y="65" width="22" height="35" rx="3"/><rect class="icon-tint" x="35" y="61" width="12" height="14" rx="2"/></g></svg><span class="temp-detail" id="tstate0">Нет данных</span></button>
 <button class="card temp" data-temp="1"><span class="temp-name">На улице</span><span class="temp-value" id="t1">--.- °C</span><svg class="temp-icon" data-icon="outdoor" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><circle cx="38" cy="36" r="20"/><path d="M38 3V9M8 36H2M64 10L59 15M10 10L15 15M67 36H74M10 62L15 57" fill="none"/><path d="M34 94C24 94 18 87 18 76C18 66 25 60 34 60C37 43 48 34 65 34C78 34 86 43 88 54C103 52 112 63 112 74C112 87 106 94 96 94Z"/></g></svg><span class="temp-detail" id="tstate1">Нет данных</span></button>
-<button class="card temp" data-temp="2"><span class="temp-name">Теплоноситель</span><span class="temp-value" id="t2">--.- °C</span><svg class="temp-icon" data-icon="radiator" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><path d="M15 40V18H5M105 82H115V98M28 92V100M92 92V100" fill="none"/><rect x="14" y="32" width="92" height="58" rx="7"/><rect class="icon-tint" x="25" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="44" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="63" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="82" y="36" width="12" height="50" rx="4"/></g></svg><span class="temp-detail" id="tstate2">Нет данных</span></button>
+<button class="card temp" data-temp="2"><span class="temp-name">Подача</span><span class="temp-value" id="t2">--.- °C</span><svg class="temp-icon" data-icon="radiator" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><path d="M15 40V18H5M105 82H115V98M28 92V100M92 92V100" fill="none"/><rect x="14" y="32" width="92" height="58" rx="7"/><rect class="icon-tint" x="25" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="44" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="63" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="82" y="36" width="12" height="50" rx="4"/></g></svg><span class="temp-detail" id="tstate2">Нет данных</span></button>
+<button class="card temp" data-temp="4"><span class="temp-name">Обратка</span><span class="temp-value" id="t4">--.- °C</span><svg class="temp-icon" data-icon="return" viewBox="0 0 120 108" aria-hidden="true" focusable="false"><g><path d="M105 40V18H115M15 82H5V98M28 92V100M92 92V100" fill="none"/><rect x="14" y="32" width="92" height="58" rx="7"/><rect class="icon-tint" x="25" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="44" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="63" y="36" width="12" height="50" rx="4"/><rect class="icon-tint" x="82" y="36" width="12" height="50" rx="4"/></g></svg><span class="temp-detail" id="tstate4">Нет данных</span></button>
 <button class="card temp temp-fuel" data-page="fuel"><span class="temp-name">Топливо</span><span class="temp-value" id="t3">--.- °C</span><svg id="fuel-canister" class="canister" data-state="unknown" viewBox="0 0 120 148" role="img" aria-label="Уровень топлива: нет данных"><title id="canister-title">Нет данных</title><rect id="canister-fill" class="can-fill" x="18" y="136" width="84" height="0" rx="5"/><g class="can-outline"><rect x="12" y="24" width="96" height="118" rx="10"/><path d="M62 24V4H99V24M21 18V10H41V18Z"/></g><path id="canister-cross" class="can-cross" d="M43 62L78 104M78 62L43 104" visibility="hidden"/><text id="canister-symbol" class="can-symbol" x="60" y="101" text-anchor="middle">?</text></svg><span class="temp-detail" id="tstate3">Нет данных</span></button>
 </div>
 <div id="temperature-detail" class="card section hidden"><div class="stack" style="justify-content:space-between"><h2 id="detail-title">Температура</h2><button data-action="close-detail" class="ghost">Закрыть</button></div><p id="detail-meta"></p><svg id="detail-chart" class="detail-chart" viewBox="0 0 400 100" preserveAspectRatio="none" aria-label="История измерений"></svg><p id="detail-stats" class="tiny"></p></div></section>
@@ -104,7 +105,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
   <select id="cfg-channel">
     <option value="0">Температура в доме</option>
     <option value="1">Температура улицы</option>
-    <option value="2">Температура теплоносителя</option>
+    <option value="2">Температура подачи</option><option value="6">Температура обратки</option>
     <option value="3">Температура топлива</option>
     <option value="4">Нижний геркон топлива</option>
     <option value="5">Верхний геркон топлива</option>
@@ -151,7 +152,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <p id="pin-current"></p><p id="pin-base-revision" class="tiny muted"></p>
  <form id="pin-form">
   <div class="field"><label for="pin-channel">Назначить на</label><select id="pin-channel" required>
-   <option value="">Выберите назначение</option><option value="0">Температура в доме</option><option value="1">Температура улицы</option><option value="2">Температура теплоносителя</option><option value="3">Температура топлива</option><option value="4">Нижний геркон топлива</option><option value="5">Верхний геркон топлива</option>
+   <option value="">Выберите назначение</option><option value="0">Температура в доме</option><option value="1">Температура улицы</option><option value="2">Температура подачи</option><option value="6">Температура обратки</option><option value="3">Температура топлива</option><option value="4">Нижний геркон топлива</option><option value="5">Верхний геркон топлива</option>
   </select></div>
   <p id="pin-temperature" class="tiny hidden">Датчик DS18B20 · отдельная линия OneWire.</p>
   <div id="pin-reed" class="hidden">
@@ -176,7 +177,7 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
   <div class="row"><span>Пакетов обнаружения</span><span id="ha-discovery-count">0</span></div>
   <p id="ha-message" class="hint"></p>
   <button data-action="ha_discover" data-write="1">Повторить обнаружение</button>
-  <p class="tiny">12 сущностей: четыре температуры, два геркона, уровень топлива, Wi-Fi, время работы, память и microSD. Без настоящего датчика или при устаревших данных сущность недоступна.</p>
+  <p class="tiny">13 сущностей: пять температур, два геркона, уровень топлива, Wi-Fi, время работы, память и microSD. Без настоящего датчика или при устаревших данных сущность недоступна.</p>
  </div><form id="ha-form" class="card" autocomplete="off">
   <h3>Подключение к MQTT-брокеру</h3>
   <label class="stack"><input type="checkbox" id="ha-enabled">Включить интеграцию</label>
@@ -255,8 +256,14 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 "use strict";
 const $=id=>document.getElementById(id);
 const names=["Бойлер косвенного нагрева","Электрокотёл","Контур 1","Контур 2","Контур 3","Дизельный отопитель","Подогрев топлива"];
-const tnames=["В доме","На улице","Теплоноситель","Топливо"];
-const inputNames=[...tnames,"Нижний геркон","Верхний геркон"];
+const tnames=["В доме","На улице","Подача","Топливо","Обратка"];
+// Source IDs 4 and 5 belong to the reeds; return is temperature 4 and source 6.
+const inputNames=[...tnames.slice(0,4),"Нижний геркон","Верхний геркон",tnames[4]];
+const isReedInput=channel=>channel===4||channel===5;
+function selectedPinChannel(){
+ const value=$("pin-channel").value,channel=Number(value);
+ return value!==""&&Number.isInteger(channel)&&channel>=0&&channel<inputNames.length?channel:-1;
+}
 // Physical JP1 order; assignable GPIOs match panel_pin_profile.h.
 const jp1Pins=[
  ["3V3","power","Питание"],["5V","power","Питание"],
@@ -297,13 +304,13 @@ function numeric(n){return Number.isFinite(Number(n))?Number(n):0}
 function apiHeaders(){const h={};if(token)h.Authorization="Bearer "+token;return h}
 function readPinSnapshot(cfg){
  const seen=new Set(),assigned=new Map(),items=[];
- let valid=!!cfg&&cfg.available===true&&Number.isInteger(cfg.revision)&&cfg.revision>=0&&cfg.revision<=4294967295&&Array.isArray(cfg.items)&&cfg.items.length===6;
+ let valid=!!cfg&&cfg.available===true&&Number.isInteger(cfg.revision)&&cfg.revision>=0&&cfg.revision<=4294967295&&Array.isArray(cfg.items)&&cfg.items.length===inputNames.length;
  if(valid)for(const item of cfg.items){
-  if(!item||!Number.isInteger(item.channel)||item.channel<0||item.channel>=6||seen.has(item.channel)){valid=false;break;}
+  if(!item||!Number.isInteger(item.channel)||item.channel<0||item.channel>=inputNames.length||seen.has(item.channel)){valid=false;break;}
   seen.add(item.channel);items[item.channel]=item;
   if(["ds18b20","reed_no","reed_nc"].includes(item.type)){
    const pin=jp1Nodes.find(node=>node.kind==="gpio"&&node.value===item.gpio);
-   if(!pin||item.jp1_pin!==pin.index+1||(item.type==="ds18b20")!==(item.channel<4)){valid=false;break;}
+   if(!pin||item.jp1_pin!==pin.index+1||(item.type==="ds18b20")!==(!isReedInput(item.channel))){valid=false;break;}
    if(!assigned.has(item.gpio))assigned.set(item.gpio,[]);
    assigned.get(item.gpio).push(item);
   }else if(!["none","modbus","mqtt"].includes(item.type)||item.gpio!==-1){valid=false;break;}
@@ -377,11 +384,12 @@ function closePinEditor(){
  if(button?.isConnected)button.focus();
 }
 function pinDraft(){
- const channelValue=$("pin-channel").value;
- if(!/^[0-5]$/.test(channelValue))return null;
- const channel=Number(channelValue),type=channel<4?1:Number($("pin-type").value),raw=$("pin-debounce").value;
- if(channel>=4&&(![2,3].includes(type)||!/^\d+$/.test(raw)||Number(raw)>5000))return null;
- return {channel,type,debounce:channel<4?50:Number(raw)};
+ const channel=selectedPinChannel();
+ if(channel<0)return null;
+ if(!isReedInput(channel))return {channel,type:1,debounce:50};
+ const type=Number($("pin-type").value),raw=$("pin-debounce").value;
+ if(![2,3].includes(type)||!/^\d+$/.test(raw)||Number(raw)>5000)return null;
+ return {channel,type,debounce:Number(raw)};
 }
 function pinBlockReason(editor){
  if(!serverOnline)return "Нет связи с панелью. Несохранённый выбор сохранён в этом окне.";
@@ -410,7 +418,7 @@ function renderPinEditor(){
   }
  }
  if(!editor.pending&&!editor.awaiting&&editor.base&&pinSnapshot?.editable&&pinSnapshot.revision!==editor.base.revision)editor.stale=true;
- const owner=pinOwner(editor),channelValue=$("pin-channel").value,channel=/^[0-5]$/.test(channelValue)?Number(channelValue):-1,reed=channel>=4;
+ const owner=pinOwner(editor),channel=selectedPinChannel(),reed=isReedInput(channel);
  text("pin-current",editor.base?(owner?"Занят: "+inputNames[owner.channel]+" · "+pinTypeLabel(owner.type):"Свободен — датчик не назначен"):"Занятость не подтверждена");
  text("pin-base-revision",editor.base?"Снимок назначений · ревизия "+editor.base.revision:"");
  show("pin-temperature",channel>=0&&!reed);show("pin-reed",reed);
@@ -441,7 +449,7 @@ function renderPinEditor(){
 }
 function changePinChannel(){
  const editor=pinEditor;if(!editor||editor.pending||editor.awaiting)return;
- const channel=Number($("pin-channel").value),target=editor.base?.items[channel];
+ const channel=selectedPinChannel(),target=editor.base?.items[channel];
  $("pin-type").value=target?.type==="reed_no"?"2":target?.type==="reed_nc"?"3":"";
  $("pin-debounce").value=String(target?.debounce_ms??50);
  editor.message="";editor.problem=false;renderPinEditor();
@@ -491,11 +499,11 @@ function drawPage(){
 function setTab(newTab){tab=newTab;page="settings";drawPage()}
 function updateDetail(){
  if(detail<0||!current){show("temperature-detail",false);return}
- const t=current.temperatures&&current.temperatures[detail];if(!t)return;
+ const t=current.temperatures?.[detail]||{};
  show("temperature-detail",true);
  text("detail-title",tnames[detail]+" — подробности");
- text("detail-meta",t.valid?"Свежие данные":"Датчик не назначен или данные устарели");
- text("detail-stats",t.ever?("Минимум: "+t.minimum+" °C · Максимум: "+t.maximum+" °C · Измерений в памяти: "+t.history.length+" · "+(t.trend==null?"Тренд отсутствует":"Тренд "+(t.trend>0?"+":"")+t.trend+" °C")):"Реальных измерений и истории пока нет");
+ text("detail-meta",!serverOnline?"Нет связи с панелью":t.valid?"Свежие данные":"Датчик не назначен или данные устарели");
+ text("detail-stats",t.ever?("Минимум: "+t.minimum+" °C · Максимум: "+t.maximum+" °C · Измерений в памяти: "+(t.history||[]).length+" · "+(t.trend==null?"Тренд отсутствует":"Тренд "+(t.trend>0?"+":"")+t.trend+" °C")):"Реальных измерений и истории пока нет");
  const svg=$("detail-chart");
  while(svg.firstChild)svg.removeChild(svg.firstChild);
  const vals=(t.history||[]).filter(x=>Number.isFinite(x.value));
@@ -729,7 +737,7 @@ function updateCanister(f){
  text("fuel-status",title);
 }
 function markOffline(){
- for(let i=0;i<4;i++){text("t"+i,"--.- °C");text("tstate"+i,"Нет связи");}
+ for(let i=0;i<tnames.length;i++){text("t"+i,"--.- °C");text("tstate"+i,"Нет связи");}
  text("fuel-temp","--.- °C");text("lower-status","Нет связи");text("upper-status","Нет связи");updateCanister(null);
 }
 function updateView(){
@@ -745,7 +753,7 @@ function updateView(){
  text("home-fuel",d.fuel_level_text||"Нет данных");
  text("fuel-summary","Уровень: "+(d.fuel_level_text||"Нет данных"));
  text("home-wifi",d.wifi&&d.wifi.connected?"Подключено":"Не подключено");
- for(let i=0;i<4;i++){
+ for(let i=0;i<tnames.length;i++){
    const t=d.temperatures&&d.temperatures[i]||{};
    const value=t.valid&&typeof t.value==="number"?t.value.toFixed(1)+" °C":"--.- °C";
    text("t"+i,value);text("tstate"+i,t.valid?"":t.ever?"Устарело":"Нет данных");

@@ -38,8 +38,8 @@ const char* const PAGES[]={"Главная","Оборудование","Топл
 constexpr int PAGE_SETTINGS=3;
 enum MenuView { Root=0,WifiView=1,BleView=2,DisplayView=4,ConnectionsView=6,HaView=7,ServiceView=8,StorageView=9,DiagnosticsView=10,AboutView=11,WifiMoreView=12,UpdateView=13 };
 int parentMenuView(int v){if(v==WifiMoreView)return WifiView;if(v==WifiView||v==BleView||v==HaView)return ConnectionsView;if(v==StorageView||v==DiagnosticsView||v==AboutView||v==UpdateView)return ServiceView;return Root;}
-const char* const SENSOR_NAMES[]={"В доме","На улице","Теплоноситель","Топливо"};
-const uint32_t ACCENT[]={SKY,SKY,SKY,SKY};
+const char* const SENSOR_NAMES[]={"В доме","На улице","Подача","Топливо","Обратка"};
+static_assert(sizeof(SENSOR_NAMES)/sizeof(SENSOR_NAMES[0])==CHANNELS,"Home labels must match telemetry channels");
 Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sensor events.
 FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
 lv_obj_t *equipmentFuelTemp=nullptr,*equipmentFuelLevel=nullptr;
@@ -53,7 +53,7 @@ struct FuelCanister {
   lv_obj_t *crossA=nullptr,*crossB=nullptr,*glyph=nullptr,*temperature=nullptr,*status=nullptr;
 };
 FuelCanister fuelCanister;
-lv_obj_t* tempIcon[3]={};
+lv_obj_t* tempIcon[2]={};
 constexpr int CANISTER_FILL_HEIGHT=74;
 void updateCanister();
 struct FuelLevelLabels {
@@ -127,7 +127,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES,BoilerEdit=200,BoilerSave};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,Temp4,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES,BoilerEdit=200,BoilerSave};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
 void updateStorageLabel();
@@ -418,7 +418,7 @@ void action(lv_event_t* e){
     else if(!target.open)credentialsFor(target.ssid,false);
     return;
   }
-  if(code>=Temp0 && code<=Temp3){
+  if(code>=Temp0 && code<=Temp4){
     sensorDetails(unsigned(code-Temp0));return;
   }
   if(code>=Timeout0 && code<=Timeout6){cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=DISPLAY_TIMEOUTS[code-Timeout0];send(cmd);return;}
@@ -610,7 +610,7 @@ void temperatureIcon(lv_obj_t* tile,unsigned channel){
     iconLine(root,roof,3);
     auto* door=iconRect(root,56,65,22,35,3);lv_obj_set_style_bg_color(door,c(0x245D55),0);
     auto* window=iconRect(root,35,61,12,14,2);lv_obj_set_style_bg_color(window,c(0x245D55),0);
-  }else if(channel==1){
+  }else{
     iconRect(root,18,16,40,40,LV_RADIUS_CIRCLE);
     static const lv_point_t rays[][2]={{{38,3},{38,9}},{{8,36},{2,36}},{{64,10},{59,15}},{{10,10},{15,15}},{{67,36},{74,36}},{{10,62},{15,57}}};
     for(const auto& ray:rays)iconLine(root,ray,2);
@@ -618,17 +618,10 @@ void temperatureIcon(lv_obj_t* tile,unsigned channel){
     auto* cover=box(root,32,40,78,58,CARD,0);lv_obj_set_style_border_width(cover,0,0);passive(cover);
     static const lv_point_t cloud[]={{34,94},{25,91},{20,84},{18,76},{20,68},{26,62},{34,60},{37,49},{44,40},{54,35},{65,34},{76,37},{84,44},{88,54},{96,54},{104,58},{110,65},{112,74},{110,84},{104,91},{96,94},{34,94}};
     iconLine(root,cloud,sizeof(cloud)/sizeof(cloud[0]));
-  }else{
-    static const lv_point_t inlet[]={{15,40},{15,18},{5,18}},outlet[]={{105,82},{115,82},{115,98}};
-    iconLine(root,inlet,3);iconLine(root,outlet,3);
-    iconRect(root,14,32,92,58,7);
-    for(int x:{25,44,63,82}){auto* fin=iconRect(root,x,36,12,50,4);lv_obj_set_style_bg_color(fin,c(0x245D55),0);}
-    static const lv_point_t feet[][2]={{{28,92},{28,100}},{{92,92},{92,100}}};
-    for(const auto& foot:feet)iconLine(root,foot,2);
   }
 }
 void canister(lv_obj_t* tile){
-  fuelCanister.temperature=tempValue[3]; // All four temperatures share the Home label/update path.
+  fuelCanister.temperature=tempValue[3]; // Fuel stays at telemetry index 3.
   fuelCanister.root=box(tile,64,156,80,108,CARD,0);
   lv_obj_set_style_border_width(fuelCanister.root,0,0);passive(fuelCanister.root);
   fuelCanister.handle=box(fuelCanister.root,38,4,29,18,CARD,4);
@@ -681,18 +674,30 @@ void updateCanister(){
   lv_label_set_text(fuelCanister.glyph,mark);lv_obj_set_style_text_color(fuelCanister.glyph,c(ink),0);
   lv_label_set_text(fuelCanister.status,status);lv_obj_set_style_text_color(fuelCanister.status,c(ink),0);
 }
+lv_obj_t* homeTile(unsigned channel,int x,int y,int height){
+  auto* tile=box(body,x,y,208,height);
+  const uintptr_t target=channel==3?FuelOverview:Temp0+channel;
+  lv_obj_add_event_cb(tile,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(target));
+  lv_obj_set_style_border_color(tile,c(SKY),LV_STATE_PRESSED);
+  return tile;
+}
 void home(){
-  // Four cards now use the space freed by removing the lower fuel-level button.
-  for(unsigned i=0;i<CHANNELS;i++){
-    auto* tile=box(body,24+int(i%2)*224,12+int(i/2)*322,208,300);
-    lv_obj_add_event_cb(tile,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(uintptr_t(i==3?FuelOverview:Temp0+i)));
-    lv_obj_set_style_border_color(tile,c(SKY),LV_STATE_PRESSED);
+  for(unsigned i:{0U,1U,3U}){
+    auto* tile=homeTile(i,24+int(i%2)*224,12+int(i/2)*322,300);
     label(tile,SENSOR_NAMES[i],18,22,172,&boiler_font_19,MUTED);
     tempValue[i]=label(tile,"--.-",16,50,178,&boiler_font_55);
     label(tile,"°C",18,128,172,&boiler_font_19,MUTED);
     if(i==3){canister(tile);continue;}
     temperatureIcon(tile,i);
     tempState[i]=label(tile,"Нет данных",18,269,172,&boiler_font_14,MUTED);
+  }
+  // Two separate touch targets occupy the former coolant tile.
+  for(unsigned i:{2U,4U}){
+    auto* tile=homeTile(i,24,i==2?334:488,146);
+    label(tile,SENSOR_NAMES[i],16,8,136,&boiler_font_19,MUTED);
+    label(tile,"°C",158,8,36,&boiler_font_19,MUTED);
+    tempValue[i]=label(tile,"--.-",16,37,178,&boiler_font_55);
+    tempState[i]=label(tile,"Нет данных",16,117,178,&boiler_font_14,MUTED);
   }
   if(homeUpdateVisible()){
     homeUpdateNotice=box(body,24,638,432,34,BG,8);lv_obj_set_style_border_width(homeUpdateNotice,0,0);
@@ -1106,8 +1111,9 @@ void refresh(lv_timer_t*){
   panel_sensors::Event sensorEvent;
   for(unsigned n=0;n<18&&panel_sensors::poll(sensorEvent);n++){
     if(sensorEvent.revision!=lastSensorConfigRevision)continue;
-    if(sensorEvent.channel<CHANNELS)
-      measurements[sensorEvent.channel].put(sensorEvent.temperature,sensorEvent.atMs);
+    const int temperatureChannel=panel_config::temperatureIndex(sensorEvent.channel);
+    if(temperatureChannel>=0)
+      measurements[temperatureChannel].put(sensorEvent.temperature,sensorEvent.atMs);
     else if(sensorEvent.channel==uint8_t(panel_config::Channel::FuelLower))
       fuelLevel.lower.put(sensorEvent.reedReached,sensorEvent.atMs);
     else if(sensorEvent.channel==uint8_t(panel_config::Channel::FuelUpper))
