@@ -44,6 +44,7 @@ Measurement measurements[CHANNELS]; // Populated only from CRC-verified real sen
 FuelLevel fuelLevel; // Populated from configured, debounced GPIO contacts only.
 lv_obj_t *boilerOnLabel=nullptr,*boilerOffLabel=nullptr;
 lv_obj_t *boilerOnField=nullptr,*boilerOffField=nullptr,*boilerSaveCaption=nullptr;
+panel_boiler::Target boilerDraftTarget=panel_boiler::Target::Dhw;
 uint32_t boilerDraftRevision=0;
 bool boilerConfirm=false;
 lv_obj_t *haStatusLabel=nullptr,*detailValue=nullptr;
@@ -224,12 +225,16 @@ void boilerSettingsChanged(lv_event_t*){
   boilerConfirm=false;lv_label_set_text(boilerSaveCaption,"Сохранить");
   error("Проверьте оба порога и сохраните их вместе.");
 }
+panel_boiler::Target equipmentBoilerTarget(){
+  return view==2?panel_boiler::Target::Electric:panel_boiler::Target::Dhw;
+}
 void editBoiler(){
+  const auto target=equipmentBoilerTarget();
   panel_boiler::Settings current;
-  if(!panel_boiler::snapshot(current)){info("Пороги недоступны","Не удалось прочитать настройки. Повторите позже.");return;}
-  dismiss();dialogKind=6;boilerDraftRevision=current.revision;
+  if(!panel_boiler::snapshot(current,target)){info("Пороги недоступны","Не удалось прочитать настройки. Повторите позже.");return;}
+  dismiss();dialogKind=6;boilerDraftTarget=target;boilerDraftRevision=current.revision;
   overlay=box(lv_layer_top(),0,0,480,800,BG,0);
-  label(overlay,"Пороги бойлера",18,24,435,&boiler_font_25);
+  label(overlay,target==panel_boiler::Target::Electric?"Пороги электрокотла":"Пороги бойлера",18,24,435,&boiler_font_25);
   label(overlay,"Включение при охлаждении, °C",18,92,444,&boiler_font_19);
   boilerOnField=field(overlay,"Не задано",18,133,444,2);
   label(overlay,"Выключение при нагреве, °C",18,210,444,&boiler_font_19);
@@ -262,7 +267,7 @@ void saveBoiler(){
     char review[160];snprintf(review,sizeof(review),"Включение: %d °C. Выключение: %d °C. Подтвердите сохранение.",on,off);
     error(review);boilerConfirm=true;lv_label_set_text(boilerSaveCaption,"Подтвердить");return;
   }
-  const auto r=panel_boiler::save(boilerDraftRevision,on,off);
+  const auto r=panel_boiler::save(boilerDraftRevision,on,off,boilerDraftTarget);
   if(r==panel_boiler::Result::Saved){
     closeDialog=true;rebuild=true;return;
   }
@@ -731,7 +736,7 @@ void home(){
 
 void updateEquipmentReadings(){
   if(boilerOnLabel&&boilerOffLabel){
-    panel_boiler::Settings settings;const bool ok=panel_boiler::snapshot(settings);
+    panel_boiler::Settings settings;const bool ok=panel_boiler::snapshot(settings,equipmentBoilerTarget());
     char on[80],off[80];
     if(ok&&settings.configured){snprintf(on,sizeof(on),"%u °C и ниже",unsigned(settings.onC));snprintf(off,sizeof(off),"%u °C и выше",unsigned(settings.offC));}
     else{snprintf(on,sizeof(on),"%s",ok?"Не задано":"Нет данных");snprintf(off,sizeof(off),"%s",on);}
@@ -739,8 +744,8 @@ void updateEquipmentReadings(){
     if(strcmp(lv_label_get_text(boilerOffLabel),off))lv_label_set_text(boilerOffLabel,off);
   }
 }
-void equipmentInfoCard(lv_obj_t* parent,const char* title,int y,int width){
-  auto* card=box(parent,0,y,width,84);
+void equipmentInfoCard(lv_obj_t* parent,const char* title,int x,int width){
+  auto* card=box(parent,x,0,width,84);
   label(card,title,20,16,width-40,&boiler_font_19);
   label(card,"Нет данных",20,48,width-40,&boiler_font_14,MUTED);
 }
@@ -755,33 +760,47 @@ void fuelTemperatures(int y){
   pairedReading(card,3,0,40);
   pairedReading(card,5,216,40);
 }
+void unavailableHeatButton(const char* caption,int y){
+  auto* heat=button(body,caption,24,y,432,58,0,0x26373B,false);
+  // Keep the unavailable action legible without using the active action color.
+  lv_obj_set_style_opa(heat,LV_OPA_COVER,LV_STATE_DISABLED);
+  lv_obj_set_style_color_filter_opa(heat,LV_OPA_TRANSP,LV_STATE_DISABLED);
+  lv_obj_set_style_text_color(lv_obj_get_child(heat,0),c(MUTED),0);
+}
+void boilerThresholds(int y){
+  auto* limits=box(body,24,y,432,210);
+  label(limits,"Включать при",20,16,390,&boiler_font_19,MUTED);
+  boilerOnLabel=label(limits,"",20,52,390,&boiler_font_25);
+  label(limits,"Выключать при",20,112,390,&boiler_font_19,MUTED);
+  boilerOffLabel=label(limits,"",20,148,390,&boiler_font_25);
+}
 void equipmentPage(){
   if(view==1){
     auto* water=box(body,24,16,432,120);
     label(water,"Температура воды в бойлере",20,18,390,&boiler_font_19,MUTED);
     label(water,"Нет данных",20,58,390,&boiler_font_25);
-    auto* heat=button(body,"Включить бойлер",24,160,432,58,0,0x26373B,false);
-    // Keep the unavailable action legible without using the active action color.
-    lv_obj_set_style_opa(heat,LV_OPA_COVER,LV_STATE_DISABLED);
-    lv_obj_set_style_color_filter_opa(heat,LV_OPA_TRANSP,LV_STATE_DISABLED);
-    lv_obj_set_style_text_color(lv_obj_get_child(heat,0),c(MUTED),0);
+    unavailableHeatButton("Включить бойлер",160);
     label(body,"Не подключены датчик воды и контроллер.",24,236,432,&boiler_font_19,MUTED);
-    auto* limits=box(body,24,307,432,210);
-    label(limits,"Включать при",20,16,390,&boiler_font_19,MUTED);
-    boilerOnLabel=label(limits,"",20,52,390,&boiler_font_25);
-    label(limits,"Выключать при",20,112,390,&boiler_font_19,MUTED);
-    boilerOffLabel=label(limits,"",20,148,390,&boiler_font_25);
+    boilerThresholds(307);
     button(body,"Изменить пороги",24,552,432,64,BoilerEdit);
+    return;
+  }
+  if(view==2){
+    unavailableHeatButton("Включить ТЭНы",16);
+    label(body,"Датчик регулирования не назначен.\nКонтроллер ТЭНов не подключён.",24,94,432,&boiler_font_19,MUTED);
+    boilerThresholds(176);
+    button(body,"Изменить пороги",24,410,432,58,BoilerEdit);
+    auto* list=box(body,24,510,432,88,BG,0);lv_obj_set_style_border_width(list,0,0);
+    equipmentInfoCard(list,"Контур 1",0,136);
+    equipmentInfoCard(list,"Контур 2",148,136);
+    equipmentInfoCard(list,"Контур 3",296,136);
     return;
   }
   auto* state=box(body,24,16,432,168);
   label(state,"Контроллер",20,22,390,&boiler_font_19,MUTED);
   label(state,"Не подключён",20,68,390,&boiler_font_25);
   label(state,"Управление недоступно",20,120,390,&boiler_font_14,MUTED);
-  if(view==2){
-    auto* list=box(body,24,214,432,300,BG,0);lv_obj_set_style_border_width(list,0,0);
-    equipmentInfoCard(list,"Контур 1",0,432);equipmentInfoCard(list,"Контур 2",102,432);equipmentInfoCard(list,"Контур 3",204,432);
-  }else if(view==4){
+  if(view==4){
     fuelTemperatures(216);
     label(body,"До 80 °C — требование проекта,\nне действующая уставка.",24,420,432,&boiler_font_19,MUTED);
     menuRow(body,"Уровень топлива","Открыть показания",532,FuelOverview,112);

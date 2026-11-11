@@ -5,11 +5,23 @@
 
 namespace panel_boiler {
 namespace {
-constexpr char SPACE[]="bp_dhw", KEY[]="thresholds";
+constexpr char KEY[]="thresholds";
 constexpr uint16_t FORMAT=0x4201;
 SemaphoreHandle_t mutex=nullptr;
-bool known=false;
-Settings current;
+struct Store {
+  const char* space;
+  bool known;
+  Settings current;
+};
+Store dhw{"bp_dhw",false,{}},electric{"bp_electric",false,{}};
+
+Store* forTarget(Target target){
+  switch(target){
+    case Target::Dhw:return &dhw;
+    case Target::Electric:return &electric;
+  }
+  return nullptr;
+}
 
 struct Guard {
   bool held=mutex && xSemaphoreTake(mutex,pdMS_TO_TICKS(50))==pdTRUE;
@@ -21,10 +33,10 @@ bool valid(int on,int off){return on>=0 && off<=99 && on<off;}
 uint64_t encode(const Settings& s){
   return (uint64_t(FORMAT)<<48) | (uint64_t(s.revision)<<16) | (uint64_t(s.onC)<<8) | s.offC;
 }
-bool read(Settings& out){
+bool read(const Store& store,Settings& out){
   out={};
   nvs_handle_t handle;
-  esp_err_t err=nvs_open(SPACE,NVS_READONLY,&handle);
+  esp_err_t err=nvs_open(store.space,NVS_READONLY,&handle);
   if(err==ESP_ERR_NVS_NOT_FOUND)return true; // fresh namespace
   if(err!=ESP_OK)return false;
   uint64_t word=0;
@@ -38,9 +50,9 @@ bool read(Settings& out){
   out.configured=true;out.revision=revision;out.onC=on;out.offC=off;
   return true;
 }
-bool write(const Settings& s){
+bool write(const Store& store,const Settings& s){
   nvs_handle_t handle;
-  if(nvs_open(SPACE,NVS_READWRITE,&handle)!=ESP_OK)return false;
+  if(nvs_open(store.space,NVS_READWRITE,&handle)!=ESP_OK)return false;
   esp_err_t err=s.configured?nvs_set_u64(handle,KEY,encode(s)):nvs_erase_key(handle,KEY);
   if(!s.configured && err==ESP_ERR_NVS_NOT_FOUND)err=ESP_OK;
   if(err==ESP_OK)err=nvs_commit(handle);
@@ -55,34 +67,39 @@ bool same(const Settings& a,const Settings& b){
 bool begin(){
   if(!mutex)mutex=xSemaphoreCreateMutex();
   Guard lock;if(!lock.held)return false;
-  known=read(current);return known;
+  dhw.known=read(dhw,dhw.current);
+  electric.known=read(electric,electric.current);
+  return dhw.known && electric.known;
 }
-bool snapshot(Settings& out){
-  out={};Guard lock;if(!lock.held)return false;
+bool snapshot(Settings& out,Target target){
+  out={};
+  auto* store=forTarget(target);
+  Guard lock;if(!lock.held || !store)return false;
   // Cached reads avoid flash traffic during normal UI refreshes.
-  if(!known)known=read(current);
-  if(!known)return false;
-  out=current;return true;
+  if(!store->known)store->known=read(*store,store->current);
+  if(!store->known)return false;
+  out=store->current;return true;
 }
-Result save(uint32_t expectedRevision,int onC,int offC){
-  if(!valid(onC,offC))return Result::Invalid;
+Result save(uint32_t expectedRevision,int onC,int offC,Target target){
+  auto* store=forTarget(target);
+  if(!store || !valid(onC,offC))return Result::Invalid;
   Guard lock;if(!lock.held)return Result::Unavailable;
   Settings before;
-  known=read(before);
-  if(!known)return Result::Unavailable;
-  current=before;
+  store->known=read(*store,before);
+  if(!store->known)return Result::Unavailable;
+  store->current=before;
   if(before.revision!=expectedRevision)return Result::Conflict;
   if(before.configured && before.onC==onC && before.offC==offC)return Result::Saved;
   if(before.revision==UINT32_MAX)return Result::Unavailable; // never reuse a revision
   Settings next=before;
   next.configured=true;next.onC=uint8_t(onC);next.offC=uint8_t(offC);++next.revision;
   Settings check;
-  if(write(next) && read(check) && same(check,next)){
-    current=check;return Result::Saved;
+  if(write(*store,next) && read(*store,check) && same(check,next)){
+    store->current=check;return Result::Saved;
   }
   // A commit error may be ambiguous. Try to restore the previous pair, but do
   // not report either value as confirmed if storage is still unreadable.
-  known=write(before) && read(check) && same(check,before);
+  store->known=write(*store,before) && read(*store,check) && same(check,before);
   return Result::Unavailable;
 }
 } // namespace panel_boiler

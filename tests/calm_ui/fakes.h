@@ -22,14 +22,16 @@ namespace panel_radio {
 }
 namespace panel_config {State fixture;bool begin(){return true;}bool snapshot(State& s){s=fixture;return true;}}
 namespace panel_boiler {
- Settings fixture;bool available=true;unsigned attempts=0;
+ Settings fixture,electric;bool available=true;unsigned attempts=0;
+ Settings& settings(Target target){return target==Target::Electric?electric:fixture;}
  bool begin(){return true;}
- bool snapshot(Settings& s){if(!available)return false;s=fixture;return true;}
- Result save(uint32_t revision,int on,int off){
+ bool snapshot(Settings& out,Target target){if(!available)return false;out=settings(target);return true;}
+ Result save(uint32_t revision,int on,int off,Target target){
    ++attempts;if(!available)return Result::Unavailable;
-   if(revision!=fixture.revision)return Result::Conflict;
+   Settings& selected=settings(target);
+   if(revision!=selected.revision)return Result::Conflict;
    if(on<0||off>99||on>=off)return Result::Invalid;
-   fixture.configured=true;fixture.onC=uint8_t(on);fixture.offC=uint8_t(off);++fixture.revision;
+   selected.configured=true;selected.onC=uint8_t(on);selected.offC=uint8_t(off);++selected.revision;
    return Result::Saved;
  }
 }

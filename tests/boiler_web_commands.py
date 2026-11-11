@@ -10,9 +10,9 @@ p = s.index("void commandRequest() {")
 guard = s[p:s.index('  if(kind=="update_check"', p)]
 p = s.index("// Read/status and pairing", p)
 guard += s[s.index("  if(update.busy||update.bootPending)", p):s.index('  if(kind=="ha_discover")', p)]
-p = s.index('  if(kind=="boiler_thresholds")', p)
+p = s.index('  if(kind=="boiler_thresholds" ||', p)
 guard += s[p:s.index('  if(kind=="sd_format_prepare")', p)]
-p = s.index("  panel_boiler::Settings boiler;", s.index("void statusRequest()"))
+p = s.index("  for(const auto target : {panel_boiler::Target", s.index("void statusRequest()"))
 status = s[p:s.index("  panel_storage::Snapshot storage;", p)]
 digits = s[s.index("bool allDigits("):s.index("#if BP_WEB_ENABLED", s.index("bool allDigits("))]
 driver = r'''
@@ -37,11 +37,18 @@ void jsonResponse(int c,const String& value){code=c;reply=value;}
 namespace panel_update{struct Snapshot{bool started=true,busy=false,bootPending=false;};Snapshot fixture;
  bool ready=true;bool snapshot(Snapshot& v){v=fixture;return ready;}}
 namespace panel_boiler{
- Settings fixture;bool readable=true;unsigned calls=0;Result next=Result::Saved;
- bool snapshot(Settings& b){b=fixture;return readable;}
- Result save(uint32_t expected,int on,int off){
-  ++calls;assert(on==10&&off==50);if(expected!=fixture.revision)return Result::Conflict;
-  if(next==Result::Saved){fixture.configured=true;fixture.onC=on;fixture.offC=off;++fixture.revision;}return next;
+ Settings dhw,electric;bool readable=true,electricReadable=true;unsigned calls=0;Result next=Result::Saved;
+ bool snapshot(Settings& b,Target t){
+  b=t==Target::Dhw?dhw:electric;return t==Target::Dhw?readable:electricReadable;
+ }
+ Result save(uint32_t expected,int on,int off,Target t){
+  auto& fixture=t==Target::Dhw?dhw:electric;
+  ++calls;
+  if(t==Target::Dhw){assert(on==10&&off==50);}
+  else {assert(t==Target::Electric&&on==22&&off==64);}
+  if(expected!=fixture.revision)return Result::Conflict;
+  if(next==Result::Saved){fixture.configured=true;fixture.onC=on;fixture.offC=off;++fixture.revision;}
+  return next;
  }
 }
 DIGITS
@@ -65,6 +72,18 @@ int main(){
  server.args["revision"]="17";check(409,1);server.args["revision"]="0";next=Result::Unavailable;check(503,2);
  next=Result::Saved;check(200,3);std::cout<<reply<<"\n";printStatus();
  server.args["revision"]="1";readable=false;check(409,4);assert(reply=="boiler_save_unconfirmed");
+ server.args["action"]="electric_enable";check(404,4);
+ server.args["action"]="electric_thresholds";server.args["on_c"]="22";server.args["off_c"]="64";
+ auth=false;check(401,4);auth=true;origin=false;check(403,4);origin=true;
+ panel_update::fixture.busy=true;check(409,4);panel_update::fixture.busy=false;
+ panel_update::fixture.started=false;check(503,4);panel_update::fixture.started=true;
+ panel_update::fixture.bootPending=true;check(409,4);panel_update::fixture.bootPending=false;
+ server.args["off_c"]="22";check(400,4);assert(reply=="invalid_electric_thresholds");
+ server.args["off_c"]="64";check(409,5);assert(reply=="stale_revision");
+ next=Result::Unavailable;server.args["revision"]="0";check(503,6);assert(reply=="electric_settings_unavailable");
+ next=Result::Saved;check(200,7);std::cout<<reply<<"\n";printStatus();
+ server.args["revision"]="1";electricReadable=false;check(409,8);assert(reply=="electric_save_unconfirmed");
+ readable=true;printStatus();
 }
 '''
 for marker, code in (("DIGITS",digits),("GUARD",guard),("STATUS",status)):
@@ -73,9 +92,15 @@ with tempfile.TemporaryDirectory() as tmp:
     cpp, exe = Path(tmp)/"boiler.cpp", Path(tmp)/"boiler"
     cpp.write_text(driver)
     subprocess.run(["g++","-std=c++17","-Wall","-Wextra","-Werror","-I",str(root/"src"),str(cpp),"-o",str(exe)],check=True)
-    empty, unknown, saved, configured = map(json.loads, subprocess.check_output([exe],text=True).splitlines())
+    empty, unknown, saved, configured, electric_save, electric_only, electric_unknown = map(json.loads, subprocess.check_output([exe],text=True).splitlines())
 assert empty["boiler_settings"] == dict(revision=0,configured=False,on_c=None,off_c=None)
 assert unknown["boiler_settings"] is None
 assert saved == dict(ok=True,saved=True,revision=1)
 assert configured["boiler_settings"] == dict(revision=1,configured=True,on_c=10,off_c=50)
-print("PASS: boiler settings status, guarded CAS write, rejected invalid/stale fields, no enable route")
+assert empty["electric_settings"] == configured["electric_settings"] == empty["boiler_settings"]
+assert unknown["electric_settings"] == empty["electric_settings"]
+assert electric_save == saved
+assert electric_only["electric_settings"] == dict(revision=1,configured=True,on_c=22,off_c=64)
+assert electric_only["boiler_settings"] is None
+assert electric_unknown["electric_settings"] is None and electric_unknown["boiler_settings"]["on_c"] == 10
+print("PASS: separate boiler/electric status and writes, status/revision conflict, auth/Origin/OTA guards, no enable route")

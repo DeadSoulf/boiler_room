@@ -282,14 +282,14 @@ void statusRequest() {
     j+=",\"connected\":false,\"state\":\"not_connected\"}";
   }
   j+="]";
-  panel_boiler::Settings boiler;
-  j+=",\"boiler_settings\":";
-  if(!panel_boiler::snapshot(boiler))j+="null";
-  else {
-    j+="{\"revision\":";j+=String(boiler.revision);
-    j+=",\"configured\":";j+=boiler.configured?"true":"false";
-    if(boiler.configured){
-      j+=",\"on_c\":";j+=String(unsigned(boiler.onC));j+=",\"off_c\":";j+=String(unsigned(boiler.offC));
+  for(const auto target : {panel_boiler::Target::Dhw,panel_boiler::Target::Electric}){
+    j+=target==panel_boiler::Target::Dhw?",\"boiler_settings\":":",\"electric_settings\":";
+    panel_boiler::Settings limits;
+    if(!panel_boiler::snapshot(limits,target)){j+="null";continue;}
+    j+="{\"revision\":";j+=String(limits.revision);
+    j+=",\"configured\":";j+=limits.configured?"true":"false";
+    if(limits.configured){
+      j+=",\"on_c\":";j+=String(unsigned(limits.onC));j+=",\"off_c\":";j+=String(unsigned(limits.offC));
     }else j+=",\"on_c\":null,\"off_c\":null";
     j+='}';
   }
@@ -460,21 +460,24 @@ void commandRequest() {
     jsonResponse(200,"{\"ok\":true,\"saved\":true}");return;
   }
 
-  if(kind=="boiler_thresholds"){
+  if(kind=="boiler_thresholds" || kind=="electric_thresholds"){
+    const bool electric=kind=="electric_thresholds";
+    const auto target=electric?panel_boiler::Target::Electric:panel_boiler::Target::Dhw;
+    const char* invalid=electric?"invalid_electric_thresholds":"invalid_boiler_thresholds";
     if(!update.started){errorResponse(503,"update_state_unavailable");return;}
     const String on=server.arg("on_c"),off=server.arg("off_c"),revision=server.arg("revision");
     if(!allDigits(on,1,2)||!allDigits(off,1,2)||asUint(on)>=asUint(off)||
        !allDigits(revision,1,10)||strtoull(revision.c_str(),nullptr,10)>0xffffffffULL){
-      errorResponse(400,"invalid_boiler_thresholds");return;
+      errorResponse(400,invalid);return;
     }
-    const auto result=panel_boiler::save(asUint(revision),int(asUint(on)),int(asUint(off)));
-    if(result==panel_boiler::Result::Invalid){errorResponse(400,"invalid_boiler_thresholds");return;}
+    const auto result=panel_boiler::save(asUint(revision),int(asUint(on)),int(asUint(off)),target);
+    if(result==panel_boiler::Result::Invalid){errorResponse(400,invalid);return;}
     if(result==panel_boiler::Result::Conflict){errorResponse(409,"stale_revision");return;}
-    if(result!=panel_boiler::Result::Saved){errorResponse(503,"boiler_settings_unavailable");return;}
+    if(result!=panel_boiler::Result::Saved){errorResponse(503,electric?"electric_settings_unavailable":"boiler_settings_unavailable");return;}
     panel_boiler::Settings confirmed;
-    if(!panel_boiler::snapshot(confirmed)||!confirmed.configured||
+    if(!panel_boiler::snapshot(confirmed,target)||!confirmed.configured||
        unsigned(confirmed.onC)!=asUint(on)||unsigned(confirmed.offC)!=asUint(off)){
-      errorResponse(409,"boiler_save_unconfirmed");return;
+      errorResponse(409,electric?"electric_save_unconfirmed":"boiler_save_unconfirmed");return;
     }
     jsonResponse(200,String("{\"ok\":true,\"saved\":true,\"revision\":")+String(confirmed.revision)+"}");return;
   }

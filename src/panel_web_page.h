@@ -47,15 +47,15 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
 </div>
 <div id="temperature-detail" class="card section hidden"><div class="stack" style="justify-content:space-between"><h2 id="detail-title">Температура</h2><button data-action="close-detail" class="ghost">Закрыть</button></div><p id="detail-meta"></p><svg id="detail-chart" class="detail-chart" viewBox="0 0 400 100" preserveAspectRatio="none" aria-label="История измерений"></svg><p id="detail-stats" class="tiny"></p></div></section>
 <section id="equipment" class="page hidden"><h2>Оборудование</h2><div class="equip-list" id="equipment-list"></div><p class="tiny">Управление появится после подключения и проверки исполнительных контроллеров.</p></section>
-<template id="boiler-controls"><div>
- <div class="row"><span>Температура воды в баке</span><strong>Нет данных</strong></div>
- <button type="button" disabled aria-describedby="boiler-hardware">Включить бойлер</button>
- <p class="hint" id="boiler-hardware">Не подключены датчик воды и контроллер нагрева.</p>
- <form id="boiler-form" novalidate>
- <div class="field"><label for="boiler-on">Включать при температуре ≤ (°C)</label><input id="boiler-on" inputmode="numeric" maxlength="2" placeholder="Не задано" disabled></div>
- <div class="field"><label for="boiler-off">Выключать при температуре ≥ (°C)</label><input id="boiler-off" inputmode="numeric" maxlength="2" placeholder="Не задано" disabled></div>
- <div class="actions"><button type="submit" id="boiler-save" class="primary" disabled>Сохранить пороги</button><button type="button" id="boiler-reload" class="ghost hidden" disabled>Перечитать с панели</button></div>
- <p class="hint" id="boiler-feedback" role="status"></p></form>
+<template id="threshold-controls"><div>
+ <div class="row"><span data-part="temperature"></span><strong>Нет данных</strong></div>
+ <button type="button" data-part="enable" disabled></button>
+ <p class="hint" data-part="hardware"></p>
+ <form data-part="form" novalidate>
+ <div class="field"><label data-label="on">Включать при температуре ≤ (°C)</label><input data-part="on" inputmode="numeric" maxlength="2" placeholder="Не задано" disabled></div>
+ <div class="field"><label data-label="off">Выключать при температуре ≥ (°C)</label><input data-part="off" inputmode="numeric" maxlength="2" placeholder="Не задано" disabled></div>
+ <div class="actions"><button type="submit" data-part="save" class="primary" disabled>Сохранить пороги</button><button type="button" data-part="reload" class="ghost hidden" disabled>Перечитать с панели</button></div>
+ <p class="hint" data-part="feedback" role="status"></p></form>
 </div></template>
 <section id="fuel" class="page hidden"><h2>Топливо</h2><div class="two"><div class="card"><h3>Уровень</h3><p id="fuel-status" class="fuel-summary-value">Нет данных</p><div class="row"><span>Нижний датчик</span><span id="lower-status">Нет данных</span></div><div class="row"><span>Верхний датчик</span><span id="upper-status">Нет данных</span></div><details><summary>Как определяется уровень</summary><p class="tiny">Два геркона дают три состояния, без расчёта литров. Для принятой схемы контактов используйте режим NC: оба разомкнуты — полная канистра; замкнут верхний — половина; замкнуты оба — пустая. Обрыв провода неотличим от размыкания контакта.</p></details></div><div class="card"><h3>Температура и подогрев</h3><div class="row"><span>В баке</span><b id="fuel-temp">--.- °C</b></div><div class="row"><span>На выходе</span><b id="fuel-outlet-temp">--.- °C</b></div><div class="row"><span>Контроллер подогрева</span><span id="fuel-controller">Не подключён</span></div><div class="actions"><button class="ghost" data-temp="3" aria-controls="temperature-detail">История в баке</button><button class="ghost" data-temp="5" aria-controls="temperature-detail">История на выходе</button></div><p class="tiny">До 80 °C — требование проекта, не действующая уставка. Команд нагрева нет.</p></div></div></section>
 <section id="settings" class="page hidden">
@@ -527,78 +527,92 @@ function updateDetail(){
  const line=document.createElementNS("http://www.w3.org/2000/svg","polyline");
  line.setAttribute("points",points);line.setAttribute("fill","none");line.setAttribute("stroke","#71ccfa");line.setAttribute("stroke-width","2.5");svg.append(line);
 }
-// Hold the displayed revision with the draft; a poll can never rebase an unsaved edit.
-const boilerEdit={base:null,dirty:false,saving:false,awaiting:null,reloadAfter:null,review:false,message:""};
-function boilerConfig(){
- const b=current?.boiler_settings;
+const heatingSettings={
+ boiler:{status:"boiler_settings",action:"boiler_thresholds",temperature:"Температура воды в баке",
+   button:"Включить бойлер",hardware:"Не подключены датчик воды и контроллер нагрева.",unavailable:"Настройки бойлера недоступны."},
+ electric:{status:"electric_settings",action:"electric_thresholds",temperature:"Температура электрокотла",
+   button:"Включить ТЭНы",hardware:"Не подключены датчик температуры электрокотла и контроллер ТЭНов.",unavailable:"Настройки электрокотла недоступны."}
+};
+// Each equipment card keeps its own draft, original revision and save/readback state.
+const thresholdViews=[];
+function validThresholdConfig(b){
  if(!b||!Number.isInteger(b.revision)||b.revision<0||b.revision>0xffffffff)return null;
  if(b.configured===false&&b.revision===0&&b.on_c===null&&b.off_c===null)return b;
  return b.configured===true&&b.revision>0&&Number.isInteger(b.on_c)&&Number.isInteger(b.off_c)&&
    b.on_c>=0&&b.on_c<b.off_c&&b.off_c<=99?b:null;
 }
-function boilerAllowed(){
- const u=current?.update;
- return serverOnline&&!!token&&current?.authorized===true&&!!boilerConfig()&&u?.started===true&&
-   u.busy===false&&u.boot_pending===false&&!pendingUpdate&&!updateRequestInFlight;
-}
-function boilerValues(){
- const on=$("boiler-on").value,off=$("boiler-off").value;
- return /^\d{1,2}$/.test(on)&&/^\d{1,2}$/.test(off)&&Number(on)<Number(off)?{on:Number(on),off:Number(off)}:null;
-}
-function requestBoilerStatus(){if(refreshInFlight)pinPollQueued=true;else poll();}
-function renderBoiler(){
- if(!$("boiler-form"))return;
- const e=boilerEdit,b=boilerConfig(),valid=serverOnline&&!!b;
- if(e.reloadAfter!==null&&pinPollSerial>e.reloadAfter){
-   e.reloadAfter=null;
-   if(valid){e.base=null;e.dirty=e.review=false;e.message="Показаны сохранённые пороги.";}
-   else e.message="Перечитать настройки не удалось. Введённые значения оставлены в форме.";
+function mountThresholdEditor(card,kind){
+ const settings=heatingSettings[kind], content=$("threshold-controls").content.cloneNode(true), fields={};
+ for(const part of content.querySelectorAll("[data-part]")){
+   fields[part.dataset.part]=part;
+   part.id=kind+"-"+part.dataset.part;
  }
- if(e.awaiting&&pinPollSerial>e.awaiting.after){
-   const a=e.awaiting;e.awaiting=null;
-   if(valid&&current?.authorized===true&&token===a.token&&b.configured&&b.revision===a.revision&&b.on_c===a.on&&b.off_c===a.off){
-     e.base=null;e.dirty=e.review=false;e.message="Оба порога сохранены на панели.";
-   }else{e.review=true;e.message="Сохранение не подтверждено. Перечитайте пороги с панели.";}
+ for(const label of content.querySelectorAll("[data-label]"))label.htmlFor=fields[label.dataset.label].id;
+ fields.enable.textContent=settings.button;fields.enable.setAttribute("aria-describedby",fields.hardware.id);
+ fields.hardware.textContent=settings.hardware;fields.temperature.textContent=settings.temperature;
+ card.append(content);
+ const e={base:null,dirty:false,saving:false,awaiting:null,reloadAfter:null,review:false,message:""};
+ const readConfig=()=>validThresholdConfig(current?.[settings.status]);
+ function requestStatus(){if(refreshInFlight)pinPollQueued=true;else poll();}
+ function allowed(){
+  const u=current?.update;
+  return serverOnline&&!!token&&current?.authorized===true&&!!readConfig()&&u?.started===true&&
+    u.busy===false&&u.boot_pending===false&&!pendingUpdate&&!updateRequestInFlight;
  }
- if(valid&&!e.dirty&&!e.saving&&!e.awaiting&&e.base!==b.revision){
-   $("boiler-on").value=b.configured?String(b.on_c):"";$("boiler-off").value=b.configured?String(b.off_c):"";
-   e.base=b.revision;
+ function values(){
+  const on=fields.on.value,off=fields.off.value;
+  return /^\d{1,2}$/.test(on)&&/^\d{1,2}$/.test(off)&&Number(on)<Number(off)?{on:Number(on),off:Number(off)}:null;
  }
- const stale=e.dirty&&valid&&e.base!==b.revision;
- const busy=e.saving||!!e.awaiting||e.reloadAfter!==null;
- const editable=boilerAllowed()&&!busy&&!e.review&&!stale;
- $("boiler-on").disabled=$("boiler-off").disabled=!editable;
- $("boiler-save").disabled=!editable||!e.dirty||!boilerValues();
- show("boiler-reload",e.dirty||e.review);$("boiler-reload").disabled=!boilerAllowed()||busy;
- const hint=!serverOnline?"Нет связи с панелью.":!current?.authorized||!token?"Для изменения порогов выполните сопряжение.":
-   !b?"Настройки бойлера недоступны.":busy?"Проверяем настройки панели…":
-   e.review?e.message:stale?"Пороги изменились на панели. Перечитайте их перед сохранением.":
-   !boilerAllowed()?"Изменение недоступно, пока не подтверждено завершение обновления.":
-   e.dirty&&!boilerValues()?"Введите два целых числа от 0 до 99. Порог включения должен быть ниже порога выключения.":
-   e.dirty?"Изменения не сохранены. Нажмите «Сохранить пороги».":
-   e.message||(b.configured?"Сохранены пороги нагрева воды.":"Пороги пока не заданы.");
- if($("boiler-feedback").textContent!==hint)text("boiler-feedback",hint);
-}
-function mountBoiler(card){
- card.append($("boiler-controls").content.cloneNode(true));
- const e=boilerEdit,form=$("boiler-form");
- form.addEventListener("input",()=>{e.dirty=true;e.message="";renderBoiler();});
- $("boiler-reload").addEventListener("click",()=>{
-   if($("boiler-reload").disabled)return;
-   e.reloadAfter=pinPollStarted;renderBoiler();requestBoilerStatus();
+ function render(){
+  const b=readConfig(),valid=serverOnline&&!!b;
+  if(e.reloadAfter!==null&&pinPollSerial>e.reloadAfter){
+    e.reloadAfter=null;
+    if(valid){e.base=null;e.dirty=e.review=false;e.message="Показаны сохранённые пороги.";}
+    else e.message="Перечитать настройки не удалось. Введённые значения оставлены в форме.";
+  }
+  if(e.awaiting&&pinPollSerial>e.awaiting.after){
+    const a=e.awaiting;e.awaiting=null;
+    if(valid&&current?.authorized===true&&token===a.token&&b.configured&&b.revision===a.revision&&b.on_c===a.on&&b.off_c===a.off){
+      e.base=null;e.dirty=e.review=false;e.message="Оба порога сохранены на панели.";
+    }else{e.review=true;e.message="Сохранение не подтверждено. Перечитайте пороги с панели.";}
+  }
+  if(valid&&!e.dirty&&!e.saving&&!e.awaiting&&e.base!==b.revision){
+    fields.on.value=b.configured?String(b.on_c):"";fields.off.value=b.configured?String(b.off_c):"";
+    e.base=b.revision;
+  }
+  const stale=e.dirty&&valid&&e.base!==b.revision;
+  const busy=e.saving||!!e.awaiting||e.reloadAfter!==null;
+  const editable=allowed()&&!busy&&!e.review&&!stale;
+  fields.on.disabled=fields.off.disabled=!editable;
+  fields.save.disabled=!editable||!e.dirty||!values();
+  fields.reload.classList.toggle("hidden",!(e.dirty||e.review));fields.reload.disabled=!allowed()||busy;
+  const hint=!serverOnline?"Нет связи с панелью.":!current?.authorized||!token?"Для изменения порогов выполните сопряжение.":
+    !b?settings.unavailable:busy?"Проверяем настройки панели…":
+    e.review?e.message:stale?"Пороги изменились на панели. Перечитайте их перед сохранением.":
+    !allowed()?"Изменение недоступно, пока не подтверждено завершение обновления.":
+    e.dirty&&!values()?"Введите два целых числа от 0 до 99. Порог включения должен быть ниже порога выключения.":
+    e.dirty?"Изменения не сохранены. Нажмите «Сохранить пороги».":
+    e.message||(b.configured?"Показаны сохранённые пороги.":"Пороги пока не заданы.");
+  if(fields.feedback.textContent!==hint)fields.feedback.textContent=hint;
+ }
+ fields.form.addEventListener("input",()=>{e.dirty=true;e.message="";render();});
+ fields.reload.addEventListener("click",()=>{
+   if(fields.reload.disabled)return;
+   e.reloadAfter=pinPollStarted;render();requestStatus();
  });
- form.addEventListener("submit",async event=>{
-   event.preventDefault();const pair=boilerValues(),b=boilerConfig(),session=token;
-   if(!boilerAllowed()||!pair||!e.dirty||e.saving||e.awaiting||e.review||e.reloadAfter!==null||e.base!==b.revision)return;
-   e.saving=true;renderBoiler();
+ fields.form.addEventListener("submit",async event=>{
+   event.preventDefault();const pair=values(),b=readConfig(),session=token;
+   if(!allowed()||!pair||!e.dirty||e.saving||e.awaiting||e.review||e.reloadAfter!==null||e.base!==b.revision)return;
+   e.saving=true;render();
    try{
-     const ack=await sendPost("/api/command",{action:"boiler_thresholds",revision:String(e.base),on_c:String(pair.on),off_c:String(pair.off)},true);
+     const ack=await sendPost("/api/command",{action:settings.action,revision:String(e.base),on_c:String(pair.on),off_c:String(pair.off)},true);
      if(!ack||ack.ok!==true||ack.saved!==true||!Number.isInteger(ack.revision)||ack.revision<1||
         ack.revision>0xffffffff||session!==token)throw Error("unconfirmed");
      e.awaiting={...pair,revision:ack.revision,after:pinPollStarted,token:session};
    }catch(_){e.review=true;e.message="Сохранение не подтверждено. Перечитайте пороги с панели.";}
-   finally{e.saving=false;renderBoiler();requestBoilerStatus();}
+   finally{e.saving=false;render();requestStatus();}
  });
+ return render;
 }
 function renderEquipment(){
  const items=current?.equipment||[],holder=$("equipment-list");
@@ -610,11 +624,12 @@ function renderEquipment(){
    card=document.createElement("details");card.className="card equip";card.dataset.equipment=String(index);
    const summary=document.createElement("summary"),heading=document.createElement("h3"),status=document.createElement("p");
    heading.textContent=title;summary.append(heading,status);card.append(summary);
-   if(index!==0){const explanation=document.createElement("p");explanation.textContent="Управление недоступно до подключения и проверки контроллера.";card.append(explanation);}
+   if(index>1){const explanation=document.createElement("p");explanation.textContent="Управление недоступно до подключения и проверки контроллера.";card.append(explanation);}
    if(index===1)for(const n of [2,3,4]){const row=document.createElement("div");row.className="row";row.dataset.circuit=String(n);row.append(document.createElement("span"),document.createElement("span"));card.append(row);}
-   holder.append(card);if(index===0)mountBoiler(card);
+   holder.append(card);
+   if(index===0||index===1)thresholdViews[index]=mountThresholdEditor(card,index===0?"boiler":"electric");
   }
-  if(index===0)renderBoiler();
+  thresholdViews[index]?.();
   const connected=items[index]?.connected;
   card.querySelector("summary p").textContent=connected===true?"Подключён":connected===false?"Не подключён":"Нет данных";
   if(index===1)for(const n of [2,3,4]){const row=card.querySelector('[data-circuit="'+n+'"]');row.children[0].textContent=items[n]?.name||names[n];row.children[1].textContent=items[n]?.connected?"Подключён":"Нет данных";}
@@ -911,7 +926,7 @@ async function login(){
 async function logout(){
  try{await sendPost("/api/logout",{},true)}catch(_){}
  token="";sessionStorage.removeItem("boiler_panel_token");
- renderAP();renderBoiler();notice("Веб-управление отключено");
+ renderAP();thresholdViews.forEach(render=>render());notice("Веб-управление отключено");
  await poll();
 }
 async function requestStorageFormat(){

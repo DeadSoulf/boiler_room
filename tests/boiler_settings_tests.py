@@ -1,4 +1,4 @@
-"""Exercise the firmware's DHW settings storage, without hardware or heater outputs."""
+"""Exercise the firmware's DHW and electric boiler settings storage, without hardware or heater outputs."""
 import os
 from pathlib import Path
 import subprocess
@@ -18,4 +18,4 @@ with tempfile.TemporaryDirectory(prefix="boiler-settings-") as tmp:
                     "-o", str(binary)], check=True)
     for phase in ("write", "reboot"):
         subprocess.run([binary, phase, work / "stored-u64.bin"], check=True)
-print("PASS: empty/corrupt/unreadable DHW settings, atomic pair and readback faults, conflicts, fresh-process restart")
+print("PASS: independent DHW/electric settings, empty/corrupt/unreadable records, atomic pair and readback faults, conflicts, fresh-process restart")
