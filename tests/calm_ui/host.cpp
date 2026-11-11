@@ -410,7 +410,9 @@ int main(int argc,char** argv){
  touch("Подтвердить");assert(!overlay&&panel_boiler::electric.revision==1);
  assert(!strcmp(lv_label_get_text(boilerOnLabel),"42 °C и ниже")&&!strcmp(lv_label_get_text(boilerOffLabel),"58 °C и выше"));
  assert(panel_boiler::fixture.onC==55&&panel_boiler::fixture.offC==64);
- for(auto* heater:heaters)assert(lv_obj_has_state(heater,LV_STATE_DISABLED));
+ for(auto name:heaterNames){
+   auto* caption=find(body,name);assert(caption&&lv_obj_has_state(lv_obj_get_parent(caption),LV_STATE_DISABLED));
+ }
  save("electric-setpoints-fixture");
  touch("Изменить пороги");assert(!strcmp(lv_textarea_get_text(boilerOffField),"58"));
  lv_textarea_set_text(boilerOnField,"40");touch("Сохранить");
