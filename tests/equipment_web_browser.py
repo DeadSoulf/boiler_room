@@ -212,8 +212,9 @@ try:
                     expect(page.locator(f"#t{index}")).to_have_text(expected)
                 metrics = page.evaluate("""() => {
                     const box = r => ({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height});
-                    return Array.from(document.querySelectorAll("#home .temp")).map(card => {
-                        const value=card.querySelector(".temp-value"),style=getComputedStyle(value);
+                    return Array.from(document.querySelectorAll("#home .temp-value")).map(value => {
+                        const card=value.closest(".temp"),target=value.closest("button"),grouped=card!==target;
+                        const style=getComputedStyle(value);
                         const text=document.createRange();text.selectNodeContents(value);
                         const number=document.createRange();number.setStart(value.firstChild,0);
                         number.setEnd(value.firstChild,value.textContent.length-3);
@@ -232,11 +233,11 @@ try:
                             text:value.textContent,font_family:style.fontFamily,line_height:style.lineHeight,
                             font_px:parseFloat(style.fontSize),weight:style.fontWeight,spacing:style.letterSpacing,
                             overflow_x:style.overflowX,overflow_y:style.overflowY,clipping,
-                            card:box(card.getBoundingClientRect()),
-                            name:box(card.querySelector(".temp-name").getBoundingClientRect()),
+                            card:box(card.getBoundingClientRect()),target:box(target.getBoundingClientRect()),grouped,
+                            name:box(target.querySelector(".temp-name").getBoundingClientRect()),
                             value:box(value.getBoundingClientRect()),
                             icon:box(card.querySelector("svg").getBoundingClientRect()),
-                            status:box(card.querySelector(".temp-detail").getBoundingClientRect()),
+                            status:box(target.querySelector(".temp-detail").getBoundingClientRect()),
                             text_rects:Array.from(text.getClientRects(),box),
                             number_rects:Array.from(number.getClientRects(),box)
                         };
@@ -247,7 +248,14 @@ try:
                     json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 page.screenshot(path=str(out / f"home-font-{case}-{width}.png"), full_page=True)
                 assert len(metrics) == 5
-                # Preserve the existing large sizes of the first three cards.
+                expect(page.locator("#home > .grid > .card")).to_have_count(4)
+                coolant = page.get_by_role("region", name="Теплоноситель")
+                expect(coolant.get_by_role("button")).to_have_count(2)
+                expect(coolant.locator("svg")).to_have_count(1)
+                paired = [item for item in metrics if item["grouped"]]
+                assert len(paired) == 2 and paired[0]["card"] == paired[1]["card"]
+                assert paired[0]["target"]["bottom"] <= paired[1]["target"]["top"] + 1
+                # Every channel keeps the same large numeric font.
                 expected_font = {320: 28, 390: 28, 768: 42, 1280: 39.68}[width]
                 for item in metrics:
                     assert abs(item["font_px"] - expected_font) < 0.02, (width, case, item["font_px"])
@@ -259,7 +267,8 @@ try:
                         # A font's em-box can exceed line-height with overflow:visible.
                         # Check real clipping boundaries and neighbouring elements.
                         assert rect["top"] >= item["name"]["bottom"] - 1, (width, case, "text/name overlap")
-                        assert rect["bottom"] <= item["icon"]["top"] + 1, (width, case, "text/icon overlap")
+                        after_value = item["status"] if item["grouped"] else item["icon"]
+                        assert rect["bottom"] <= after_value["top"] + 1, (width, case, "text overlaps next element")
                         assert rect["top"] >= item["card"]["top"] - 1 and rect["bottom"] <= item["card"]["bottom"] + 1, (width, case, "text outside card")
                         for clip in item["clipping"]:
                             if clip["x"]:
@@ -267,8 +276,14 @@ try:
                             if clip["y"]:
                                 assert rect["top"] >= clip["bounds"]["top"] - 1 and rect["bottom"] <= clip["bounds"]["bottom"] + 1, (width, case, "text clipped vertically", clip["element"])
                     assert item["name"]["bottom"] <= item["value"]["top"] + 1
-                    assert item["value"]["bottom"] <= item["icon"]["top"] + 1, (width, case, "value/icon overlap")
-                    assert item["icon"]["bottom"] <= item["status"]["top"] + 1, (width, case, "icon/status overlap")
+                    if item["grouped"]:
+                        assert item["target"]["height"] >= 44 and item["target"]["width"] >= 44
+                        assert item["icon"]["bottom"] <= item["target"]["top"] + 1
+                        assert item["value"]["bottom"] <= item["status"]["top"] + 1
+                        assert item["status"]["bottom"] <= item["target"]["bottom"] + 1
+                    else:
+                        assert item["value"]["bottom"] <= item["icon"]["top"] + 1, (width, case, "value/icon overlap")
+                        assert item["icon"]["bottom"] <= item["status"]["top"] + 1, (width, case, "icon/status overlap")
                     for part in ("value", "icon", "status"):
                         assert item[part]["left"] >= item["card"]["left"] - 1 and item[part]["right"] <= item["card"]["right"] + 1, (width, case, part)
                         assert item[part]["bottom"] <= item["card"]["bottom"] + 1, (width, case, part)

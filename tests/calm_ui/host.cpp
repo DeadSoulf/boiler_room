@@ -46,6 +46,20 @@ void swipe(bool left=true){mx=left?420:60;my=85;down=true;step(60);for(int i=0;i
 void go(int p,int v=0){dismiss();page=p;view=v;pendingPage=-1;rebuild=false;render();step();check();}
 void homeTemperatureChecks(){
  lv_obj_update_layout(lv_scr_act());
+ auto* supply=lv_obj_get_parent(tempValue[2]);auto* backflow=lv_obj_get_parent(tempValue[4]);
+ auto* coolant=lv_obj_get_parent(supply);
+ assert(supply!=backflow&&coolant==lv_obj_get_parent(backflow)&&lv_obj_get_parent(coolant)==body);
+ assert(lv_obj_get_child_cnt(body)==4U+(homeUpdateNotice?1U:0U));
+ assert(lv_obj_get_child_cnt(coolant)==4&&lv_obj_get_width(coolant)==208&&lv_obj_get_height(coolant)==300);
+ auto* heading=find(coolant,"Теплоноситель");assert(heading);
+ auto* radiator=lv_obj_get_child(coolant,1);
+ lv_area_t h,icon,first,second;
+ lv_obj_get_coords(heading,&h);lv_obj_get_coords(radiator,&icon);
+ lv_obj_get_coords(supply,&first);lv_obj_get_coords(backflow,&second);
+ const auto* headingFont=lv_obj_get_style_text_font(heading,0);
+ lv_point_t headingSize;lv_txt_get_size(&headingSize,lv_label_get_text(heading),headingFont,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+ assert(headingSize.x<=lv_obj_get_width(heading)&&lv_obj_get_height(heading)==headingFont->line_height);
+ assert(h.x2<icon.x1&&h.y2<first.y1&&icon.y2<first.y1&&first.y2<second.y1);
  for(unsigned i=0;i<CHANNELS;i++){
    auto* value=tempValue[i];assert(value&&lv_obj_get_style_text_font(value,0)==&boiler_font_55);
    auto* tile=lv_obj_get_parent(value);auto* unit=find(tile,"°C");assert(unit);
@@ -57,12 +71,8 @@ void homeTemperatureChecks(){
    lv_obj_get_coords(i==3?fuelCanister.status:tempState[i],&statusBox);
    assert(titleBox.y2<valueBox.y1&&valueBox.x1>=cardBox.x1&&valueBox.x2<=cardBox.x2&&statusBox.y2<cardBox.y2);
    if(i==2||i==4){
-     lv_area_t radiator;lv_obj_get_coords(tempIcon[i],&radiator);
-     auto* title=find(tile,SENSOR_NAMES[i]);const auto* font=lv_obj_get_style_text_font(title,0);
-     lv_point_t size;lv_txt_get_size(&size,lv_label_get_text(title),font,0,3,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
-     assert(size.x<=lv_obj_get_width(title)&&lv_obj_get_height(title)==font->line_height);
-     assert(titleBox.x2<radiator.x1&&radiator.x2<unitBox.x1&&radiator.y2<valueBox.y1);
-     assert(unitBox.y2<valueBox.y1&&valueBox.y2<statusBox.y1);
+     assert(lv_obj_get_style_border_width(tile,0)==0&&lv_obj_get_style_bg_opa(tile,0)==LV_OPA_TRANSP);
+     assert(titleBox.x2<unitBox.x1&&unitBox.y2<valueBox.y1&&valueBox.y2<statusBox.y1);
    }else{
      lv_area_t iconBox;lv_obj_get_coords(i==3?fuelCanister.root:tempIcon[i],&iconBox);
      assert(valueBox.y2<unitBox.y1&&unitBox.y2<iconBox.y1&&iconBox.y2<statusBox.y1);
@@ -232,8 +242,10 @@ int main(int argc,char** argv){
    assert(find(overlay,SENSOR_NAMES[i]));touch("Назад");assert(!overlay&&page==0);
  }
  for(unsigned i:{2U,4U}){
-   touch(SENSOR_NAMES[i]);assert(overlay&&detailChannel==int(i));
-   save(i==2?"supply-no-data":"return-no-data");touch("Назад");
+   auto* title=find(lv_obj_get_parent(tempValue[i]),SENSOR_NAMES[i]);
+   lv_area_t bounds;lv_obj_get_coords(title,&bounds);
+   clickAt((bounds.x1+bounds.x2)/2,(bounds.y1+bounds.y2)/2);
+   assert(overlay&&detailChannel==int(i));save(i==2?"supply-no-data":"return-no-data");touch("Назад");
  }
  // Exercise the real sensor-event route, including the non-contiguous return input.
  auto sensorReading=[](uint8_t channel,float value){
@@ -246,8 +258,8 @@ int main(int argc,char** argv){
  sensorReading(6,40.0f);sensorReading(6,44.5f);step(1100);
  assert(measurements[2].count==1&&measurements[4].count==2&&!measurements[3].count);
  for(unsigned i:{2U,4U}){
-   lv_area_t icon;lv_obj_get_coords(tempIcon[i],&icon);
-   clickAt((icon.x1+icon.x2)/2,(icon.y1+icon.y2)/2);
+   lv_area_t value;lv_obj_get_coords(tempValue[i],&value);
+   clickAt((value.x1+value.x2)/2,(value.y1+value.y2)/2);
    assert(detailChannel==int(i)&&find(overlay,SENSOR_NAMES[i]));
    assert(find(overlay,i==2?"60.5 °C":"44.5 °C")&&find(overlay,i==2?"Пока нет истории":"Последние измерения"));
    touch("Назад");
@@ -261,7 +273,7 @@ int main(int argc,char** argv){
  for(auto& reading:measurements){reading=Measurement{};}step(1100);check();homeTemperatureChecks();save("home-font-no-data-fixture");save("home-icons-no-data");
  assert(tempValue[3]&&fuelCanister.temperature==tempValue[3]&&fuelCanister.root);
  assert(lv_obj_get_style_text_font(fuelCanister.temperature,0)==&boiler_font_55);
- assert(lv_obj_get_child_cnt(body)==5&&!find(body,"Уровень топлива"));
+ assert(lv_obj_get_child_cnt(body)==4&&!find(body,"Уровень топлива"));
  assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"--.-"));
  assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
  touch("Топливо");assert(page==2&&!overlay);touch("Температура топлива");assert(overlay&&detailChannel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);

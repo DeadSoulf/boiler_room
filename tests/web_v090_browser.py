@@ -3,7 +3,7 @@ from pathlib import Path
 from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
 from threading import Thread
 from urllib.parse import parse_qs
-import copy,json,time,os,sys
+import copy,json,time,os,re,sys
 from playwright.sync_api import sync_playwright,expect
 r=Path(__file__).resolve().parents[1]
 version=(r/'VERSION').read_text(encoding='ascii').strip()
@@ -68,8 +68,9 @@ try:
   page.goto(base);expect(page.locator('#version')).to_have_text(version);expect(page.locator('#fuel-canister')).to_have_attribute('data-state','full')
   assert len(page.locator('.topnav button').all())==4
   expect(page.locator('#home .temp-name').first).to_have_text('В доме')
-  assert page.locator('#home svg.temp-icon').count()==4
-  for kind,index,name in [('house',0,'В доме'),('outdoor',1,'На улице'),('radiator',2,'Подача'),('return',4,'Обратка')]:
+  assert page.locator('#home svg.temp-icon').count()==3
+  expect(page.locator('#home > .grid > .card')).to_have_count(4)
+  for kind,index,name in [('house',0,'В доме'),('outdoor',1,'На улице')]:
    icon=page.locator(f'svg[data-icon="{kind}"]');expect(icon).to_be_visible()
    assert icon.get_attribute('aria-hidden')=='true'
    box=icon.bounding_box();page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2)
@@ -77,6 +78,23 @@ try:
    expect(page.locator('#detail-title')).to_have_text(name+' — подробности')
    expect(page.locator('#detail-stats')).to_contain_text('Минимум: '+str(fixture['temperatures'][index]['minimum'])+' °C')
    page.click('[data-action="close-detail"]')
+  coolant=page.get_by_role('region',name='Теплоноситель')
+  expect(coolant.get_by_role('heading',name='Теплоноситель')).to_have_count(1)
+  expect(coolant.locator('svg[data-icon="radiator"]')).to_have_count(1)
+  supply=coolant.get_by_role('button',name=re.compile('Подача'))
+  returning=coolant.get_by_role('button',name=re.compile('Обратка'))
+  supply.focus();page.keyboard.press('Tab');expect(returning).to_be_focused()
+  for button,name,index,key in ((supply,'Подача',2,'Enter'),(returning,'Обратка',4,'Space')):
+   button.focus();page.keyboard.press(key)
+   expect(page.locator('#detail-title')).to_have_text(name+' — подробности')
+   expect(page.locator('#detail-stats')).to_contain_text('Минимум: '+str(fixture['temperatures'][index]['minimum'])+' °C')
+   page.click('[data-action="close-detail"]')
+  fixture['temperatures'][4]['valid']=False
+  expect(coolant.locator('#tstate4')).to_have_text('Устарело',timeout=5500)
+  expect(coolant.locator('#t4')).to_have_text('--.- °C')
+  expect(coolant.locator('#t2')).to_have_text('61.7 °C')
+  fixture['temperatures'][4]['valid']=True
+  expect(coolant.locator('#t4')).to_have_text('43.2 °C',timeout=5500)
   page.screenshot(path=str(out/'desktop-home.png'),full_page=True)
   page.click('#pairbutton');expect(page.locator('#pairbox')).to_be_visible();expect(page.locator('#pair-submit')).to_be_enabled()
   assert state['starts']==1 and state['active'] and page.input_value('#paircode')==''

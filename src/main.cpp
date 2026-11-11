@@ -53,7 +53,7 @@ struct FuelCanister {
   lv_obj_t *crossA=nullptr,*crossB=nullptr,*glyph=nullptr,*temperature=nullptr,*status=nullptr;
 };
 FuelCanister fuelCanister;
-lv_obj_t* tempIcon[CHANNELS]={};
+lv_obj_t* tempIcon[2]={};
 constexpr int CANISTER_FILL_HEIGHT=74;
 void updateCanister();
 struct FuelLevelLabels {
@@ -620,8 +620,8 @@ void temperatureIcon(lv_obj_t* tile,unsigned channel){
     iconLine(root,cloud,sizeof(cloud)/sizeof(cloud[0]));
   }
 }
-void coolantIcon(lv_obj_t* tile,unsigned channel){
-  auto* root=box(tile,117,9,32,24,CARD,0);tempIcon[channel]=root;
+void coolantIcon(lv_obj_t* tile){
+  auto* root=box(tile,161,9,32,24,CARD,0);
   lv_obj_set_style_border_width(root,0,0);passive(root);
   auto* radiator=iconRect(root,4,4,24,15,3);
   lv_obj_set_style_border_width(radiator,2,0);
@@ -687,16 +687,15 @@ void updateCanister(){
   lv_label_set_text(fuelCanister.glyph,mark);lv_obj_set_style_text_color(fuelCanister.glyph,c(ink),0);
   lv_label_set_text(fuelCanister.status,status);lv_obj_set_style_text_color(fuelCanister.status,c(ink),0);
 }
-lv_obj_t* homeTile(unsigned channel,int x,int y,int height){
-  auto* tile=box(body,x,y,208,height);
+void bindHomeReading(lv_obj_t* object,unsigned channel){
   const uintptr_t target=channel==3?FuelOverview:Temp0+channel;
-  lv_obj_add_event_cb(tile,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(target));
-  lv_obj_set_style_border_color(tile,c(SKY),LV_STATE_PRESSED);
-  return tile;
+  lv_obj_add_event_cb(object,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(target));
 }
 void home(){
   for(unsigned i:{0U,1U,3U}){
-    auto* tile=homeTile(i,24+int(i%2)*224,12+int(i/2)*322,300);
+    auto* tile=box(body,24+int(i%2)*224,12+int(i/2)*322,208,300);
+    bindHomeReading(tile,i);
+    lv_obj_set_style_border_color(tile,c(SKY),LV_STATE_PRESSED);
     label(tile,SENSOR_NAMES[i],18,22,172,&boiler_font_19,MUTED);
     tempValue[i]=label(tile,"--.-",16,50,178,&boiler_font_55);
     label(tile,"°C",18,128,172,&boiler_font_19,MUTED);
@@ -704,14 +703,21 @@ void home(){
     temperatureIcon(tile,i);
     tempState[i]=label(tile,"Нет данных",18,269,172,&boiler_font_14,MUTED);
   }
-  // Two separate touch targets occupy the former coolant tile.
+  auto* coolant=box(body,24,334,208,300);
+  passive(coolant);
+  label(coolant,"Теплоноситель",16,8,141,&boiler_font_19,MUTED);
+  coolantIcon(coolant);
   for(unsigned i:{2U,4U}){
-    auto* tile=homeTile(i,24,i==2?334:488,146);
-    label(tile,SENSOR_NAMES[i],16,8,96,&boiler_font_19,MUTED);
-    coolantIcon(tile,i);
-    label(tile,"°C",158,8,36,&boiler_font_19,MUTED);
-    tempValue[i]=label(tile,"--.-",16,37,178,&boiler_font_55);
-    tempState[i]=label(tile,"Нет данных",16,117,178,&boiler_font_14,MUTED);
+    auto* row=box(coolant,0,i==2?42:169,206,126,CARD,0);
+    lv_obj_set_style_border_width(row,0,0);
+    lv_obj_set_style_bg_opa(row,LV_OPA_TRANSP,0);
+    lv_obj_set_style_bg_color(row,c(0x26373B),LV_STATE_PRESSED);
+    lv_obj_set_style_bg_opa(row,LV_OPA_COVER,LV_STATE_PRESSED);
+    bindHomeReading(row,i);
+    label(row,SENSOR_NAMES[i],16,0,135,&boiler_font_19);
+    label(row,"°C",158,0,36,&boiler_font_19,MUTED);
+    tempValue[i]=label(row,"--.-",16,28,178,&boiler_font_55);
+    tempState[i]=label(row,"Нет данных",16,105,178,&boiler_font_14,MUTED);
   }
   if(homeUpdateVisible()){
     homeUpdateNotice=box(body,24,638,432,34,BG,8);lv_obj_set_style_border_width(homeUpdateNotice,0,0);
