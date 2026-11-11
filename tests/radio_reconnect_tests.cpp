@@ -11,7 +11,7 @@ void resetReconnectTest(){
  disconnectReason.store(0);observeConnect.store(false);associated.store(false);
  wifiDriver=WifiDriver{};eventInstalled=false;driverStoppedForRecovery=false;
  staStartEvents.store(0);staStopEvents.store(0);delayHook=nullptr;recoveryPending=false;pinsReady=false;
- resetReconnect(false);
+ lastGood=SavedNetwork{};resetReconnect(false);
 }
 Command network(const char* ssid="saved-network",const char* password="synthetic-key"){
  Command cmd;cmd.job=Job::Connect;snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",ssid);
@@ -21,7 +21,8 @@ void persist(const Command& cmd=network()){
  Credentials credentials;snprintf(credentials.ssid,sizeof(credentials.ssid),"%s",cmd.ssid);
  snprintf(credentials.password,sizeof(credentials.password),"%s",cmd.password);credentials.open=cmd.open;
  assert(prefs.putBytes("credentials",&credentials,sizeof(credentials))==sizeof(credentials));
- prefs.autoValue=true;haveCredentials=true;state.hasSaved=true;state.autoConnect=true;
+ prefs.autoValue=true;haveCredentials=true;state.hasSaved=true;state.autoConnect=true;state.savedCount=1;
+ snprintf(state.savedNetworks[0].ssid,sizeof(state.savedNetworks[0].ssid),"%s",cmd.ssid);state.savedNetworks[0].open=cmd.open;
  wipe(&credentials,sizeof(credentials));prefs.credentialWrites=0;
 }
 void tick(){updateConnection();superviseWifi();}
@@ -100,8 +101,8 @@ int main(){
    prefs.putBytes("credentials",&corrupt,sizeof(corrupt));resetReconnect(true,true);tick();assert(!WiFi.beginCount);
  }
 
- // Failed replacement never reconnects the previous saved network. A successful
- // manual replacement re-enables recovery with only the newly verified settings.
+ // A failed manual choice suspends automatic attempts for this session. A
+ // verified manual choice becomes preferred, without deleting the older profile.
  resetReconnectTest();persist();resetReconnect(true,true);const auto replacement=network("new-network","new-password");
  assert(!connectWifi(replacement,true));assert(!reconnectEnabled&&prefs.credentialWrites==0);
  fakeMillis+=3600000;const auto failed=WiFi.beginCount;tick();assert(WiFi.beginCount==failed);

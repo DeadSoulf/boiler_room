@@ -7,15 +7,20 @@ void reset(){
  state=RadioState{};state.ready=true;pendingCommand=false;urgent=Job::None;
  wipe(&pending,sizeof(pending));WiFi=Wifi{};prefs=Preferences{};nvsOK=true;screenPrefs=Preferences{};screenNvsOK=true;
  Serial.output.clear();wifiStarted=false;haveCredentials=false;fakeMillis=0;disconnectReason.store(0);observeConnect.store(false);associated.store(false);
- wifiDriver=WifiDriver{};eventInstalled=false;driverStoppedForRecovery=false;staStartEvents.store(0);staStopEvents.store(0);delayHook=nullptr;
+ wifiDriver=WifiDriver{};eventInstalled=false;driverStoppedForRecovery=false;staStartEvents.store(0);staStopEvents.store(0);delayHook=nullptr;lastGood=SavedNetwork{};resetReconnect(false);
 }
 Command connection(){Command c;c.job=Job::Connect;strcpy(c.ssid,"test");strcpy(c.password,"12345678");return c;}
+void seedLegacy(){
+ Credentials legacy;strcpy(legacy.ssid,"test");strcpy(legacy.password,"12345678");
+ assert(prefs.putBytes("credentials",&legacy,sizeof(legacy))==sizeof(legacy));wipe(&legacy,sizeof(legacy));prefs.credentialWrites=0;
+ haveCredentials=true;state.hasSaved=true;state.savedCount=1;strcpy(state.savedNetworks[0].ssid,"test");
+}
 int main(){
  taskResult=0;assert(!begin());assert(!stateMutex);taskResult=1;assert(begin());auto mutex=stateMutex;assert(begin()&&stateMutex==mutex);
  reset();Command c=connection();assert(submit(c));assert(!submit(c));assert(state.busy);
  Command received;assert(takeCommand(received));assert(!strcmp(received.password,c.password));
  for(const auto byte:pending.password){assert(byte==0);}assert(!pendingCommand);
- reset();assert(submit(c));Command forget;forget.job=Job::Forget;assert(submit(forget));assert(cancel());
+ reset();seedLegacy();assert(submit(c));Command forget;forget.job=Job::Forget;assert(submit(forget));assert(cancel());
  assert(takeCommand(received));assert(received.job==Job::Forget);assert(!pendingCommand);
  for(const auto byte:pending.password){assert(byte==0);}assert(!takeCommand(received));
  reset();memset(c.ssid,'x',sizeof(c.ssid));assert(!submit(c));c=connection();memset(c.password,'x',sizeof(c.password));assert(!submit(c));
@@ -28,7 +33,7 @@ int main(){
  reset();WiFi.connectSuccess=true;prefs.writes=false;connectWifi(c,true);assert(!state.autoConnect&&!haveCredentials);updateConnection();assert(strstr(state.wifiMessage,"не сохранены"));
  reset();state.autoConnect=true;WiFi.connectSuccess=true;connectWifi(c,false);assert(prefs.credentialWrites==0&&state.autoConnect);
  reset();pinsReady=false;versions();assert(!strcmp(state.c6Version,"Не прочитана"));
- reset();prefs.credentialKey=true;haveCredentials=true;state.hasSaved=true;state.autoConnect=true;prefs.autoValue=true;prefs.writes=false;
+ reset();seedLegacy();state.autoConnect=true;prefs.autoValue=true;prefs.writes=false;
  disconnectWifi(true);assert(state.hasSaved&&state.autoConnect&&prefs.credentialKey);assert(strstr(state.wifiMessage,"Не удалось"));
  prefs.writes=true;disconnectWifi(true);assert(!state.hasSaved&&!state.autoConnect&&!prefs.credentialKey);
  reset();for(uint16_t t:{0,30,60,120,300,600,1800})assert(validDisplayTimeout(t));for(uint16_t t:{1,29,31,65535})assert(!validDisplayTimeout(t));

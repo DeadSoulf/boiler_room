@@ -2,6 +2,7 @@
 // No automatic C6 firmware updates. No passwords in Serial or UI snapshots.
 #include <Arduino.h>
 #include <Preferences.h>
+#include <nvs.h>
 #include <sdkconfig.h>
 #include <soc/soc_caps.h>
 #include <freertos/FreeRTOS.h>
@@ -48,24 +49,113 @@ bool nvsOK=false;
 Preferences screenPrefs;
 bool screenNvsOK=false;
 bool pinsReady=false;
-struct Credentials { uint32_t magic=0x42503033; char ssid[33]={}; char password[65]={}; uint8_t open=0; };
+struct Credentials { uint32_t magic=0x42503033; char ssid[33]={}; char password[65]={}; uint8_t open=0,reserved=0; };
 bool haveCredentials=false;
 const char* const ZONES[] = {"UTC0", "MSK-3", "CET-1CEST,M3.5.0/2,M10.5.0/3"};
 const char* const ZONE_NAMES[] = {"UTC", "Москва UTC+3", "Берлин CET/CEST"};
 void lock() { xSemaphoreTake(stateMutex, portMAX_DELAY); }
 void unlock() { ++state.revision; xSemaphoreGive(stateMutex); }
 void wipe(void* ptr, size_t size) { volatile unsigned char* p=static_cast<volatile unsigned char*>(ptr); while(size--) *p++=0; }
+// The old single-profile blob stays readable until an explicit, verified update.
+// The new key is authoritative even when empty or invalid: never revive a
+// forgotten legacy key after a failed read. Neither format enters RadioState.
+constexpr char PROFILE_KEY[]="wifi_profiles";
+constexpr uint32_t PROFILE_MAGIC=0x42505731; // BPW1
+struct ProfileBook {
+  uint32_t magic=PROFILE_MAGIC;
+  uint8_t count=0,reserved[3]={};
+  Credentials items[MAX_WIFI_PROFILES];
+  uint32_t checksum=0;
+};
+static_assert(sizeof(Credentials)==104 && sizeof(ProfileBook)==844,"Unexpected Wi-Fi profile storage layout");
+struct Scrub {
+  void* ptr; size_t size;
+  ~Scrub(){wipe(ptr,size);}
+};
+bool validCredential(const Credentials& c) {
+  return c.magic==0x42503033 && c.open<=1 && c.ssid[0] &&
+    memchr(c.ssid,0,sizeof(c.ssid)) && memchr(c.password,0,sizeof(c.password)) &&
+    passwordValid(c.password,c.open!=0);
+}
+uint32_t profileChecksum(const ProfileBook& b) {
+  const auto* bytes=reinterpret_cast<const uint8_t*>(&b);uint32_t h=2166136261U;
+  for(size_t i=0;i<offsetof(ProfileBook,checksum);++i)h=(h^bytes[i])*16777619U;
+  return h;
+}
+int profileIndex(const ProfileBook& b,const char* ssid,bool open) {
+  for(unsigned i=0;i<b.count;++i)if(b.items[i].open==open && !strcmp(b.items[i].ssid,ssid))return int(i);
+  return -1;
+}
+// Preferences::isKey cannot distinguish NOT_FOUND from NVS errors. Only an
+// explicitly absent key permits legacy fallback or first-time creation. If the
+// size probe succeeded but a later data read fails, it was never an absent key.
+enum class Blob { Missing, Present, Error };
+Blob readBlob(const char* key,void* dst,size_t expected) {
+  nvs_handle_t handle;
+  if(!nvsOK || nvs_open("boiler03",NVS_READONLY,&handle)!=ESP_OK)return Blob::Error;
+  size_t length=0;
+  const esp_err_t probe=nvs_get_blob(handle,key,nullptr,&length);
+  Blob result=probe==ESP_ERR_NVS_NOT_FOUND?Blob::Missing:probe==ESP_OK?Blob::Present:Blob::Error;
+  if(result==Blob::Present && dst &&
+      (length!=expected || nvs_get_blob(handle,key,dst,&length)!=ESP_OK || length!=expected))result=Blob::Error;
+  nvs_close(handle);
+  return result;
+}
 // Credentials live only for one read/attempt, never in the shared snapshot.
-bool loadCredentials(Credentials& credentials) {
+bool loadCredentials(Credentials& credentials,bool* missing=nullptr) {
   wipe(&credentials,sizeof(credentials));
-  const bool valid=nvsOK && prefs.getBytesLength("credentials")==sizeof(credentials) &&
-    prefs.getBytes("credentials",&credentials,sizeof(credentials))==sizeof(credentials) &&
-    credentials.magic==0x42503033 && credentials.open<=1 && credentials.ssid[0] &&
-    memchr(credentials.ssid,0,sizeof(credentials.ssid)) &&
-    memchr(credentials.password,0,sizeof(credentials.password)) &&
-    passwordValid(credentials.password,credentials.open!=0);
-  if(!valid)wipe(&credentials,sizeof(credentials));
-  return valid;
+  const Blob status=readBlob("credentials",&credentials,sizeof(credentials));
+  if(missing)*missing=status==Blob::Missing;
+  if(status==Blob::Present && validCredential(credentials))return true;
+  wipe(&credentials,sizeof(credentials));return false;
+}
+bool loadProfiles(ProfileBook& book,bool* hadCanonical=nullptr) {
+  const Blob status=readBlob(PROFILE_KEY,&book,sizeof(book));
+  if(hadCanonical)*hadCanonical=status==Blob::Present;
+  if(status==Blob::Error)return false;
+  if(status==Blob::Missing) {
+    bool missing=false;
+    if(!loadCredentials(book.items[0],&missing))return missing; // valid, unmodified empty store only if neither key exists
+    book.count=1;return true; // lazy migration, no writes on boot or retries
+  }
+  if(book.magic!=PROFILE_MAGIC || book.count>MAX_WIFI_PROFILES || book.checksum!=profileChecksum(book))return false;
+  for(unsigned i=0;i<book.count;++i) {
+    const auto& c=book.items[i];if(!validCredential(c))return false;
+    for(unsigned j=0;j<i;++j)if(c.open==book.items[j].open && !strcmp(c.ssid,book.items[j].ssid))return false;
+  }
+  return true;
+}
+bool knownAP(const AccessPoint& ap) { // stateMutex held; unsupported modes never match
+  if(!ap.supported)return false;
+  for(unsigned i=0;i<state.savedCount;++i)if(state.savedNetworks[i].open==(ap.auth==0) &&
+    !strcmp(state.savedNetworks[i].ssid,ap.ssid))return true;
+  return false;
+}
+void publishProfiles(const ProfileBook& b) {
+  haveCredentials=b.count!=0;
+  lock();state.hasSaved=haveCredentials;state.savedCount=b.count;
+  for(unsigned i=0;i<MAX_WIFI_PROFILES;++i) {
+    auto& id=state.savedNetworks[i];id=SavedNetwork{};
+    if(i<b.count){snprintf(id.ssid,sizeof(id.ssid),"%s",b.items[i].ssid);id.open=b.items[i].open!=0;}
+  }
+  for(unsigned i=0;i<state.apCount;++i)state.aps[i].saved=knownAP(state.aps[i]);
+  unlock();
+}
+// Preferences writes a single NVS blob; confirm its exact bytes before publishing
+// the index. On an unconfirmed write restore the previous canonical record, or
+// remove the first candidate (the legacy record has not yet been touched).
+bool storeProfiles(ProfileBook& after,const ProfileBook& before,bool hadCanonical) {
+  after.checksum=profileChecksum(after);
+  ProfileBook check;Scrub erase{&check,sizeof(check)};
+  if(prefs.putBytes(PROFILE_KEY,&after,sizeof(after))==sizeof(after) &&
+     readBlob(PROFILE_KEY,&check,sizeof(check))==Blob::Present && !memcmp(&check,&after,sizeof(check)))return true;
+  if(hadCanonical)prefs.putBytes(PROFILE_KEY,&before,sizeof(before));
+  else prefs.remove(PROFILE_KEY);
+  return false;
+}
+bool discardLegacy() {
+  const Blob old=readBlob("credentials",nullptr,0);
+  return old==Blob::Missing || (old==Blob::Present && prefs.remove("credentials"));
 }
 void message(const char* text, bool ble=false) {
   lock(); snprintf(ble?state.bleMessage:state.wifiMessage,150,"%s",text); unlock();
@@ -80,7 +170,7 @@ bool takeCommand(Command& cmd) {
     if(pendingCommand && (pending.job==Job::Connect || pending.job==Job::WifiScan)) {
       wipe(&pending,sizeof(pending));pendingCommand=false;
     }
-    cmd.job=urgent;urgent=Job::None;
+    wipe(&cmd,sizeof(cmd));cmd.job=urgent;urgent=Job::None;
   } else if(pendingCommand) {
     cmd=pending;wipe(&pending,sizeof(pending));pendingCommand=false;
   } else {xSemaphoreGive(stateMutex);return false;}
@@ -144,8 +234,12 @@ bool wifiStarted=false;
 bool reconnectEnabled=false;
 bool reconnectWaiting=false;
 uint32_t reconnectSince=0,reconnectDelay=0,reconnectNext=15000;
+// Nonsecret identity only. The last successful link is tried first this boot;
+// index zero in NVS is the last explicitly selected profile.
+SavedNetwork lastGood;
+uint8_t roundOffset=0;
 void resetReconnect(bool enabled, bool immediate=false) {
-  reconnectEnabled=enabled;reconnectWaiting=enabled && immediate;
+  reconnectEnabled=enabled;reconnectWaiting=enabled && immediate;roundOffset=0;
   reconnectSince=millis();reconnectDelay=0;reconnectNext=15000;
 }
 void scheduleReconnect() {
@@ -397,14 +491,47 @@ void scanWifi() {
   } else esp_wifi_clear_ap_list();
   if(wasConnected)WiFi.setAutoReconnect(reconnect);
   lock();state.apCount=count;
-  for(int i=0;i<count;i++)state.aps[i]=results[i];
+  for(int i=0;i<count;i++){results[i].saved=knownAP(results[i]);state.aps[i]=results[i];}
   snprintf(state.wifiMessage,sizeof(state.wifiMessage),"Найдено: %u. В списке: %u",unsigned(total),unsigned(count));unlock();
   if(Serial)Serial.printf("[BP-WIFI] scan_result: total=%u listed=%u\n",unsigned(total),unsigned(count));
 }
-bool connectWifi(const Command& cmd, bool save) {
-  if(stopRequested()){message("Подключение отменено");return false;}
-  if(!cmd.ssid[0] || !passwordValid(cmd.password,cmd.open)) { message("Проверьте имя сети и пароль");return false; }
-  if(save)resetReconnect(false); // Explicit credentials replace the previous intent.
+// Admission must precede disconnect: an obsolete saved button or a full/failed
+// store must leave the currently working link alone. Copy only the chosen secret.
+bool prepareManual(const Command& request,Command& cmd,uint8_t& alternatives,uint8_t& nextOffset) {
+  ProfileBook book;Scrub erase{&book,sizeof(book)};
+  if(!loadProfiles(book)){message("Не удалось прочитать сохранённые сети");return false;}
+  const int pos=profileIndex(book,request.ssid,request.open);
+  if(request.useSaved) {
+    if(request.password[0] || pos<0){message("Профиль этой сети не найден");return false;}
+    snprintf(cmd.password,sizeof(cmd.password),"%s",book.items[pos].password);
+    alternatives=book.count-1;
+    const int preferred=profileIndex(book,lastGood.ssid,lastGood.open);
+    nextOffset=pos==(preferred<0?0:preferred)?1:0;
+  } else if(pos<0 && book.count==MAX_WIFI_PROFILES) {
+    message("Сохранено 8 сетей. Удалите одну перед добавлением");return false;
+  }
+  return true;
+}
+// Only called after the requested SSID has a usable IP. Index 0 is the last
+// explicit choice, not an automatic fallback; background joins never write NVS.
+bool rememberNetwork(const Command& cmd,bool& cleanupOK) {
+  ProfileBook before;Scrub clearBefore{&before,sizeof(before)};
+  bool hadCanonical=false;
+  if(!loadProfiles(before,&hadCanonical))return false;
+  int pos=profileIndex(before,cmd.ssid,cmd.open);
+  if(pos<0 && before.count==MAX_WIFI_PROFILES)return false;
+  if(pos==0 && !strcmp(before.items[0].password,cmd.password) && hadCanonical) {
+    publishProfiles(before);cleanupOK=discardLegacy();return true;
+  }
+  ProfileBook after=before;Scrub clearAfter{&after,sizeof(after)};
+  if(pos<0)pos=after.count++;
+  for(int i=pos;i>0;--i)after.items[i]=after.items[i-1];
+  auto& c=after.items[0];wipe(&c,sizeof(c));c.magic=0x42503033;c.open=cmd.open;
+  snprintf(c.ssid,sizeof(c.ssid),"%s",cmd.ssid);snprintf(c.password,sizeof(c.password),"%s",cmd.password);
+  if(!storeProfiles(after,before,hadCanonical))return false;
+  publishProfiles(after);cleanupOK=discardLegacy();return true;
+}
+bool joinWifi(const Command& cmd,bool save) {
   recoveryPending=false;
   message("Подключение к Wi-Fi...");
   if(!startWifi()) return false;
@@ -478,25 +605,44 @@ bool connectWifi(const Command& cmd, bool save) {
   observeConnect.store(false);
   if(Serial) Serial.printf("[BP-WIFI] connected_with_ip elapsed_ms=%lu\n",(unsigned long)uint32_t(millis()-attemptAt));
   updateConnection();recoveryPending=false;
-  bool stored=true;
+  snprintf(lastGood.ssid,sizeof(lastGood.ssid),"%s",cmd.ssid);lastGood.open=cmd.open;
+  bool stored=true,cleanupOK=true;
   lock();bool automatic=state.autoConnect;xSemaphoreGive(stateMutex);
   if(save) {
-    Credentials candidate;wipe(&candidate,sizeof(candidate));candidate.magic=0x42503033;snprintf(candidate.ssid,sizeof(candidate.ssid),"%s",cmd.ssid);
-    snprintf(candidate.password,sizeof(candidate.password),"%s",cmd.password);candidate.open=cmd.open?1:0;
-    stored=nvsOK && prefs.putBytes("credentials",&candidate,sizeof(candidate))==sizeof(candidate);
-    if(stored) {haveCredentials=true;stored=prefs.putBool("autoconnect",true)==1;automatic=stored || prefs.getBool("autoconnect",false);}
-    wipe(&candidate,sizeof(candidate));
+    stored=rememberNetwork(cmd,cleanupOK);
+    if(stored) {
+      automatic=prefs.getBool("autoconnect",false) || prefs.putBool("autoconnect",true)==1;
+      stored=automatic;
+    }
+    resetReconnect(stored && automatic);
   }
   // One retry owner: the supervisor, not an independent SDK reconnect loop.
   WiFi.setAutoReconnect(false);
-  if(save)resetReconnect(stored && automatic);
   configTime(0,0,"pool.ntp.org","time.cloudflare.com");
   // configTime may change TZ; restore the user's selected timezone.
   lock();const uint8_t zone=state.zone;unlock();setenv("TZ",ZONES[zone],1);tzset();
   lock();state.hasSaved=haveCredentials;state.autoConnect=automatic;
-  snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s",stored?"Подключено. Время синхронизируется":"Подключено, но настройки не сохранены");
+  snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s",!stored?"Подключено, но настройки не сохранены":!cleanupOK?"Подключено. Старая копия не удалена из NVS":"Подключено. Время синхронизируется");
   unlock();versions();
   return true;
+}
+bool connectWifi(const Command& request, bool save) {
+  if(stopRequested()){message("Подключение отменено");return false;}
+  Command cmd=request;Scrub clearCmd{&cmd,sizeof(cmd)};
+  uint8_t alternatives=0,nextOffset=0;
+  if(save && !prepareManual(request,cmd,alternatives,nextOffset))return false;
+  if(!cmd.ssid[0] || !passwordValid(cmd.password,cmd.open)) {message("Проверьте имя сети и пароль");return false;}
+  const bool resumeOnFailure=save && request.useSaved && reconnectEnabled;
+  if(save)resetReconnect(false); // Explicit new credentials replace the previous intent.
+  const bool joined=joinWifi(cmd,save);
+  if(!joined && resumeOnFailure && !stopRequested()) {
+    // A stale/unreachable saved AP must not strand an otherwise automatic panel.
+    // A separately entered password still takes control until the user reconnects.
+    resetReconnect(true,true);
+    if(alternatives)roundOffset=nextOffset;
+    else scheduleReconnect();
+  }
+  return joined;
 }
 void superviseWifi() {
   if(!reconnectEnabled)return;
@@ -504,28 +650,38 @@ void superviseWifi() {
   lock();
   if(state.busy || pendingCommand || urgent!=Job::None) {xSemaphoreGive(stateMutex);return;}
   if(state.connected) {
-    reconnectWaiting=false;reconnectNext=15000;
+    roundOffset=0;reconnectWaiting=false;reconnectNext=15000;
     xSemaphoreGive(stateMutex);return;
   }
   if(!reconnectWaiting) {xSemaphoreGive(stateMutex);scheduleReconnect();return;}
   if(uint32_t(millis()-reconnectSince)<reconnectDelay) {xSemaphoreGive(stateMutex);return;}
   state.job=Job::Connect;state.busy=true;unlock();
-  Credentials credentials;
-  Command cmd;cmd.job=Job::Connect;
-  bool connected=false;
-  if(loadCredentials(credentials)) {
-    cmd.open=credentials.open!=0;
-    snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",credentials.ssid);
-    snprintf(cmd.password,sizeof(cmd.password),"%s",credentials.password);
-    wipe(&credentials,sizeof(credentials));
-    connected=connectWifi(cmd,false);
-  } else {
-    message("NVS: не удалось прочитать сохранённую сеть");
-    wifiTrace("reconnect_credentials",ESP_FAIL);
+  Command cmd;Scrub eraseCmd{&cmd,sizeof(cmd)};cmd.job=Job::Connect;
+  uint8_t count=0;
+  {
+    ProfileBook book;Scrub eraseBook{&book,sizeof(book)};
+    if(loadProfiles(book)) {
+      publishProfiles(book);count=book.count;
+      if(count) {
+        const int preferred=profileIndex(book,lastGood.ssid,lastGood.open);
+        const auto& c=book.items[((preferred<0?0:preferred)+roundOffset)%count];
+        cmd.open=c.open;snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",c.ssid);
+        snprintf(cmd.password,sizeof(cmd.password),"%s",c.password);
+      }
+    }
   }
-  wipe(&credentials,sizeof(credentials));wipe(&cmd,sizeof(cmd));
-  if(connected) {reconnectWaiting=false;reconnectNext=15000;}
-  else if(!stopRequested())scheduleReconnect();
+  bool connected=false;
+  if(count)connected=connectWifi(cmd,false);
+  else wifiTrace("reconnect_profiles",ESP_FAIL);
+  if(connected) {roundOffset=0;reconnectWaiting=false;reconnectNext=15000;}
+  else if(!stopRequested()) {
+    // No multi-minute wait per missing SSID. Yield to the mailbox after each
+    // attempt; apply the normal capped backoff only after a whole failed round.
+    if(count && ++roundOffset<count) {
+      reconnectWaiting=true;reconnectSince=millis();reconnectDelay=0;
+      message("Пробую следующую сохранённую сеть");
+    } else {roundOffset=0;scheduleReconnect();}
+  }
   jobState(Job::None,false);
 }
 
@@ -588,37 +744,98 @@ void scanBle() {
   message("BLE не включён в установленной сборке Arduino",true);
 #endif
 }
-void disconnectWifi(bool forget) {
-  bool disconnected=true;
+bool dropLink() {
 #if PANEL_WIFI
-  resetReconnect(false); // Inhibit even if disconnect or NVS persistence fails.
-  if(wifiStarted){
+  if(wifiStarted) {
     recoveryPending=false;WiFi.setAutoReconnect(false);
     const bool hadConnection=WiFi.status()==WL_CONNECTED;
     const bool accepted=WiFi.disconnect(false,false);
-    disconnected=(!hadConnection || accepted) && WiFi.status()!=WL_CONNECTED;
     updateConnection();recoveryPending=false;
+    return (!hadConnection || accepted) && WiFi.status()!=WL_CONNECTED;
   }
 #endif
-  const bool autoStored=nvsOK && prefs.putBool("autoconnect",false)==1;
-  bool forgotten=true;
-  if(forget){
-    forgotten=nvsOK && (!prefs.isKey("credentials") || prefs.remove("credentials"));
-    if(forgotten)haveCredentials=false;
+  return true;
+}
+void disconnectWifi(bool forget,const char* ssid=nullptr,bool open=false) {
+  const bool named=ssid && ssid[0];
+  bool drop=!forget,disable=!forget,forgotten=!forget,cleanupOK=true,hadCanonical=false,resumeAfterDelete=false;
+  ProfileBook before;Scrub clearBefore{&before,sizeof(before)};
+  int pos=-1;
+  if(forget) {
+    if(!loadProfiles(before,&hadCanonical)) {
+      if(named){message("Не удалось прочитать сохранённые сети");return;}
+      drop=disable=true; // legacy explicit stop also inhibits retries on read failure
+    } else {
+      if(!named && before.count>1){message("Выберите сеть для удаления");return;}
+      pos=named?profileIndex(before,ssid,open):(before.count==1?0:-1);
+      if(pos<0 && named){message("Профиль этой сети не найден");return;}
+      if(pos>=0) {
+#if PANEL_WIFI
+        const auto& c=before.items[pos];
+        if(wifiStarted && WiFi.status()==WL_CONNECTED && !strcmp(WiFi.SSID().c_str(),c.ssid)) {
+          if(!strcmp(lastGood.ssid,c.ssid))drop=lastGood.open==bool(c.open);
+          else if(!named)drop=true; // compatibility with the old single-profile command
+          else {
+            wifi_ap_record_t link={};
+            drop=esp_wifi_sta_get_ap_info(&link)==ESP_OK && (link.authmode==WIFI_AUTH_OPEN)==bool(c.open);
+          }
+        }
+#endif
+        disable=drop || before.count==1;
+#if PANEL_WIFI
+        resumeAfterDelete=drop && before.count>1 && reconnectEnabled;
+#endif
+      } else {drop=disable=true;forgotten=true;} // nothing saved, explicit legacy stop
+    }
   }
-  lock();state.autoConnect=haveCredentials && !autoStored && state.autoConnect;state.hasSaved=haveCredentials;
-  if(disconnected){state.connected=false;state.ssid[0]=0;state.ip[0]=0;state.rssi=0;}
-  const char* result=!forgotten?"Не удалось удалить сеть из NVS":!autoStored?"NVS: автозапуск не сохранён":forget?"Сохранённая сеть удалена":"Автоподключение выключено";
-  snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s. %s",disconnected?"Wi-Fi отключён":"Не удалось отключить Wi-Fi",result);unlock();
+  bool autoStored=true,disconnected=true;
+  if(disable) {
+#if PANEL_WIFI
+    resetReconnect(false); // A failed NVS write cannot reverse an explicit stop this boot.
+#endif
+    if(!resumeAfterDelete)autoStored=nvsOK && prefs.putBool("autoconnect",false)==1;
+  }
+  if(drop)disconnected=dropLink();
+  if(pos>=0) {
+    ProfileBook after=before;Scrub clearAfter{&after,sizeof(after)};
+    --after.count;
+    for(unsigned i=unsigned(pos);i<after.count;++i)after.items[i]=after.items[i+1];
+    wipe(&after.items[after.count],sizeof(Credentials)); // don't leave the removed password in the blob
+    forgotten=storeProfiles(after,before,hadCanonical); // retain an authoritative empty book after deleting the last entry
+    if(forgotten) {
+      publishProfiles(after);cleanupOK=discardLegacy();
+#if PANEL_WIFI
+      roundOffset=0;
+      if(!strcmp(lastGood.ssid,before.items[pos].ssid) && lastGood.open==bool(before.items[pos].open))lastGood=SavedNetwork{};
+      if(resumeAfterDelete){disable=false;resetReconnect(true,true);} // only confirmed remaining profiles
+
+#endif
+    } else if(resumeAfterDelete) {
+      // Do not retry the profile whose removal failed, even if NVS is unhealthy.
+      autoStored=nvsOK && prefs.putBool("autoconnect",false)==1;
+    }
+  }
+  lock();
+  if(disable)state.autoConnect=haveCredentials && !autoStored && state.autoConnect;
+  state.hasSaved=haveCredentials;
+  if(drop && disconnected){state.connected=false;state.ssid[0]=0;state.ip[0]=0;state.rssi=0;}
+  const char* result=!forgotten?"Не удалось удалить сеть из NVS":!autoStored?"NVS: автозапуск не сохранён":
+    !cleanupOK?"Профиль удалён. Старая копия осталась в NVS":forget?"Сохранённая сеть удалена":"Автоподключение выключено";
+  snprintf(state.wifiMessage,sizeof(state.wifiMessage),"%s%s",!drop?"":disconnected?"Wi-Fi отключён. ":"Не удалось отключить Wi-Fi. ",result);
+  unlock();
 }
 void worker(void*) {
   nvsOK=prefs.begin("boiler03",false);
   uint8_t zone=nvsOK?prefs.getUChar("timezone",0):0;if(zone>2)zone=0;
   setenv("TZ",ZONES[zone],1);tzset();
-  Credentials credentials;
-  haveCredentials=loadCredentials(credentials);
-  wipe(&credentials,sizeof(credentials));
-  const bool automatic=nvsOK && haveCredentials && prefs.getBool("autoconnect",false);
+  bool profilesOK;
+  {
+    ProfileBook book;Scrub erase{&book,sizeof(book)};
+    profilesOK=loadProfiles(book);
+    if(profilesOK)publishProfiles(book);
+    else {book.count=0;publishProfiles(book);}
+  }
+  const bool automatic=nvsOK && (haveCredentials || !profilesOK) && prefs.getBool("autoconnect",false);
   const uint16_t displayTimeout=initializeDisplaySettings();
   lock();state.displayTimeoutSec=displayTimeout;
   snprintf(state.displayMessage,sizeof(state.displayMessage),"%s",screenNvsOK?"":"NVS недоступна: таймаут не сохранится");
@@ -628,9 +845,10 @@ void worker(void*) {
   snprintf(state.bleMessage,sizeof(state.bleMessage),"%s",PANEL_BLE?"Нажмите Поиск. Устройства не подключаются":"BLE не включён в установленной сборке Arduino");
   unlock();
   if(!nvsOK)message("NVS недоступна: настройки не будут сохранены");
+  else if(!profilesOK)message("Не удалось прочитать сохранённые сети");
   versions();
 #if PANEL_WIFI
-  resetReconnect(automatic,true); // First attempt is immediate; commands still win.
+  lastGood=SavedNetwork{};resetReconnect(automatic,true); // First attempt is immediate; commands still win.
 #endif
   for(;;) {
     Command cmd;
@@ -652,7 +870,7 @@ void worker(void*) {
 #endif
           break;
         case Job::Disconnect:
-        case Job::Forget:disconnectWifi(cmd.job==Job::Forget);break;
+        case Job::Forget:disconnectWifi(cmd.job==Job::Forget,cmd.ssid,cmd.open);break;
         case Job::SetDisplayTimeout:setDisplayTimeout(cmd.displayTimeoutSec);break;
         case Job::BleScan:scanBle();break;
         case Job::Zone:
@@ -685,14 +903,18 @@ bool snapshot(RadioState& out) {
 bool submit(const Command& command) {
   if(!stateMutex)return false;
   if(command.job==Job::None || unsigned(command.job)>unsigned(Job::SetDisplayTimeout))return false;
-  if(command.job==Job::Connect && (!memchr(command.ssid,0,sizeof(command.ssid)) || !command.ssid[0] ||
-      !memchr(command.password,0,sizeof(command.password)) || !passwordValid(command.password,command.open)))return false;
+  if(command.useSaved && command.job!=Job::Connect)return false;
+  if((command.job==Job::Connect || command.job==Job::Forget) && !memchr(command.ssid,0,sizeof(command.ssid)))return false;
+  if(command.job==Job::Connect && (!command.ssid[0] || !memchr(command.password,0,sizeof(command.password)) ||
+      (command.useSaved?command.password[0]!=0:!passwordValid(command.password,command.open))))return false;
   if(command.job==Job::SetClock && !memchr(command.input,0,sizeof(command.input)))return false;
   if(command.job==Job::Zone && command.zone>2)return false;
   if(command.job==Job::SetDisplayTimeout && !validDisplayTimeout(command.displayTimeoutSec))return false;
   if(xSemaphoreTake(stateMutex,pdMS_TO_TICKS(3))!=pdTRUE)return false;
   if(!state.ready){xSemaphoreGive(stateMutex);return false;}
-  if(command.job==Job::Disconnect || command.job==Job::Forget){
+  const bool legacyForget=command.job==Job::Forget && !command.ssid[0];
+  if(legacyForget && state.savedCount>1){xSemaphoreGive(stateMutex);return false;}
+  if(command.job==Job::Disconnect || legacyForget){
     if(urgent!=Job::Forget)urgent=command.job;
     state.busy=true;unlock();return true;
   }

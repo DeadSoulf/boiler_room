@@ -50,8 +50,12 @@ button.jp1-pin{text-align:left;width:100%;transition:background .15s}button.jp1-
  <div class="row"><span>IP</span><span id="wifi-ip">—</span></div>
  <div class="row"><span>RSSI</span><span id="wifi-rssi">—</span></div>
  <p class="hint" id="wifi-message"></p>
- <div class="actions"><button class="primary" data-action="wifi_scan" data-write="1">Найти сети</button></div><details class="details"><summary>Отключение и удаление сети</summary><div class="actions"><button data-action="wifi_disconnect" data-write="1">Отключить</button><button class="danger" data-action="wifi_forget" data-write="1">Забыть сеть</button></div></details>
+ <div class="actions"><button class="primary" data-action="wifi_scan" data-write="1">Найти сети</button></div><details class="details"><summary>Сохранённые сети и отключение</summary>
+ <div class="field"><label for="wifi-profile">Сохранённая сеть</label><select id="wifi-profile"><option value="">Выберите сеть</option></select></div>
+ <div class="actions"><button id="wifi-edit-password" type="button" data-write="1">Новый пароль</button><button class="danger" data-action="wifi_forget" data-write="1">Забыть выбранную сеть</button></div>
+ <div class="actions"><button data-action="wifi_disconnect" data-write="1">Отключить Wi-Fi панели</button></div></details>
  <div class="field"><label>Найденные сети</label><div id="ap-list" class="feed"><p class="muted">Нажмите «Найти сети»</p></div></div>
+ <p class="hint">Нажмите на сохранённую сеть для подключения без ввода пароля. Для новой или скрытой сети используйте форму ниже.</p>
  <form id="wifi-form" autocomplete="off"><div class="field"><label for="ssid">SSID (до 32 байт)</label><input id="ssid" name="ssid" maxlength="32" required placeholder="Имя сети"></div>
  <div class="field"><label for="wifi-pass">Пароль сети</label><input id="wifi-pass" name="password" type="password" autocomplete="new-password" maxlength="64" placeholder="WPA2/WPA3 пароль"></div>
  <div class="stack"><label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" id="wifi-open">Открытая сеть, без пароля</label><button type="submit" class="primary" data-write="1">Подключиться</button></div></form>
@@ -264,6 +268,7 @@ let token=sessionStorage.getItem("boiler_panel_token")||"",current=null,page="ho
 let lastServerError="",lastToast=null,refreshInFlight=false,serverOnline=false;
 let pairTicket="",pairDeadline=0,pairGeneration=0,pairBusy=false;
 let haFormRevision=null,haDirty=false;
+const wifiRows=new Map();let wifiRequestInFlight=false,wifiChoicesSignature="";
 let updateRequestInFlight=false,pendingUpdate=null,updateResult="",updateResultError=false;
 let pinSnapshot=null,pinEditor=null,pinPollSerial=0,pinPollStarted=0,pinPollQueued=false;
 try{const saved=JSON.parse(sessionStorage.getItem("boiler_panel_update")||"null");if(saved&&typeof saved.target==="string"&&saved.target.length>0&&saved.target.length<24&&typeof saved.from==="string"&&["update_install","update_rollback"].includes(saved.action)&&Number.isFinite(saved.at)&&Date.now()>=saved.at&&Date.now()-saved.at<3600000)pendingUpdate=saved;}catch(_){}
@@ -510,22 +515,63 @@ function renderEquipment(){
   if(index===1)for(const n of [2,3,4]){const row=card.querySelector('[data-circuit="'+n+'"]');row.children[0].textContent=items[n]?.name||names[n];row.children[1].textContent=items[n]?.connected?"Подключён":"Нет данных";}
  }
 }
+function wifiReady(){
+ const d=current,w=d?.wifi;
+ return !!(token&&serverOnline&&d?.authorized&&w&&w.ready!==false&&w.supported&&!w.busy&&
+   !d.update?.busy&&!d.update?.boot_pending&&!pendingUpdate&&!updateRequestInFlight&&!wifiRequestInFlight);
+}
+const profileKey=n=>JSON.stringify([n.ssid,n.open]);
+const apKey=a=>JSON.stringify([a.ssid,a.auth,!!a.saved,!!a.supported]);
+function selectedProfile(){return (current?.wifi?.savedNetworks||[]).find(n=>profileKey(n)===$("wifi-profile").value);}
+function wifiForm(ssid,open){
+ $("ssid").value=ssid;$("wifi-open").checked=open;
+ const pass=$("wifi-pass");pass.value="";pass.disabled=open;
+ if(!open)pass.focus();else $("wifi-form").querySelector("button").focus();
+}
+async function wifiWrite(action,params){
+ if(!wifiReady())return;
+ wifiRequestInFlight=true;renderAP();
+ try{await command(action,params);await poll();}
+ finally{wifiRequestInFlight=false;renderAP();}
+}
 function renderAP(){
- const d=current||{},aps=d.wifi&&d.wifi.aps||[],list=$("ap-list");
- list.replaceChildren();
- if(!d.authorized){const p=document.createElement("p");p.textContent="После сопряжения можно искать сети и подключаться.";list.append(p);return}
- if(!aps.length){const p=document.createElement("p");p.textContent="Сетей в списке нет. Нажмите «Найти сети».";list.append(p);return}
- for(const ap of aps){
-   const b=document.createElement("button");b.className="ghost";b.style.width="100%";b.style.textAlign="left";b.style.margin="4px 0";
-   b.textContent=ap.ssid+" · "+ap.rssi+" dBm · "+(ap.auth===0?"Открытая":ap.supported?"WPA Personal":"Не поддерживается");
-   b.disabled=!ap.supported;
-   b.addEventListener("click",()=>{
-     $("ssid").value=ap.ssid;$("wifi-open").checked=ap.auth===0;
-     $("wifi-pass").disabled=ap.auth===0;
-     if(ap.auth===0)$("wifi-pass").value="";
-     notice("Сеть выбрана. Введите пароль и нажмите «Подключиться».");
-   });list.append(b);
+ const d=current||{},w=d.wifi||{},auth=!!(d.authorized&&token),enabled=wifiReady();
+ const profiles=auth?w.savedNetworks||[]:[],select=$("wifi-profile");
+ const signature=JSON.stringify(profiles.map(profileKey));
+ if(signature!==wifiChoicesSignature){
+   const old=select.value;select.replaceChildren(new Option("Выберите сеть",""));
+   for(const n of profiles)select.add(new Option(n.ssid+" · "+(n.open?"Открытая":"Защищённая"),profileKey(n)));
+   select.value=profiles.some(n=>profileKey(n)===old)?old:"";wifiChoicesSignature=signature;
  }
+ const profile=auth&&selectedProfile();
+ select.disabled=!enabled||!profiles.length;
+ $("wifi-edit-password").disabled=!enabled||!profile||profile.open;
+ document.querySelector('[data-action="wifi_forget"]').disabled=!enabled||!profile;
+ $("wifi-form").querySelector("button").disabled=!enabled;
+ const aps=auth?w.aps||[]:[],list=$("ap-list"),active=new Set(),next=[];
+ for(const ap of aps){
+   const key=apKey(ap);active.add(key);
+   let b=wifiRows.get(key);
+   if(!b){
+     b=document.createElement("button");b.type="button";b.className="ghost";b.style.width="100%";b.style.textAlign="left";b.style.margin="4px 0";
+     b.dataset.saved=ap.saved?"1":"0";b.dataset.write="1";wifiRows.set(key,b);
+     b.addEventListener("click",()=>{
+       if(!wifiReady()||!ap.supported||!current.wifi.aps.some(a=>apKey(a)===key))return;
+       if(ap.saved){wifiWrite("wifi_connect",{ssid:ap.ssid,open:ap.auth===0?"1":"0",saved:"1"});return;}
+       wifiForm(ap.ssid,ap.auth===0);
+       notice(ap.auth===0?"Открытая сеть выбрана. Нажмите «Подключиться».":"Сеть выбрана. Введите пароль и нажмите «Подключиться».");
+     });
+   }
+   const caption=ap.ssid+" · "+(ap.saved?"Сохранена · ":"")+ap.rssi+" dBm · "+(ap.auth===0?"Открытая":ap.supported?"WPA Personal":"Не поддерживается");
+   if(b.textContent!==caption)b.textContent=caption;
+   b.disabled=!enabled||!ap.supported;next.push(b);
+ }
+ for(const key of wifiRows.keys())if(!active.has(key))wifiRows.delete(key);
+ if(!next.length){
+   const msg=auth?"Сетей в списке нет. Нажмите «Найти сети».":"После сопряжения можно искать сети и подключаться.";
+   if(list.textContent!==msg)list.textContent=msg;
+ }else if(list.children.length!==next.length||next.some((b,i)=>list.children[i]!==b))list.replaceChildren(...next);
+ if(!auth){$("ssid").value="";$("wifi-pass").value="";$("wifi-open").checked=false;}
 }
 function renderBLE(){
  const d=current||{},items=d.ble&&d.ble.devices||[],list=$("ble-list");
@@ -582,7 +628,7 @@ async function request(path,options){
   const body=await response.text();return {response,body};
  }finally{clearTimeout(timer);}
 }
-function errorText(code){return ({stale_revision:"Назначения изменились. Перечитайте их перед сохранением.",invalid_pin_fields:"Проверьте поля назначения пина.",invalid_pin_assignment:"Этот датчик нельзя назначить на выбранный пин.",configuration_unavailable:"Назначения временно недоступны. Перечитайте их.",configuration_write_failed:"Сохранение не подтверждено. Перечитайте назначения.",same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера",update_busy:"Дождитесь завершения обновления панели",update_unavailable:"Обновление пока недоступно",update_state_unavailable:"Состояние обновления временно недоступно. Повторите запрос.",update_confirmation_required:"Подтвердите выбранную версию ещё раз",update_version_changed:"Доступная версия изменилась. Проверьте сведения и подтвердите нужную версию.",update_not_ready:"Обновление не принято. Проверьте состояние панели.",update_cancel_unavailable:"На этом этапе отмена уже недоступна"})[code]||code;}
+function errorText(code){return ({wifi_profile_changed:"Сохранённая сеть изменилась. Выберите её снова.",stale_revision:"Назначения изменились. Перечитайте их перед сохранением.",invalid_pin_fields:"Проверьте поля назначения пина.",invalid_pin_assignment:"Этот датчик нельзя назначить на выбранный пин.",configuration_unavailable:"Назначения временно недоступны. Перечитайте их.",configuration_write_failed:"Сохранение не подтверждено. Перечитайте назначения.",same_origin_required:"Запрос разрешён только из локальной страницы панели",display_not_ready:"Дисплей ещё запускается",pairing_in_progress:"Код уже запрошен в другом браузере. Завершите тот запрос или дождитесь истечения срока.",pairing_rate_limited:"Слишком много попыток. Подождите до двух минут и запросите новый код.",code_invalid_or_expired:"Неверный или просроченный код",pair_required:"Выполните сопряжение",invalid_code:"Введите шесть цифр",ha_configuration_changed_reload:"Настройки изменились. Перечитайте форму",ha_invalid_or_password_required_for_new_broker:"Проверьте адрес брокера и заново введите пароль при смене сервера",update_busy:"Дождитесь завершения обновления панели",update_unavailable:"Обновление пока недоступно",update_state_unavailable:"Состояние обновления временно недоступно. Повторите запрос.",update_confirmation_required:"Подтвердите выбранную версию ещё раз",update_version_changed:"Доступная версия изменилась. Проверьте сведения и подтвердите нужную версию.",update_not_ready:"Обновление не принято. Проверьте состояние панели.",update_cancel_unavailable:"На этом этапе отмена уже недоступна"})[code]||code;}
 function updateCanister(f){
  let state="unknown",title="Нет данных",height=0,symbol="?";
  if(f?.lower?.valid&&f?.upper?.valid){
@@ -757,7 +803,7 @@ async function login(){
 async function logout(){
  try{await sendPost("/api/logout",{},true)}catch(_){}
  token="";sessionStorage.removeItem("boiler_panel_token");
- notice("Веб-управление отключено");
+ renderAP();notice("Веб-управление отключено");
  await poll();
 }
 async function requestStorageFormat(){
@@ -889,7 +935,11 @@ function handleAction(b){
  if(action==="logout"){logout();return}
  if(action==="close-detail"){detail=-1;updateDetail();return}
  if(action==="refresh"){poll();return}
- if(action==="wifi_forget"&&!confirm("Удалить сохранённую сеть и отключить автоподключение на панели?"))return;
+ if(action==="wifi_forget"){
+   const n=selectedProfile();
+   if(wifiReady()&&n&&confirm("Забыть сеть «"+n.ssid+"» ("+(n.open?"открытая":"защищённая")+")?"))wifiWrite(action,{ssid:n.ssid,open:n.open?"1":"0"});
+   return;
+ }
  if(action==="wifi_disconnect"&&!confirm("Отключить Wi-Fi? Веб-интерфейс может стать недоступным."))return;
  if(action==="zone"){command("zone",{value:$("zone-select").value});return}
  if(action==="clock"){command("clock",{value:$("manual-clock").value.trim()});return}
@@ -947,6 +997,11 @@ $("cfg-type").addEventListener("change",e=>{
  $("cfg-debounce").disabled=t!==2&&t!==3;
  $("cfg-debounce").value="50";
 });
+$("wifi-profile").addEventListener("change",renderAP);
+$("wifi-edit-password").addEventListener("click",()=>{
+ const n=selectedProfile();if(!wifiReady()||!n||n.open)return;
+ wifiForm(n.ssid,false);notice("Введите новый пароль и нажмите «Подключиться».");
+});
 $("wifi-open").addEventListener("change",e=>{
  const isOpen=e.target.checked;$("wifi-pass").disabled=isOpen;
  if(isOpen)$("wifi-pass").value="";
@@ -954,13 +1009,14 @@ $("wifi-open").addEventListener("change",e=>{
 $("wifi-form").addEventListener("submit",e=>{
  e.preventDefault();
  if(!token){startPairing();return}
+ if(!wifiReady()){notice("Сейчас подключение недоступно",true);return;}
  const ssid=$("ssid").value,pass=$("wifi-pass").value,open=$("wifi-open").checked;
  if(!ssid||new TextEncoder().encode(ssid).length>32){notice("SSID до 32 байт",true);return}
  if(!open&&!((pass.length>=8&&pass.length<=63)||/^[0-9a-fA-F]{64}$/.test(pass))){
    notice("Пароль WPA2/WPA3: 8–63 символа или 64 hex",true);return;
  }
  if(!confirm("Подключить панель к выбранной сети? Это может изменить её IP."))return;
- command("wifi_connect",{ssid,password:pass,open:open?"1":"0"});
+ wifiWrite("wifi_connect",{ssid,password:pass,open:open?"1":"0"});
  $("wifi-pass").value="";
 });
 async function poll(){

@@ -9,11 +9,16 @@ void resetTransition(){
  Serial.output.clear();wifiStarted=false;haveCredentials=false;fakeMillis=0;
  disconnectReason.store(0);observeConnect.store(false);associated.store(false);
  wifiDriver=WifiDriver{};eventInstalled=false;driverStoppedForRecovery=false;staStartEvents.store(0);staStopEvents.store(0);delayHook=nullptr;recoveryPending=false;pinsReady=false;
- bleScanPending=false;bleScanComplete=false;
+ bleScanPending=false;bleScanComplete=false;lastGood=SavedNetwork{};resetReconnect(false);
  *BLEDevice::getScan()=BLEScan{};
 }
 Command newConnection(){Command cmd;cmd.job=Job::Connect;strcpy(cmd.ssid,"requested-network");strcpy(cmd.password,"test-key-123");return cmd;}
-void oldConnection(){WiFi.connected=true;WiFi.connectedSsid="previous-network";haveCredentials=true;prefs.credentialKey=true;prefs.autoValue=true;state.autoConnect=true;}
+void oldConnection(){
+ WiFi.connected=true;WiFi.connectedSsid="previous-network";
+ Credentials c;std::strcpy(c.ssid,"previous-network");std::strcpy(c.password,"previous-fixture-key");
+ assert(prefs.putBytes("credentials",&c,sizeof(c))==sizeof(c));wipe(&c,sizeof(c));prefs.credentialWrites=0;
+ haveCredentials=true;prefs.autoValue=true;state.autoConnect=true;state.hasSaved=true;state.savedCount=1;std::strcpy(state.savedNetworks[0].ssid,"previous-network");
+}
 int main(){
  assert(begin());const Command cmd=newConnection();
  resetTransition();oldConnection();WiFi.disconnectSuccess=false;WiFi.beginFailure=true;

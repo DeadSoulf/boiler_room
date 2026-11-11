@@ -8,7 +8,9 @@ void resetScan(){
  WiFi=Wifi{};wifiDriver=WifiDriver{};prefs=Preferences{};nvsOK=true;
  Serial.output.clear();wifiStarted=false;eventInstalled=false;pinsReady=false;
  driverStoppedForRecovery=false;recoveryPending=false;haveCredentials=true;
- prefs.credentialKey=true;prefs.autoValue=true;state.autoConnect=true;
+ Credentials c;strcpy(c.ssid,"test");strcpy(c.password,"scan-fixture-key");
+ assert(prefs.putBytes("credentials",&c,sizeof(c))==sizeof(c));wipe(&c,sizeof(c));prefs.credentialWrites=0;
+ prefs.autoValue=true;state.autoConnect=true;
  fakeMillis=0;delayHook=nullptr;staStartEvents.store(0);staStopEvents.store(0);
  disconnectReason.store(0);observeConnect.store(false);associated.store(false);
 }

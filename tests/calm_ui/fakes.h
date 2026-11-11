@@ -40,7 +40,8 @@ namespace panel_update {
  Snapshot fixture;unsigned checked=0,installed=0,cancelled=0,rolledBack=0,heartbeats=0;bool healthy=false,accept=true;
  char requestedVersion[24]={};
  bool begin(){fixture.started=fixture.supported=true;return true;}
- bool snapshot(Snapshot& s){s=fixture;return true;}
+ bool snapshotAvailable=true;
+ bool snapshot(Snapshot& s){if(!snapshotAvailable){s={};return false;}s=fixture;return true;}
  bool requestCheck(){if(!accept||fixture.busy||fixture.bootPending)return false;++checked;fixture.busy=true;fixture.phase=Phase::Checking;return true;}
  bool requestInstall(const char* expected){
    if(!accept||fixture.busy||fixture.bootPending||!fixture.available||strcmp(expected,fixture.latestVersion))return false;

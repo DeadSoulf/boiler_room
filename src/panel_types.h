@@ -11,6 +11,7 @@ namespace panel {
 constexpr const char* VERSION = "v0.10.6";
 constexpr unsigned CHANNELS = 4;
 constexpr unsigned MAX_AP = 16;
+constexpr unsigned MAX_WIFI_PROFILES = 8;
 constexpr unsigned MAX_BLE = 16;
 constexpr uint32_t STALE_MS = 30000;
 constexpr unsigned HISTORY_POINTS=24;
@@ -112,10 +113,11 @@ struct Command {
   Job job = Job::None;
   char ssid[33] = {}, password[65] = {}, input[48] = {};
   uint16_t displayTimeoutSec=0;
-  bool open = false;
+  bool open = false, useSaved = false;
   uint8_t zone = 0;
 };
-struct AccessPoint { char ssid[33] = {}; int32_t rssi=0; uint8_t auth=0; bool supported=false; };
+struct SavedNetwork { char ssid[33]={}; bool open=false; }; // Public identity only.
+struct AccessPoint { char ssid[33] = {}; int32_t rssi=0; uint8_t auth=0; bool supported=false, saved=false; };
 struct BleDevice { char name[64] = {}, address[20] = {}; int32_t rssi=0; };
 struct RadioState {
   uint32_t revision=0;
@@ -124,7 +126,8 @@ struct RadioState {
   bool ready=false, busy=false, wifiSupported=false, bleSupported=false;
   bool connected=false, hasSaved=false, autoConnect=false;
   Job job=Job::None;
-  uint8_t zone=0, apCount=0, bleCount=0;
+  uint8_t zone=0, apCount=0, bleCount=0, savedCount=0;
+  SavedNetwork savedNetworks[MAX_WIFI_PROFILES];
   int32_t rssi=0;
   char ssid[33] = {}, ip[24] = {}, wifiMessage[150] = {}, bleMessage[150] = {}, timeMessage[100] = {};
   char hostVersion[24] = {}, c6Version[24] = {};

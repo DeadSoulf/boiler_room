@@ -217,7 +217,14 @@ void statusRequest() {
     j+=",\"rssi\":";j+=String(radio.aps[i].rssi);
     j+=",\"auth\":";j+=String(radio.aps[i].auth);
     j+=",\"supported\":";j+=radio.aps[i].supported?"true":"false";
+    j+=",\"saved\":";j+=radio.aps[i].saved?"true":"false";
     j+='}';
+  }
+  j+="],\"savedNetworks\":[";
+  if(admin)for(unsigned i=0;i<radio.savedCount;i++){
+    if(i)j+=',';
+    j+="{\"ssid\":";jsonQuote(j,radio.savedNetworks[i].ssid);
+    j+=",\"open\":";j+=radio.savedNetworks[i].open?"true":"false";j+='}';
   }
   j+="]}";
   j+=",\"ble\":{\"supported\":";j+=radio.bleSupported?"true":"false";
@@ -510,19 +517,29 @@ void commandRequest() {
   panel::Command cmd;
   if(kind=="wifi_scan")cmd.job=Job::WifiScan;
   else if(kind=="wifi_disconnect")cmd.job=Job::Disconnect;
-  else if(kind=="wifi_forget")cmd.job=Job::Forget;
   else if(kind=="ble_scan")cmd.job=Job::BleScan;
-  else if(kind=="wifi_connect"){
-    const String ssid=server.arg("ssid"),pass=server.arg("password");
-    const bool open=server.arg("open")=="1";
-    if(ssid.isEmpty()||ssid.length()>32||pass.length()>64||
-       !passwordValid(pass.c_str(),open) || (open&&!pass.isEmpty())){
+  else if(kind=="wifi_connect"||kind=="wifi_forget"){
+    const String ssid=server.arg("ssid"),open=server.arg("open"),saved=server.arg("saved");
+    const bool forget=kind=="wifi_forget";
+    // Older clients submitted an unqualified Forget. Bind it to the only profile
+    // in the snapshot below; an empty or ambiguous target never clears the book.
+    const bool legacyForget=forget&&!server.hasArg("ssid")&&!server.hasArg("open");
+    if((!legacyForget&&(ssid.isEmpty()||ssid.length()>32||ssid.length()!=strlen(ssid.c_str())||
+        (open!="0"&&open!="1")||open.length()!=1))||
+       (server.hasArg("saved")&&(forget||saved!="1"||saved.length()!=1))){
       errorResponse(400,"invalid_network_credentials");return;
     }
-    cmd.job=Job::Connect;
-    cmd.open=open;
+    cmd.job=forget?Job::Forget:Job::Connect;cmd.useSaved=!forget&&saved=="1";cmd.open=open=="1";
     snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",ssid.c_str());
-    snprintf(cmd.password,sizeof(cmd.password),"%s",pass.c_str());
+    if(forget||cmd.useSaved){
+      if(server.hasArg("password")){errorResponse(400,"invalid_network_credentials");return;}
+    }else{
+      const String pass=server.arg("password");
+      if(pass.length()>64||pass.length()!=strlen(pass.c_str())||!passwordValid(pass.c_str(),cmd.open)){
+        errorResponse(400,"invalid_network_credentials");return;
+      }
+      snprintf(cmd.password,sizeof(cmd.password),"%s",pass.c_str());
+    }
   }
   else if(kind=="zone"){
     const String val=server.arg("value");
@@ -556,6 +573,18 @@ void commandRequest() {
   if(!panel_radio::snapshot(radio)||!radio.ready){
     memset(cmd.password,0,sizeof(cmd.password));
     errorResponse(503,"radio_unavailable");return;
+  }
+  if(cmd.useSaved||cmd.job==Job::Forget){
+    if(!cmd.ssid[0]&&radio.savedCount==1){
+      const auto& only=radio.savedNetworks[0];
+      snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",only.ssid);cmd.open=only.open;
+    }
+    bool found=false;
+    for(unsigned i=0;i<radio.savedCount;i++){
+      const auto& net=radio.savedNetworks[i];
+      if(net.open==cmd.open&&!strcmp(net.ssid,cmd.ssid)){found=true;break;}
+    }
+    if(!found){errorResponse(409,"wifi_profile_changed");return;}
   }
   const bool accepted=panel_radio::submit(cmd);
   volatile char* secret=cmd.password;

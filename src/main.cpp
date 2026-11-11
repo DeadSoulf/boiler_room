@@ -75,6 +75,8 @@ int renderedPage=-1,renderedView=-1,detailChannel=-1;
 uint32_t activityStart=0,detailRevision=0;
 bool wifiLogSeen=false,wifiLogWasOnline=false;
 AccessPoint displayedAps[MAX_AP];uint8_t displayedApCount=0;
+SavedNetwork displayedNetworks[MAX_WIFI_PROFILES],confirmedForget;
+uint8_t displayedNetworkCount=0;
 bool displaySettingsLoaded=false;
 uint16_t appliedDisplayTimeout=0;
 void info(const char* title,const char* description);
@@ -120,13 +122,13 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,WifiForget,BleScan,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,Temp1,Temp2,Temp3,FuelHistory=60,FuelOverview,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
 void updateStorageLabel();
 void updateUpdateLabels();
 void confirmUpdate(bool rollback);
-void confirmNetwork(bool forget);
+void confirmNetwork(const SavedNetwork* target=nullptr);
 lv_obj_t* scrollList(int y,int height);
 lv_obj_t* button(lv_obj_t* parent,const char* title,int x,int y,int w,int h,uintptr_t code,uint32_t fill=0x26373B,bool enabled=true){
   auto* o=lv_btn_create(parent);lv_obj_set_pos(o,x,y);lv_obj_set_size(o,w,h);
@@ -146,16 +148,20 @@ void dismiss(){
   detailChannel=-1;detailText=detailGraph=detailValue=nullptr;fuelDetailLabels={};
   fuelDetailHint=fuelTemperatureValue=fuelTemperatureState=nullptr;
   if(overlay){clearSecretFields();lv_obj_del(overlay);}overlay=nullptr;dialogKind=0;closeDialog=false;
-  memset(confirmedUpdateVersion,0,sizeof(confirmedUpdateVersion));
+  confirmedForget={};memset(confirmedUpdateVersion,0,sizeof(confirmedUpdateVersion));
 }
 void error(const char* msg){if(dialogError)lv_label_set_text(dialogError,msg);}
 bool send(Command& command){
-  panel_update::Snapshot update;panel_update::snapshot(update);
+  panel_update::Snapshot update;const bool known=panel_update::snapshot(update);
   const bool updating=update.busy||update.bootPending;
-  const bool ok=!updating&&panel_radio::submit(command);
+  const bool ok=known&&!updating&&panel_radio::submit(command);
   // Erase the command copy after the queue has copied it.
   volatile char* p=command.password;for(size_t i=0;i<sizeof(command.password);i++)p[i]=0;
-  if(!ok){if(overlay)error(updating?"Дождитесь завершения обновления":"Операция уже выполняется. Повторите после завершения");else info("Операция не принята",updating?"Дождитесь завершения обновления панели.":"Радио не готово или очередь занята. Повторите после завершения текущей операции.");}
+  if(!ok){
+    const char* why=!known?"Не удалось проверить состояние обновления. Повторите попытку.":
+      updating?"Дождитесь завершения обновления панели.":"Радио не готово или очередь занята. Повторите позже.";
+    if(overlay)error(why);else info("Операция не принята",why);
+  }
   else activityStart=millis();
   return ok;
 }
@@ -208,12 +214,12 @@ void makeKeyboard(int y){
   setKeyboardMap(LOWER);upper=false;symbols=false;
   lv_obj_clear_flag(keyboard,LV_OBJ_FLAG_GESTURE_BUBBLE);lv_obj_add_event_cb(keyboard,keyboardEvent,LV_EVENT_VALUE_CHANGED,nullptr);
 }
-void credentials(const AccessPoint* ap){
-  dismiss();dialogKind=1;ssidLocked=ap!=nullptr;openNetwork=ap && ap->auth==0;
+void credentialsFor(const char* ssid,bool isOpen){
+  dismiss();dialogKind=1;ssidLocked=ssid!=nullptr;openNetwork=isOpen;
   overlay=box(lv_layer_top(),0,0,480,800,BG,0);
   label(overlay,"Подключение Wi-Fi",18,23,300,&boiler_font_25);button(overlay,"Домой",350,14,112,50,Home);
-  if(ap){
-    snprintf(selectedSsid,sizeof(selectedSsid),"%s",ap->ssid);
+  if(ssid){
+    snprintf(selectedSsid,sizeof(selectedSsid),"%s",ssid);
     // Sanitize only the caption; selectedSsid retains the bytes used to connect.
     char caption[sizeof(selectedSsid)];snprintf(caption,sizeof(caption),"%s",selectedSsid);
     for(char* p=caption;*p;++p)if(static_cast<unsigned char>(*p)<0x20 || *p==0x7F)*p=' ';
@@ -231,6 +237,7 @@ void credentials(const AccessPoint* ap){
   button(overlay,"Назад",18,387,144,50,Cancel);button(overlay,"Подключиться",174,387,288,50,Connect,0x157A92);
   makeKeyboard(460);activeField=ssidField?ssidField:passwordField;
 }
+void credentials(const AccessPoint* ap){credentialsFor(ap?ap->ssid:nullptr,ap&&ap->auth==0);}
 void manualClock(){
   dismiss();dialogKind=2;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
   label(overlay,"Установка времени",18,23,306,&boiler_font_25);button(overlay,"Домой",350,14,112,50,Home);
@@ -336,7 +343,23 @@ void action(lv_event_t* e){
   ++clicks;const uintptr_t code=reinterpret_cast<uintptr_t>(lv_event_get_user_data(e));
   Command cmd;
   if(code>=Ap0 && code<Ap0+MAX_AP){
-    const unsigned i=unsigned(code-Ap0);if(i<displayedApCount){if(displayedAps[i].supported)credentials(&displayedAps[i]);else info("Тип защиты","Эта версия поддерживает открытые сети и WPA2/WPA3 Personal. Корпоративные сети и WEP не поддерживаются.");}return;
+    const unsigned i=unsigned(code-Ap0);if(i>=displayedApCount)return;
+    const auto& ap=displayedAps[i];
+    if(!ap.supported)info("Тип защиты","Эта версия поддерживает открытые сети и WPA2/WPA3 Personal. Корпоративные сети и WEP не поддерживаются.");
+    else if(ap.saved){
+      cmd.job=Job::Connect;cmd.useSaved=true;cmd.open=ap.auth==0;
+      snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",ap.ssid);send(cmd);
+    }else credentials(&ap);
+    return;
+  }
+  if(code>=SavedEdit0&&code<SavedForget0+MAX_WIFI_PROFILES){
+    const bool forget=code>=SavedForget0;
+    const unsigned i=unsigned(code-(forget?SavedForget0:SavedEdit0));
+    if(i>=displayedNetworkCount)return;
+    const auto& target=displayedNetworks[i];
+    if(forget)confirmNetwork(&target);
+    else if(!target.open)credentialsFor(target.ssid,false);
+    return;
   }
   if(code>=Temp0 && code<=Temp3){
     sensorDetails(unsigned(code-Temp0));return;
@@ -369,7 +392,12 @@ void action(lv_event_t* e){
     case AboutMenu:view=AboutView;rebuild=true;break;
     case WifiMore:view=WifiMoreView;rebuild=true;break;
     case ConfirmDisconnect:cmd.job=Job::Disconnect;if(send(cmd))closeDialog=true;break;
-    case ConfirmForget:cmd.job=Job::Forget;if(send(cmd))closeDialog=true;break;
+    case ConfirmForget:
+      if(confirmedForget.ssid[0]){
+        cmd.job=Job::Forget;cmd.open=confirmedForget.open;
+        snprintf(cmd.ssid,sizeof(cmd.ssid),"%s",confirmedForget.ssid);
+        if(send(cmd))closeDialog=true;
+      }break;
     case Display:view=4;rebuild=true;break;
     case SdFormatApprove:{
       panel_update::Snapshot update;panel_update::snapshot(update);
@@ -382,8 +410,7 @@ void action(lv_event_t* e){
     case Ble:view=2;rebuild=true;break;
     case WifiScan:cmd.job=Job::WifiScan;send(cmd);break;
     case WifiManual:credentials(nullptr);break;
-    case WifiDisconnect:confirmNetwork(false);break;
-    case WifiForget:confirmNetwork(true);break;
+    case WifiDisconnect:confirmNetwork();break;
     case BleScan:cmd.job=Job::BleScan;send(cmd);break;
     case ManualClock:manualClock();break;
     case Cancel:closeDialog=true;break;
@@ -463,10 +490,15 @@ lv_obj_t* menuRow(lv_obj_t* parent,const char* title,const char* subtitle,int y,
   if(subtitle&&*subtitle)label(row,subtitle,20,64,350,&boiler_font_19,MUTED);
   label(row,">",386,(h-25)/2,25,&boiler_font_25,MUTED);return row;
 }
-void confirmNetwork(bool forget){
-  dismiss();dialogKind=3;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
+void confirmNetwork(const SavedNetwork* target){
+  dismiss();const bool forget=target!=nullptr;if(forget)confirmedForget=*target;
+  dialogKind=3;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
   label(overlay,forget?"Забыть сеть?":"Отключить Wi-Fi?",24,70,432,&boiler_font_25);
-  label(overlay,forget?"Сохранённое подключение будет удалено. Для возврата понадобится пароль.":"Веб-панель и Home Assistant потеряют связь с устройством.",24,160,432,&boiler_font_19,MUTED);
+  if(forget){
+    auto* name=label(overlay,confirmedForget.ssid,24,138,432,&boiler_font_25,SKY);
+    lv_label_set_long_mode(name,LV_LABEL_LONG_DOT);lv_obj_set_height(name,38);
+    label(overlay,confirmedForget.open?"Открытая сеть будет удалена из сохранённых.":"Пароль этой сети будет удалён. Для подключения понадобится ввести его снова.",24,204,432,&boiler_font_19,MUTED);
+  }else label(overlay,"Веб-панель и Home Assistant потеряют связь с устройством.",24,160,432,&boiler_font_19,MUTED);
   button(overlay,"Отмена",24,350,432,60,Cancel);
   button(overlay,forget?"Забыть сеть":"Отключить",24,430,432,60,forget?ConfirmForget:ConfirmDisconnect,0x704443);
   dialogError=label(overlay,"",24,540,432,&boiler_font_19,AMBER);
@@ -694,15 +726,29 @@ void wifiPage(){
   for(unsigned i=0;i<radio.apCount;i++){
     auto* row=button(list,"",0,int(i)*86,422,76,Ap0+i,CARD,available);
     auto* name=label(row,radio.aps[i].ssid,16,11,386,&boiler_font_19);lv_label_set_long_mode(name,LV_LABEL_LONG_DOT);lv_obj_set_height(name,26);
-    label(row,radio.aps[i].auth==0?"Открытая сеть":radio.aps[i].supported?"Защищённая сеть":"Защита не поддерживается",16,45,386,&boiler_font_14,MUTED);
+    const auto& ap=displayedAps[i];
+    const char* security=ap.auth==0?"Открытая сеть":ap.supported?"Защищённая сеть":"Защита не поддерживается";
+    char status[108];snprintf(status,sizeof(status),"%s%s",ap.saved?"Сохранена / ":"",security);
+    label(row,status,16,45,386,&boiler_font_14,ap.saved?SKY:MUTED);
   }
   button(body,"Другие действия",24,542,432,56,WifiMore);
   if(radio.wifiMessage[0])label(body,radio.wifiMessage,24,618,432,&boiler_font_14,MUTED);
 }
 void wifiMorePage(){
   button(body,"Отключить Wi-Fi",24,30,432,64,WifiDisconnect,0x26373B,radio.ready&&(radio.connected||radio.autoConnect||(radio.busy&&radio.job==Job::Connect)));
-  button(body,"Забыть сеть",24,116,432,64,WifiForget,0x26373B,radio.ready&&radio.hasSaved);
-  label(body,"Для каждого действия потребуется\nотдельное подтверждение.",24,230,432,&boiler_font_19,MUTED);
+  label(body,"Сохранённые сети",24,128,432,&boiler_font_25);
+  auto* list=scrollList(184,432);
+  displayedNetworkCount=radio.savedCount;memcpy(displayedNetworks,radio.savedNetworks,sizeof(displayedNetworks));
+  if(!displayedNetworkCount)label(list,"Сохранённых сетей пока нет",12,16,398,&boiler_font_19,MUTED);
+  const bool available=radio.ready&&!radio.busy;
+  for(unsigned i=0;i<displayedNetworkCount;i++){
+    const auto& item=displayedNetworks[i];auto* row=box(list,0,int(i)*134,422,124);
+    auto* name=label(row,item.ssid,12,6,390,&boiler_font_19);
+    lv_label_set_long_mode(name,LV_LABEL_LONG_DOT);lv_obj_set_height(name,28);
+    label(row,item.open?"Открытая сеть":"Защищённая сеть",12,39,390,&boiler_font_14,MUTED);
+    if(!item.open)button(row,"Новый пароль",12,65,192,48,SavedEdit0+i,0x26373B,available);
+    button(row,"Забыть сеть",216,65,192,48,SavedForget0+i,0x26373B,available);
+  }
 }
 void blePage(){
   label(body,"Устройства Bluetooth LE",24,16,432,&boiler_font_19,MUTED);

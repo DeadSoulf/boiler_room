@@ -119,7 +119,7 @@ void expectStatus(int code){
 int main(){
  using namespace panel_update;
  // Actual token and Origin validation, including expired/contended sessions.
- for(const char* action:{"update_check","update_install","update_cancel","update_rollback"}){
+ for(const char* action:{"update_check","update_install","update_cancel","update_rollback","wifi_connect","wifi_forget"}){
   reset(action);server.headers.erase("Authorization");expectStatus(401);assert(!called);
   reset(action);server.headers["Authorization"]="Bearer 00000000000000000000000000000000";expectStatus(401);assert(!called);
   reset(action);server.headers["Origin"]="https://unrelated.invalid";expectStatus(403);assert(!called);

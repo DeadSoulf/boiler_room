@@ -186,6 +186,10 @@ int main(int argc,char** argv){
  lv_disp_drv_t display;lv_disp_drv_init(&display);display.hor_res=480;display.ver_res=800;display.flush_cb=flush;display.draw_buf=&draw;display.full_refresh=fullRefresh;display.monitor_cb=monitor;lv_disp_drv_register(&display);
  lv_indev_drv_t input;lv_indev_drv_init(&input);input.type=LV_INDEV_TYPE_POINTER;input.read_cb=pointer;lv_indev_drv_register(&input);
  auto& radioFixture=panel_radio::fixture;radioFixture.ready=true;radioFixture.wifiSupported=true;radioFixture.bleSupported=true;radioFixture.connected=true;radioFixture.hasSaved=true;
+#ifndef BEFORE_CAPTURE
+ radioFixture.savedCount=2;strcpy(radioFixture.savedNetworks[0].ssid,"Example-WiFi");
+ strcpy(radioFixture.savedNetworks[1].ssid,"Guest");radioFixture.savedNetworks[1].open=true;
+#endif
  strcpy(radioFixture.ssid,"Example-WiFi");strcpy(radioFixture.ip,"192.0.2.10");radioFixture.rssi=-53;strcpy(radioFixture.hostVersion,"2.9.6");strcpy(radioFixture.c6Version,"2.9.6");
  auto& sd=panel_storage::fixture;sd.started=sd.mounted=sd.logging=true;sd.freeBytes=62602390528ULL;sd.usedBytes=6144;
  panel_ha::fixture.ready=panel_ha::fixture.supported=true;
@@ -236,6 +240,16 @@ int main(int argc,char** argv){
  touch("Wi-Fi");assert(view==WifiView);save("wifi");touch("Другие действия");assert(view==WifiMoreView);
  unsigned sent=panel_radio::submitted;touch("Забыть сеть");assert(overlay&&panel_radio::submitted==sent);save("forget-confirm");touch("Отмена");assert(!overlay&&view==WifiMoreView&&panel_radio::submitted==sent);
  touch("Отключить Wi-Fi");panel_radio::accept=false;touch("Отключить");assert(overlay&&dialogError&&strlen(lv_label_get_text(dialogError))>0);panel_radio::accept=true;touch("Отключить");assert(!overlay&&panel_radio::submitted==sent+1&&panel_radio::last.job==Job::Disconnect);
+ // A changed password is a separate, explicit credentials flow.
+ touch("Новый пароль");assert(overlay&&ssidLocked&&!openNetwork&&!strcmp(selectedSsid,"Example-WiFi"));
+ assert(!*lv_textarea_get_text(passwordField));touch("Назад");
+ // Forget must still name the exact profile confirmed, even after a snapshot reorder.
+ touch("Забыть сеть");assert(find(overlay,"Example-WiFi"));sent=panel_radio::submitted;
+ const auto firstProfile=radioFixture.savedNetworks[0];
+ radioFixture.savedNetworks[0]=radioFixture.savedNetworks[1];radioFixture.savedNetworks[1]=firstProfile;
+ ++radioFixture.revision;step(300);touch("Забыть сеть");
+ assert(panel_radio::submitted==sent+1&&panel_radio::last.job==Job::Forget&&!panel_radio::last.open&&
+        !strcmp(panel_radio::last.ssid,"Example-WiFi")&&!panel_radio::last.password[0]);
  // A reconnect pause is idle/offline, but the user must still be able to stop it.
  const auto connectedFixture=panel_radio::fixture;
  panel_radio::fixture.connected=false;panel_radio::fixture.busy=false;
@@ -320,6 +334,17 @@ int main(int argc,char** argv){
  ++radioFixture.revision;step();assert(lv_obj_get_scroll_y(resultList)>0);
  lv_obj_scroll_to_y(resultList,0,LV_ANIM_OFF);step();mx=150;my=375;down=true;step(80);
  strcpy(radioFixture.aps[0].ssid,"Replacement");++radioFixture.revision;step(140);assert(displayedAps[0].ssid[0]=='W');down=false;step(300);assert(overlay&&selectedSsid[0]=='W');check();save("credentials-fixture");dismiss();
+ // An AP row is bound to the identity shown at press time. No credential editor
+ // opens for a saved profile; a lookalike open AP never receives that credential.
+ auto& known=radioFixture.aps[0];strcpy(known.ssid,"Example-WiFi");known.saved=true;
+ ++radioFixture.revision;step(300);assert(find(resultList,"Сохранена / Защищённая сеть"));
+ sent=panel_radio::submitted;panel_update::snapshotAvailable=false;clickAt(150,375);
+ assert(overlay&&panel_radio::submitted==sent);panel_update::snapshotAvailable=true;dismiss();
+ mx=150;my=375;down=true;step(80);
+ known.auth=0;known.saved=false;++radioFixture.revision;step(140);down=false;step(300);
+ assert(!overlay&&panel_radio::submitted==sent+1&&panel_radio::last.job==Job::Connect);
+ assert(panel_radio::last.useSaved&&!panel_radio::last.open&&!strcmp(panel_radio::last.ssid,"Example-WiFi")&&!panel_radio::last.password[0]);
+ clickAt(150,375);assert(overlay&&ssidLocked&&openNetwork&&panel_radio::submitted==sent+1);dismiss();
  go(0);const float values[]={22.4f,-8.2f,61.7f,34.8f};for(unsigned i=0;i<4;i++)measurements[i].put(values[i],millis());fuelLevel.put(true,false,millis());step(1100);save("home-values-fixture");check();
  for(unsigned i=0;i<3;i++)assert(!strcmp(lv_label_get_text(tempState[i]),""));
  assert(!strcmp(lv_label_get_text(fuelCanister.temperature),"34.8"));homeTemperatureChecks();
