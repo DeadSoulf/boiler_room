@@ -21,3 +21,14 @@
 ## GitHub
 
 Исходный набор проверок до повышения версии: [коммит](https://github.com/DeadSoulf/boiler_room/commit/88464fc2e61c8c9541856dd7288a1e0daf7a7180), [GitHub OTA checks и target-сборка](https://github.com/DeadSoulf/boiler_room/actions/runs/42978906617). Выпуск и установка на панели — отдельные этапы.
+
+Опубликована [v0.10.7](https://github.com/DeadSoulf/boiler_room/releases/tag/v0.10.7), 2026-11-11T07:39:40Z. [Исходный коммит](https://github.com/DeadSoulf/boiler_room/commit/4aa1de1dac0cdab6b0379cfe022d7332f59a19c0); [выпуск, повторные проверки, скачивание публичных файлов](https://github.com/DeadSoulf/boiler_room/actions/runs/42980026608). Все четыре файла доступны и сверены по SHA-256 на GitHub без авторизации. Список файлов этого выпуска:
+
+| Файл | Размер, байт | SHA-256 |
+|---|---:|---|
+| boiler-panel-ota.json | 609 | `23c98e7d4ada3c532acd3827864d34c186f29b9de12a6affd8599acbc979d1ca` |
+| BoilerPanel-v0.10.7-COM3.zip | 1224981 | `599b6a3f8e645293886e584e3dcfa7741f620da8905a6f2bae6b1053d430df2b` |
+| BoilerPanel-v0.10.7-firmware.bin | 2097488 | `c0f24c667e98ccdd64f39f981c5d2a731efef7760fef0e8cd06df7a8fb44b4f8` |
+| SHA256SUMS.txt | 282 | `f5dc75266f7b05cafa15340395ddc67004473c7c91b50aee970f5b1ef16ae64a` |
+
+Панель не перепрошивалась в рамках этого выпуска. Последнее прямое наблюдение на ней — v0.10.6.
