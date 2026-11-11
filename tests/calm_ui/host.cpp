@@ -247,15 +247,16 @@ int main(int argc,char** argv){
      assert(a.x1>=pict.x1&&a.x2<=pict.x2&&a.y1>=pict.y1&&a.y2<=pict.y2);
      for(unsigned k=0;k<lv_obj_get_child_cnt(nodes[n]);k++)nodes.push_back(lv_obj_get_child(nodes[n],k));
    }
-   clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);assert(overlay&&detailChannel==int(i));
-   assert(find(overlay,SENSOR_NAMES[i]));touch("Назад");assert(!overlay&&page==0);
+   clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);assert(overlay&&targetEditor.channel==int(i));
+   assert(find(overlay,SENSOR_NAMES[i])&&find(overlay,"Не задана")&&find(overlay,"Нет данных"));
+   save(i==0?"room-no-data":"outside-no-data");touch("Назад");assert(!overlay&&page==0);
  }
  const char* emptyTemperatureScreens[]={"","","supply-no-data","tank-no-data","return-no-data","outlet-no-data"};
  for(unsigned i=2;i<CHANNELS;i++){
    auto* title=find(lv_obj_get_parent(tempValue[i]),SENSOR_NAMES[i]);
    lv_area_t bounds;lv_obj_get_coords(title,&bounds);
    clickAt((bounds.x1+bounds.x2)/2,(bounds.y1+bounds.y2)/2);
-   assert(overlay&&detailChannel==int(i));save(emptyTemperatureScreens[i]);touch("Назад");
+   assert(overlay&&targetEditor.channel==int(i));save(emptyTemperatureScreens[i]);touch("Назад");
  }
  // Exercise sensor events through the real non-contiguous GPIO to temperature mapping.
  auto sensorReading=[](uint8_t channel,float value){
@@ -275,23 +276,60 @@ int main(int argc,char** argv){
  for(unsigned i=2;i<CHANNELS;i++){
    lv_area_t value;lv_obj_get_coords(tempValue[i],&value);
    clickAt((value.x1+value.x2)/2,(value.y1+value.y2)/2);
-   assert(detailChannel==int(i)&&find(overlay,SENSOR_NAMES[i]));
-   assert(find(overlay,detailTemperatures[i])&&find(overlay,i<=3?"Пока нет истории":"Последние измерения"));
+   assert(targetEditor.channel==int(i)&&find(overlay,SENSOR_NAMES[i]));
+   assert(find(overlay,detailTemperatures[i])&&find(overlay,"Заданная температура"));
+   assert(lv_obj_check_type(targetEditor.slider,&lv_slider_class)&&find(overlay,"Не задана"));
+   assert(lv_obj_has_state(targetEditor.save,LV_STATE_DISABLED)&&!find(overlay,"Последние измерения"));
    touch("Назад");
  }
+ // Drag the real LVGL slider. A release changes only the draft and Back discards it.
+ touch("Подача");
+ auto* slider=targetEditor.slider;
+ assert(lv_slider_get_min_value(slider)==panel_targets::MIN_C&&lv_slider_get_max_value(slider)==panel_targets::MAX_C);
+ assert(lv_slider_get_value(slider)==61);
+ lv_area_t rail;lv_obj_get_coords(slider,&rail);
+ mx=rail.x1+(61-panel_targets::MIN_C)*(rail.x2-rail.x1)/(panel_targets::MAX_C-panel_targets::MIN_C);
+ my=(rail.y1+rail.y2)/2;down=true;step(80);
+ for(int j=0;j<6;j++){mx+=10;step(50);}
+ down=false;step(200);check();
+ assert(overlay&&page==0&&lv_slider_get_value(slider)>61&&panel_targets::writes==0);
+ touch("Назад");touch("Подача");
+ assert(lv_slider_get_value(targetEditor.slider)==61&&find(overlay,"Не задана"));
+ touch("+1 °C");assert(lv_slider_get_value(targetEditor.slider)==62&&find(overlay,"62 °C"));save("temperature-slider-fixture");
+ sensorReading(2,62.5f);step(1100);
+ assert(find(overlay,"62.5 °C")&&lv_slider_get_value(targetEditor.slider)==62);
+ panel_update::fixture.busy=true;step(1100);
+ assert(lv_obj_has_state(targetEditor.save,LV_STATE_DISABLED)&&panel_targets::writes==0);
+ panel_update::fixture.busy=false;step(1100);touch("Сохранить");
+ assert(!overlay&&page==0&&panel_targets::writes==1&&panel_targets::fixture[2].valueC==62);
+ for(unsigned i=0;i<CHANNELS;i++)assert(panel_targets::fixture[i].configured==(i==2));
+ touch("Подача");assert(lv_slider_get_value(targetEditor.slider)==62);touch("-1 °C");
+ assert(panel_targets::save(2,1,57)==panel_targets::Result::Saved);step(1100);
+ assert(lv_obj_has_state(targetEditor.save,LV_STATE_DISABLED)&&find(overlay,"61 °C"));
+ touch("Назад");touch("Подача");assert(lv_slider_get_value(targetEditor.slider)==57);
+ touch("Домой");assert(!overlay&&page==0&&panel_targets::writes==2);
  step(31000);sensorReading(2,61.5f);sensorReading(7,40.5f);step(1100);
  assert(!strcmp(lv_label_get_text(tempState[2]),"")&&!strcmp(lv_label_get_text(tempState[4]),"Устарело"));
  assert(!strcmp(lv_label_get_text(tempState[3]),"Устарело")&&!strcmp(lv_label_get_text(tempState[5]),""));
+ touch("Обратка");
+ assert(find(overlay,"Данные устарели")&&find(overlay,"Не задана")&&lv_slider_get_value(targetEditor.slider)==0);
+ panel_targets::available=false;step(1100);assert(lv_obj_has_state(targetEditor.slider,LV_STATE_DISABLED));
+ panel_targets::available=true;touch("Назад");
  for(float value:{-55.0f,0.0f,125.0f}){
    for(unsigned i=0;i<CHANNELS;i++){measurements[i].put(value,millis());}step(1100);check();homeTemperatureChecks();
    save(value<0?"home-font-negative-fixture":value>=100?"home-font-three-digit-fixture":"home-font-zero-fixture");
+   touch("На улице");
+   assert(lv_slider_get_value(targetEditor.slider)==int(value));
+   assert(lv_obj_has_state(targetEditor.decrease,LV_STATE_DISABLED)==(value==panel_targets::MIN_C));
+   assert(lv_obj_has_state(targetEditor.increase,LV_STATE_DISABLED)==(value==panel_targets::MAX_C));
+   touch("Назад");
  }
  for(auto& reading:measurements){reading=Measurement{};}step(1100);check();homeTemperatureChecks();save("home-font-no-data-fixture");save("home-icons-no-data");
  assert(tempValue[3]&&tempValue[5]&&fuelCanister.root);
  assert(lv_obj_get_child_cnt(body)==4&&!find(body,"Уровень топлива"));
  assert(!strcmp(lv_label_get_text(tempValue[3]),"--.-"));
  assert(lv_obj_has_flag(fuelCanister.fill,LV_OBJ_FLAG_HIDDEN)&&!strcmp(lv_label_get_text(fuelCanister.glyph),"?"));
- touch("Топливо");assert(page==2&&!overlay);touch("В баке");assert(overlay&&detailChannel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);
+ touch("Топливо");assert(page==2&&!overlay);touch("В баке");assert(overlay&&targetEditor.channel==3);save("temperature-no-data");touch("Назад");touch("Домой");assert(!overlay&&page==0);
  swipe();assert(page==1&&view==0);save("equipment");
  touch("Бойлер");assert(view==1&&find(body,"Температура воды в бойлере"));
  auto* blocked=lv_obj_get_parent(find(body,"Включить бойлер"));assert(lv_obj_has_state(blocked,LV_STATE_DISABLED));
@@ -349,7 +387,7 @@ int main(int argc,char** argv){
  touch("Дизельный отопитель");assert(view==3);touch("Домой");assert(page==0&&!overlay);
  swipe();swipe();assert(page==2);save("fuel-no-data");
  for(unsigned i:{3U,5U}){
-   touch(SENSOR_NAMES[i]);assert(overlay&&detailChannel==int(i));touch("Назад");assert(!overlay&&page==2);
+   touch(SENSOR_NAMES[i]);assert(overlay&&targetEditor.channel==int(i));touch("Назад");assert(!overlay&&page==2);
  }
  swipe();assert(page==PAGE_SETTINGS);save("settings");touch("Подключения");assert(view==ConnectionsView);save("connections");
  touch("Wi-Fi");assert(view==WifiView);save("wifi");touch("Другие действия");assert(view==WifiMoreView);
@@ -463,9 +501,9 @@ int main(int argc,char** argv){
  go(0);const float values[CHANNELS]={22.4f,-8.2f,61.7f,34.8f,47.3f,41.5f};for(unsigned i=0;i<CHANNELS;i++)measurements[i].put(values[i],millis());fuelLevel.put(true,false,millis());step(1100);save("home-values-fixture");check();
  for(unsigned i=0;i<CHANNELS;i++)assert(!strcmp(lv_label_get_text(tempState[i]),""));
  assert(!strcmp(lv_label_get_text(tempValue[3]),"34.8")&&!strcmp(lv_label_get_text(tempValue[5]),"41.5"));homeTemperatureChecks();
- const char* sampleScreens[]={"","","supply-values-fixture","tank-values-fixture","return-values-fixture","outlet-values-fixture"};
- for(unsigned i=2;i<CHANNELS;i++){
-   touch(SENSOR_NAMES[i]);assert(overlay&&detailChannel==int(i));
+ const char* sampleScreens[]={"room-values-fixture","outside-values-fixture","supply-values-fixture","tank-values-fixture","return-values-fixture","outlet-values-fixture"};
+ for(unsigned i=0;i<CHANNELS;i++){
+   touch(SENSOR_NAMES[i]);assert(overlay&&targetEditor.channel==int(i));
    save(sampleScreens[i]);touch("Назад");
  }
  go(2);assert(find(body,"34.8")&&find(body,"41.5"));save("fuel-values-fixture");go(0);step(31000);assert(!strcmp(lv_label_get_text(tempState[0]),"Устарело"));save("home-stale-fixture");
@@ -474,7 +512,13 @@ int main(int argc,char** argv){
  for(int p=0;p<4;p++){go(p);for(int i=0;i<4;i++){swipe();assert(page==(p+i+1)%4);if(page==0)homeHeaderChecks();else assert(!clockLabel&&!dateLabel&&find(header,"Домой"));}}
  for(int v:{Root,WifiView,BleView,DisplayView,ConnectionsView,HaView,ServiceView,StorageView,DiagnosticsView,AboutView,WifiMoreView,UpdateView}){go(PAGE_SETTINGS,v);if(v==DisplayView)save("display");if(v==BleView)save("bluetooth");check();}
  go(1,1);save("boiler");go(1,3);save("diesel");go(1,4);save("fuel-heater");
- for(unsigned i:{3U,5U}){touch(SENSOR_NAMES[i]);assert(overlay&&detailChannel==int(i));touch("Назад");assert(!overlay&&page==1&&view==4);}
+ for(unsigned i:{3U,5U}){touch(SENSOR_NAMES[i]);assert(overlay&&targetEditor.channel==int(i));touch("Назад");assert(!overlay&&page==1&&view==4);}
+ touch("На выходе");touch("-1 °C");
+ const int fuelSelection=lv_slider_get_value(targetEditor.slider);touch("Сохранить");
+ assert(!overlay&&page==1&&view==4&&panel_targets::fixture[5].valueC==fuelSelection);
+ touch("Домой");touch("Топливо");touch("На выходе");
+ assert(targetEditor.channel==5&&lv_slider_get_value(targetEditor.slider)==fuelSelection);
+ touch("Назад");assert(page==2&&!overlay);
  go(0);
  auto contacts=[&](bool upperClosed,bool lowerClosed){
    const bool lowerReached=panel_config::reedLevelReached(panel_config::Type::ReedNC,!lowerClosed);
@@ -510,7 +554,7 @@ int main(int argc,char** argv){
  assert(!panel_config::reedLevelReached(panel_config::Type::ReedNO,true));
  for(int n=0;n<240;n++){go(n%4);}
 
- printf("RESULT: %u layout checks, clipped=%u; Home date/clock/PIN fit, unknown time/recovery/rollover/timezone, all six Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
+ printf("RESULT: %u layout checks, clipped=%u; Home date/clock/PIN fit, unknown time/recovery/rollover/timezone, all six Home temperatures font55 with no overlap (--.-, -55.0, 0.0, 125.0), temperature slider drag, 1-degree steps, save/cancel, independent channels and revision conflict, actual LVGL pointer navigation, update offer/confirmation/version race/progress/cancel/rollback/heartbeat, OTA redraw/pixel stability with radio changes, back/home, fresh/absent/stale data, wake, AP selection race, pairing and physical SD gates; no hardware access\n",checks,clipped);
  return clipped?1:0;
 #endif
 }

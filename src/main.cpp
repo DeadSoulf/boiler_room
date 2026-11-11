@@ -5,6 +5,7 @@
  */
 #include <Arduino.h>
 #include <time.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 #include "lvgl.h"
@@ -20,6 +21,7 @@
 #include "panel_screen.h"
 #include "panel_equipment.h"
 #include "panel_boiler.h"
+#include "panel_targets.h"
 #if !LV_USE_BTNMATRIX || !LV_USE_TEXTAREA
 #error "BoilerPanel requires LV_USE_BTNMATRIX=1 and LV_USE_TEXTAREA=1 in the existing lv_conf.h"
 #endif
@@ -47,7 +49,15 @@ lv_obj_t *boilerOnField=nullptr,*boilerOffField=nullptr,*boilerSaveCaption=nullp
 panel_boiler::Target boilerDraftTarget=panel_boiler::Target::Dhw;
 uint32_t boilerDraftRevision=0;
 bool boilerConfirm=false;
-lv_obj_t *haStatusLabel=nullptr,*detailValue=nullptr;
+lv_obj_t *haStatusLabel=nullptr;
+struct TemperatureEditor {
+  int channel=-1;
+  panel_targets::Setting original{};
+  bool edited=false;
+  const char* saveError=nullptr;
+  lv_obj_t *reading=nullptr,*selection=nullptr,*slider=nullptr,*decrease=nullptr,*increase=nullptr,*save=nullptr;
+};
+TemperatureEditor targetEditor;
 struct FuelCanister {
   lv_obj_t *root=nullptr,*body=nullptr,*fill=nullptr,*handle=nullptr,*cap=nullptr;
   lv_obj_t *crossA=nullptr,*crossB=nullptr,*glyph=nullptr,*status=nullptr;
@@ -68,7 +78,7 @@ bool rebuild=false, closeDialog=false;
 uint32_t lastSensorConfigRevision=0xffffffffU;
 lv_obj_t *tempValue[CHANNELS]={},*tempState[CHANNELS]={},*tempTrend[CHANNELS]={},*freshBar[CHANNELS]={};
 lv_obj_t *sensorSummary=nullptr,*sensorHint=nullptr,*liveTime=nullptr,*activity=nullptr,*activityDot=nullptr;
-lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr,*detailText=nullptr,*detailGraph=nullptr;
+lv_obj_t *resultList=nullptr,*heapLabel=nullptr,*uptimeLabel=nullptr;
 lv_obj_t *sdStatusLabel=nullptr,*sdFormatNotice=nullptr,*sdFormatAccept=nullptr,*sdFormatReject=nullptr;
 panel_update::Snapshot updateState;
 lv_obj_t *updateLatest=nullptr,*updateStatus=nullptr,*updateMessage=nullptr,*updateProgress=nullptr,*updateProgressFill=nullptr,*updateError=nullptr;
@@ -76,8 +86,8 @@ lv_obj_t *updateCheckButton=nullptr,*updateInstallButton=nullptr,*updateCancelBu
 lv_obj_t *homeUpdateNotice=nullptr,*homeUpdateText=nullptr;
 char confirmedUpdateVersion[24]={};
 bool confirmUpdateRollback=false,firstFrameShown=false,startupServicesReady=false;
-int renderedPage=-1,renderedView=-1,detailChannel=-1;
-uint32_t activityStart=0,detailRevision=0;
+int renderedPage=-1,renderedView=-1;
+uint32_t activityStart=0;
 bool wifiLogSeen=false,wifiLogWasOnline=false;
 AccessPoint displayedAps[MAX_AP];uint8_t displayedApCount=0;
 SavedNetwork displayedNetworks[MAX_WIFI_PROFILES],confirmedForget;
@@ -127,7 +137,7 @@ lv_obj_t* box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t fill=CARD,int ra
   lv_obj_set_style_border_color(o,c(LINE),0);lv_obj_set_style_border_width(o,1,0);lv_obj_set_style_radius(o,radius,0);
   lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_flag(o,LV_OBJ_FLAG_GESTURE_BUBBLE);return o;
 }
-enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,FuelOverview=61,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES,BoilerEdit=200,BoilerSave};
+enum Action:uintptr_t{Home=1,Back,Wifi,Ble,Time,WifiScan,WifiManual,WifiDisconnect,BleScan=10,ManualClock,ClockSave,Connect,Cancel,ToggleOpen,TogglePassword,ServiceRefresh,Zone0,Zone1,Zone2,Display,Timeout0=30,Timeout1,Timeout2,Timeout3,Timeout4,Timeout5,Timeout6,Temp0=40,FuelOverview=61,EquipmentDhw=70,EquipmentElectric,EquipmentDiesel,EquipmentFuel,Ap0=100,SdFormatApprove=120,SdFormatCancel,Connections=140,HaStatus,ServiceMenu,StorageMenu,DiagnosticsMenu,AboutMenu,WifiMore,ConfirmDisconnect,ConfirmForget,UpdateMenu,UpdateCheck,UpdateInstall,UpdateCancel,UpdateRollback,UpdateConfirm,SavedEdit0=170,SavedForget0=SavedEdit0+MAX_WIFI_PROFILES,BoilerEdit=200,BoilerSave,TargetLess,TargetMore,TargetSave};
 void action(lv_event_t* e);
 void updateEquipmentReadings();
 void updateStorageLabel();
@@ -151,7 +161,7 @@ void clearSecretFields(){
 }
 void dismiss(){
   boilerOnField=boilerOffField=boilerSaveCaption=nullptr;boilerConfirm=false;
-  detailChannel=-1;detailText=detailGraph=detailValue=nullptr;fuelDetailLabels={};
+  targetEditor=TemperatureEditor{};fuelDetailLabels={};
   fuelDetailHint=nullptr;
   if(overlay){clearSecretFields();lv_obj_del(overlay);}overlay=nullptr;dialogKind=0;closeDialog=false;
   confirmedForget={};memset(confirmedUpdateVersion,0,sizeof(confirmedUpdateVersion));
@@ -309,35 +319,104 @@ void manualClock(){
   button(overlay,"Назад",18,370,144,52,Cancel);button(overlay,"Установить",174,370,288,52,ClockSave,0x157A92);
   makeKeyboard(450);lv_btnmatrix_set_map(keyboard,SYMBOLS);symbols=true;
 }
-void updateDetail(){
-  if(detailChannel<0 || !detailText)return;
-  const auto& m=measurements[unsigned(detailChannel)];char b[192],value[24];
-  temperature(value,sizeof(value),m,millis());
-  if(detailValue){snprintf(b,sizeof(b),"%s °C",value);lv_label_set_text(detailValue,b);}
-  if(!m.count)snprintf(b,sizeof(b),"Нет измерений\nПодключите датчик в веб-панели.");
-  else snprintf(b,sizeof(b),"Мин. %.1f °C     Макс. %.1f °C\n%s",m.minimum,m.maximum,m.fresh(millis())?"Актуальные показания":"Данные устарели");
-  lv_label_set_text(detailText,b);
-  if(detailGraph && detailRevision==m.revision)return;
-  if(detailGraph)lv_obj_del(detailGraph);
-  detailRevision=m.revision;detailGraph=box(overlay,24,245,432,230);
-  if(m.count<2)label(detailGraph,"Пока нет истории",24,95,382,&boiler_font_19,MUTED);
-  else{
-    double lo=m.at(0),hi=lo;for(unsigned n=1;n<m.count;n++){lo=fmin(lo,m.at(n));hi=fmax(hi,m.at(n));}
-    if(hi-lo<0.2){lo-=0.1;hi+=0.1;}
-    snprintf(b,sizeof(b),"%.1f ... %.1f °C",lo,hi);label(detailGraph,b,20,16,390,&boiler_font_14,MUTED);
-    for(unsigned n=0;n<m.count;n++){
-      auto* dot=box(detailGraph,20+int(n)*380/int(m.count-1),180-int((m.at(n)-lo)/(hi-lo)*118),6,6,SKY,3);
-      lv_obj_set_style_border_width(dot,0,0);lv_obj_clear_flag(dot,LV_OBJ_FLAG_CLICKABLE);
-    }
-    label(detailGraph,"Последние измерения",20,199,390,&boiler_font_14,MUTED);
+void updateButtonState(lv_obj_t* object,bool enabled,bool visible=true);
+void updateTargetEditor(){
+  auto& editor=targetEditor;
+  if(!editor.slider)return;
+  const auto& measured=measurements[unsigned(editor.channel)];
+  const bool fresh=measured.fresh(millis());
+  char caption[48],value[24];
+  if(fresh){
+    temperature(value,sizeof(value),measured,millis());
+    snprintf(caption,sizeof(caption),"%s °C",value);
+  }else snprintf(caption,sizeof(caption),"%s",measured.count?"Данные устарели":"Нет данных");
+  if(strcmp(lv_label_get_text(editor.reading),caption))lv_label_set_text(editor.reading,caption);
+
+  panel_targets::Setting saved;
+  const bool known=panel_targets::snapshot(unsigned(editor.channel),saved);
+  if(known && !editor.edited){
+    editor.original=saved;
+    int initial=0;
+    if(saved.configured)initial=saved.valueC;
+    else if(fresh)initial=int(lroundf(measured.value));
+    if(lv_slider_get_value(editor.slider)!=initial)lv_slider_set_value(editor.slider,initial,LV_ANIM_OFF);
   }
+  const bool showValue=editor.edited || (known&&editor.original.configured);
+  const int selected=lv_slider_get_value(editor.slider);
+  if(showValue)snprintf(caption,sizeof(caption),"%d °C",selected);
+  else snprintf(caption,sizeof(caption),"%s",known?"Не задана":"Нет данных");
+  if(strcmp(lv_label_get_text(editor.selection),caption))lv_label_set_text(editor.selection,caption);
+  const bool conflict=known && editor.edited && saved.revision!=editor.original.revision;
+  panel_update::Snapshot ota;
+  const bool ready=panel_update::snapshot(ota)&&ota.started&&!ota.busy&&!ota.bootPending;
+  const bool editable=known&&ready&&!conflict&&!editor.saveError;
+  updateButtonState(editor.slider,editable);
+  updateButtonState(editor.decrease,editable&&selected>panel_targets::MIN_C);
+  updateButtonState(editor.increase,editable&&selected<panel_targets::MAX_C);
+  updateButtonState(editor.save,editable&&editor.edited);
+  const char* hint=editor.saveError?editor.saveError:
+    !known?"Настройка недоступна. Повторите позже.":
+    conflict?"Настройка изменилась. Откройте регулятор снова.":
+    !ready?"Сохранение недоступно во время обновления.":
+    editor.edited?"Нажмите «Сохранить», чтобы записать значение.":
+    saved.configured?"Значение сохранено на панели.":"Выберите температуру бегунком или кнопками.";
+  if(strcmp(lv_label_get_text(dialogError),hint))error(hint);
 }
-void sensorDetails(unsigned i){
+void targetChanged(lv_event_t*){
+  auto& editor=targetEditor;
+  if(!editor.slider||lv_obj_has_state(editor.slider,LV_STATE_DISABLED))return;
+  editor.edited=!editor.original.configured || lv_slider_get_value(editor.slider)!=editor.original.valueC;
+  updateTargetEditor();
+}
+void adjustTarget(int delta){
+  auto* slider=targetEditor.slider;
+  if(!slider||lv_obj_has_state(slider,LV_STATE_DISABLED))return;
+  lv_slider_set_value(slider,lv_slider_get_value(slider)+delta,LV_ANIM_OFF);
+  targetChanged(nullptr);
+}
+void saveTarget(){
+  auto& editor=targetEditor;
+  updateTargetEditor();
+  if(!editor.save||lv_obj_has_state(editor.save,LV_STATE_DISABLED))return;
+  const auto result=panel_targets::save(unsigned(editor.channel),editor.original.revision,lv_slider_get_value(editor.slider));
+  if(result==panel_targets::Result::Saved){closeDialog=true;return;}
+  editor.saveError=result==panel_targets::Result::Conflict?"Настройка изменилась. Откройте регулятор снова.":
+    "Запись не подтверждена. Откройте регулятор снова.";
+  updateTargetEditor();
+}
+void openTargetEditor(unsigned channel){
   dismiss();dialogKind=3;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
-  label(overlay,SENSOR_NAMES[i],24,30,310,&boiler_font_25);button(overlay,"Домой",350,18,106,56,Home);
-  detailChannel=int(i);detailValue=label(overlay,"--.- °C",24,125,432,&boiler_font_55);
-  detailText=label(overlay,"",24,520,432,&boiler_font_19,MUTED);updateDetail();
-  button(overlay,"Назад",24,684,432,60,Cancel);
+  auto& editor=targetEditor;editor.channel=int(channel);
+  label(overlay,SENSOR_NAMES[channel],24,30,310,&boiler_font_25);
+  button(overlay,"Домой",350,18,106,56,Home);
+  auto* actual=box(overlay,24,110,432,126);
+  label(actual,"Измеренная температура",20,15,392,&boiler_font_19,MUTED);
+  editor.reading=label(actual,"",20,55,392,&boiler_font_25);
+  auto* target=box(overlay,24,260,432,300);
+  label(target,"Заданная температура",20,18,392,&boiler_font_19,MUTED);
+  editor.selection=label(target,"",20,81,236,&boiler_font_25,SKY);
+  editor.decrease=button(target,"-1 °C",260,64,68,64,TargetLess);
+  editor.increase=button(target,"+1 °C",340,64,68,64,TargetMore);
+  editor.slider=lv_slider_create(target);
+  lv_obj_set_pos(editor.slider,30,178);lv_obj_set_size(editor.slider,370,16);
+  lv_obj_set_ext_click_area(editor.slider,18);
+  lv_obj_set_style_bg_color(editor.slider,c(LINE),LV_PART_MAIN);
+  lv_obj_set_style_bg_color(editor.slider,c(SKY),LV_PART_INDICATOR);
+  lv_obj_set_style_bg_color(editor.slider,c(TXT),LV_PART_KNOB);
+  lv_obj_set_style_pad_all(editor.slider,9,LV_PART_KNOB);
+  lv_obj_clear_flag(editor.slider,LV_OBJ_FLAG_GESTURE_BUBBLE);
+  lv_slider_set_range(editor.slider,panel_targets::MIN_C,panel_targets::MAX_C);
+  char limit[16];snprintf(limit,sizeof(limit),"%d °C",int(panel_targets::MIN_C));
+  label(target,limit,22,221,145,&boiler_font_14,MUTED);
+  snprintf(limit,sizeof(limit),"%d °C",int(panel_targets::MAX_C));
+  auto* upperLimit=label(target,limit,260,221,148,&boiler_font_14,MUTED);
+  lv_obj_set_style_text_align(upperLimit,LV_TEXT_ALIGN_RIGHT,0);
+  dialogError=label(overlay,"",24,595,432,&boiler_font_19,MUTED);
+  button(overlay,"Назад",24,684,168,60,Cancel);
+  editor.save=button(overlay,"Сохранить",204,684,252,60,TargetSave,0x245D55);
+  updateTargetEditor();
+  lv_obj_add_event_cb(editor.slider,targetChanged,LV_EVENT_VALUE_CHANGED,nullptr);
+  lv_obj_add_event_cb(editor.slider,targetChanged,LV_EVENT_RELEASED,nullptr);
 }
 
 const char* fuelStatusText(FuelLevelStatus status){
@@ -418,7 +497,7 @@ void action(lv_event_t* e){
     return;
   }
   if(code>=Temp0 && code<Temp0+CHANNELS){
-    sensorDetails(unsigned(code-Temp0));return;
+    openTargetEditor(unsigned(code-Temp0));return;
   }
   if(code>=Timeout0 && code<=Timeout6){cmd.job=Job::SetDisplayTimeout;cmd.displayTimeoutSec=DISPLAY_TIMEOUTS[code-Timeout0];send(cmd);return;}
   switch(code){
@@ -426,6 +505,9 @@ void action(lv_event_t* e){
     case Back:view=page==PAGE_SETTINGS?parentMenuView(view):Root;rebuild=true;break;
     case BoilerEdit:editBoiler();break;
     case BoilerSave:saveBoiler();break;
+    case TargetLess:adjustTarget(-1);break;
+    case TargetMore:adjustTarget(1);break;
+    case TargetSave:saveTarget();break;
     case Connections:view=ConnectionsView;rebuild=true;break;
     case HaStatus:view=HaView;rebuild=true;break;
     case ServiceMenu:view=ServiceView;rebuild=true;break;
@@ -972,7 +1054,7 @@ void updateVisibility(lv_obj_t* object,bool visible){
     if(visible)lv_obj_clear_flag(object,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(object,LV_OBJ_FLAG_HIDDEN);
   }
 }
-void updateButtonState(lv_obj_t* object,bool enabled,bool visible=true){
+void updateButtonState(lv_obj_t* object,bool enabled,bool visible){
   if(!object)return;
   updateVisibility(object,visible);
   if(enabled)lv_obj_clear_state(object,LV_STATE_DISABLED);else lv_obj_add_state(object,LV_STATE_DISABLED);
@@ -1073,7 +1155,7 @@ void aboutPage(){
 }
 
 void updateLive(){
-  updateFuel();updateDetail();updateEquipmentReadings();updateUpdateLabels();const uint32_t now=millis();char text[120];
+  updateFuel();updateTargetEditor();updateEquipmentReadings();updateUpdateLabels();const uint32_t now=millis();char text[120];
   for(unsigned i=0;i<CHANNELS;i++)if(tempValue[i]){
     const auto& m=measurements[i];temperature(text,sizeof(text),m,now);lv_label_set_text(tempValue[i],text);
     lv_obj_set_style_text_font(tempValue[i],strlen(text)>5?&boiler_font_25:&boiler_font_55,0);
@@ -1225,6 +1307,7 @@ void setup(){
   Serial.begin(115200);
   const bool configReady=panel_config::begin(),sensorsReady=panel_sensors::begin(),radioReady=panel_radio::begin();
   panel_boiler::begin(); // Optional local preferences. A read fault disables editing, not the rest of the panel.
+  panel_targets::begin();
   const bool storageReady=panel_storage::begin(),haReady=panel_ha::begin(),webReady=panel_web::begin();
   const bool updateReady=panel_update::begin();
   if(lvgl_glue_lock(0)){

@@ -14,9 +14,13 @@ p = s.index('  if(kind=="boiler_thresholds" ||', p)
 guard += s[p:s.index('  if(kind=="sd_format_prepare")', p)]
 p = s.index("  for(const auto target : {panel_boiler::Target", s.index("void statusRequest()"))
 status = s[p:s.index("  panel_storage::Snapshot storage;", p)]
+target_parser = s[s.index("bool parseTargetC("):s.index("void commandRequest() {")]
 digits = s[s.index("bool allDigits("):s.index("#if BP_WEB_ENABLED", s.index("bool allDigits("))]
 driver = r'''
 #include "panel_boiler.h"
+#include "panel_targets.h"
+#include "panel_types.h"
+using panel::CHANNELS;
 #include <string>
 #include <iostream>
 #include <cassert>
@@ -51,7 +55,19 @@ namespace panel_boiler{
   return next;
  }
 }
+namespace panel_targets{
+ Setting fixtures[CHANNELS];unsigned writes=0;bool readable=true;
+ bool snapshot(unsigned channel,Setting& setting){
+   assert(channel<CHANNELS);setting=fixtures[channel];return readable;
+ }
+ Result save(unsigned channel,uint32_t revision,int degrees){
+   assert(channel<CHANNELS);auto& s=fixtures[channel];++writes;
+   if(s.revision!=revision)return Result::Conflict;
+   s.configured=true;s.valueC=degrees;++s.revision;return Result::Saved;
+ }
+}
 DIGITS
+TARGET_PARSER
 GUARD
  errorResponse(404,"unknown_action");}
 void printStatus(){String j="{\"ok\":true";STATUS;std::cout<<j<<"}\n";}
@@ -84,15 +100,35 @@ int main(){
  next=Result::Saved;check(200,7);std::cout<<reply<<"\n";printStatus();
  server.args["revision"]="1";electricReadable=false;check(409,8);assert(reply=="electric_save_unconfirmed");
  readable=true;printStatus();
+ server.args={{"action","temperature_target"},{"channel","5"},{"value_c","-55"},{"revision","0"}};
+ auto targetCheck=[](int expected,unsigned calls){
+   code=0;commandRequest();assert(code==expected&&panel_targets::writes==calls);
+ };
+ auth=false;targetCheck(401,0);auth=true;origin=false;targetCheck(403,0);origin=true;
+ panel_update::fixture.busy=true;targetCheck(409,0);panel_update::fixture.busy=false;
+ panel_update::fixture.bootPending=true;targetCheck(409,0);panel_update::fixture.bootPending=false;
+ panel_update::fixture.started=false;targetCheck(503,0);panel_update::fixture.started=true;
+ for(const char* bad:{"-1","6","99",""}){server.args["channel"]=bad;targetCheck(400,0);}
+ server.args["channel"]="5";
+ for(const char* bad:{"-56","126","2.5","-","+",".7"," 5","", "1x"}){
+   server.args["value_c"]=bad;targetCheck(400,0);
+ }
+ server.args["value_c"]=String("2\0",2);targetCheck(400,0);server.args["value_c"]="-55";
+ server.args["revision"]="4294967296";targetCheck(400,0);server.args["revision"]="1";targetCheck(409,1);
+ server.args["revision"]="0";targetCheck(200,2);std::cout<<reply<<"\n";printStatus();
+ server.args["channel"]="0";server.args["value_c"]="125";targetCheck(200,3);
+ assert(panel_targets::fixtures[5].valueC==-55&&panel_targets::fixtures[0].valueC==125);
+ panel_targets::readable=false;server.args["revision"]="1";targetCheck(409,4);
+ assert(reply=="temperature_target_unconfirmed");printStatus();
 }
 '''
-for marker, code in (("DIGITS",digits),("GUARD",guard),("STATUS",status)):
+for marker, code in (("DIGITS",digits),("TARGET_PARSER",target_parser),("GUARD",guard),("STATUS",status)):
     driver = driver.replace(marker, code)
 with tempfile.TemporaryDirectory() as tmp:
     cpp, exe = Path(tmp)/"boiler.cpp", Path(tmp)/"boiler"
     cpp.write_text(driver)
     subprocess.run(["g++","-std=c++17","-Wall","-Wextra","-Werror","-I",str(root/"src"),str(cpp),"-o",str(exe)],check=True)
-    empty, unknown, saved, configured, electric_save, electric_only, electric_unknown = map(json.loads, subprocess.check_output([exe],text=True).splitlines())
+    empty, unknown, saved, configured, electric_save, electric_only, electric_unknown, target_save, target_confirmed, targets_unavailable = map(json.loads, subprocess.check_output([exe],text=True).splitlines())
 assert empty["boiler_settings"] == dict(revision=0,configured=False,on_c=None,off_c=None)
 assert unknown["boiler_settings"] is None
 assert saved == dict(ok=True,saved=True,revision=1)
@@ -103,4 +139,9 @@ assert electric_save == saved
 assert electric_only["electric_settings"] == dict(revision=1,configured=True,on_c=22,off_c=64)
 assert electric_only["boiler_settings"] is None
 assert electric_unknown["electric_settings"] is None and electric_unknown["boiler_settings"]["on_c"] == 10
-print("PASS: separate boiler/electric status and writes, status/revision conflict, auth/Origin/OTA guards, no enable route")
+assert empty["temperature_targets"] == [dict(configured=False,revision=0,value_c=None)] * 6
+assert target_save == dict(ok=True,saved=True,revision=1)
+assert target_confirmed["temperature_targets"][:5] == empty["temperature_targets"][:5]
+assert target_confirmed["temperature_targets"][5] == dict(configured=True,revision=1,value_c=-55)
+assert targets_unavailable["temperature_targets"] == [None] * 6
+print("PASS: appliance settings, signed channel targets, authenticated writes, strict bounds, conflict and readback handling")

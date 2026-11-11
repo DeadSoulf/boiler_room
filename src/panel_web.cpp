@@ -16,6 +16,7 @@
 #include "panel_radio.h"
 #include "panel_equipment.h"
 #include "panel_boiler.h"
+#include "panel_targets.h"
 #include "panel_screen.h"
 #include "panel_storage.h"
 #include "panel_update.h"
@@ -293,6 +294,17 @@ void statusRequest() {
     }else j+=",\"on_c\":null,\"off_c\":null";
     j+='}';
   }
+  j+=",\"temperature_targets\":[";
+  for(unsigned channel=0;channel<CHANNELS;channel++){
+    if(channel)j+=',';
+    panel_targets::Setting setting;
+    if(!panel_targets::snapshot(channel,setting)){j+="null";continue;}
+    j+="{\"configured\":";j+=setting.configured?"true":"false";
+    j+=",\"revision\":";j+=String(setting.revision);
+    j+=",\"value_c\":";if(setting.configured)j+=String(setting.valueC);else j+="null";
+    j+='}';
+  }
+  j+=']';
   panel_storage::Snapshot storage;
   const bool storageOK=panel_storage::snapshot(storage);
   j+=",\"storage\":{\"started\":";j+=(storageOK&&storage.started)?"true":"false";
@@ -394,6 +406,18 @@ void statusRequest() {
   jsonResponse(200,j);
 }
 
+bool parseTargetC(const String& raw,int& value){
+  const bool negative=raw.length()>0 && raw[0]=='-';
+  const size_t first=negative?1:0;
+  if(raw.length()<=first || raw.length()-first>3)return false;
+  int degrees=0;
+  for(size_t i=first;i<raw.length();i++){
+    if(raw[i]<'0' || raw[i]>'9')return false;
+    degrees=degrees*10+(raw[i]-'0');
+  }
+  value=negative?-degrees:degrees;
+  return value>=panel_targets::MIN_C && value<=panel_targets::MAX_C;
+}
 void commandRequest() {
   if(!authorized()){errorResponse(401,"pair_required");return;}
   if(!pairingOriginAllowed()){errorResponse(403,"same_origin_required");return;}
@@ -481,6 +505,27 @@ void commandRequest() {
     if(!panel_boiler::snapshot(confirmed,target)||!confirmed.configured||
        unsigned(confirmed.onC)!=asUint(on)||unsigned(confirmed.offC)!=asUint(off)){
       errorResponse(409,electric?"electric_save_unconfirmed":"boiler_save_unconfirmed");return;
+    }
+    jsonResponse(200,String("{\"ok\":true,\"saved\":true,\"revision\":")+String(confirmed.revision)+"}");return;
+  }
+  if(kind=="temperature_target"){
+    if(!update.started){errorResponse(503,"update_state_unavailable");return;}
+    const String ch=server.arg("channel"),rev=server.arg("revision");
+    int value=0;
+    if(!allDigits(ch,1,1)||asUint(ch)>=CHANNELS||!parseTargetC(server.arg("value_c"),value)||
+       !allDigits(rev,1,10)||strtoull(rev.c_str(),nullptr,10)>0xffffffffULL){
+      errorResponse(400,"invalid_temperature_target");return;
+    }
+    const unsigned channel=asUint(ch);
+    const uint32_t expected=asUint(rev);
+    const auto result=panel_targets::save(channel,expected,value);
+    if(result==panel_targets::Result::Invalid){errorResponse(400,"invalid_temperature_target");return;}
+    if(result==panel_targets::Result::Conflict){errorResponse(409,"stale_revision");return;}
+    if(result!=panel_targets::Result::Saved){errorResponse(503,"temperature_target_unavailable");return;}
+    panel_targets::Setting confirmed;
+    if(!panel_targets::snapshot(channel,confirmed)||!confirmed.configured||confirmed.valueC!=value||
+       (confirmed.revision!=expected && (expected==UINT32_MAX || confirmed.revision!=expected+1))){
+      errorResponse(409,"temperature_target_unconfirmed");return;
     }
     jsonResponse(200,String("{\"ok\":true,\"saved\":true,\"revision\":")+String(confirmed.revision)+"}");return;
   }

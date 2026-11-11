@@ -10,6 +10,7 @@
 #include "panel_update.h"
 #include "panel_config.h"
 #include "panel_boiler.h"
+#include "panel_targets.h"
 #include "panel_sensors.h"
 #include "panel_ha.h"
 uint32_t fakeMillis=1000;SerialStub Serial;ESPStub ESP;
@@ -32,6 +33,24 @@ namespace panel_boiler {
    if(revision!=selected.revision)return Result::Conflict;
    if(on<0||off>99||on>=off)return Result::Invalid;
    selected.configured=true;selected.onC=uint8_t(on);selected.offC=uint8_t(off);++selected.revision;
+   return Result::Saved;
+ }
+}
+namespace panel_targets {
+ Setting fixture[panel::CHANNELS]{};
+ unsigned writes=0;
+ bool available=true;
+ bool begin(){return true;}
+ bool snapshot(unsigned channel,Setting& out){
+   if(!available||channel>=panel::CHANNELS)return false;
+   out=fixture[channel];return true;
+ }
+ Result save(unsigned channel,uint32_t revision,int value){
+   if(!available)return Result::Unavailable;
+   if(channel>=panel::CHANNELS||value<MIN_C||value>MAX_C)return Result::Invalid;
+   auto& item=fixture[channel];
+   if(revision!=item.revision)return Result::Conflict;
+   item.configured=true;item.valueC=value;++item.revision;++writes;
    return Result::Saved;
  }
 }
