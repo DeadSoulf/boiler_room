@@ -734,7 +734,11 @@ void equipmentPage(){
     auto* water=box(body,24,16,432,120);
     label(water,"Температура воды в бойлере",20,18,390,&boiler_font_19,MUTED);
     label(water,"Нет данных",20,58,390,&boiler_font_25);
-    button(body,"Включить бойлер",24,160,432,58,0,0x245D55,false);
+    auto* heat=button(body,"Включить бойлер",24,160,432,58,0,0x26373B,false);
+    // Keep the unavailable action legible without using the active action color.
+    lv_obj_set_style_opa(heat,LV_OPA_COVER,LV_STATE_DISABLED);
+    lv_obj_set_style_color_filter_opa(heat,LV_OPA_TRANSP,LV_STATE_DISABLED);
+    lv_obj_set_style_text_color(lv_obj_get_child(heat,0),c(MUTED),0);
     label(body,"Не подключены датчик воды и контроллер.",24,236,432,&boiler_font_19,MUTED);
     auto* limits=box(body,24,307,432,210);
     label(limits,"Включать при",20,16,390,&boiler_font_19,MUTED);
