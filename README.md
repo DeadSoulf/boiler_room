@@ -1,4 +1,10 @@
-# Boiler Room Touch Panel — v0.10.6
+# Boiler Room Touch Panel — v0.10.7
+
+## v0.10.7: saved Wi-Fi networks
+
+The panel remembers up to eight networks and tries other saved profiles if a connection is lost. Open **Settings → Connections → Wi-Fi** on the panel, or **Settings → Wi-Fi** in a paired browser. Scan, then tap a network marked **Saved** to connect without re-entering its password. Unknown protected networks still need a password. A manual disconnect pauses automatic connections without erasing any profiles.
+
+An existing v0.10.6 credential works after upgrading. Downgrading after changing profiles may require entering the password on the older firmware. [Verification and migration notes](docs/verification/wifi-profiles-2026-11-11.md).
 
 ## v0.10.6: assign sensors by selecting a pin
 
