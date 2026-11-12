@@ -107,3 +107,26 @@ jobs:
           name: github-ota-esp32p4-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: artifacts/
           retention-days: 14
+      - name: Stage the installable files for a manual build
+        if: github.workflow == 'GitHub OTA checks and ESP32-P4 build'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(cat VERSION)
+          base="BoilerPanel-$version"
+          bundle="$RUNNER_TEMP/panel-download"
+          mkdir -p "$bundle"
+          cp "artifacts/$base-firmware.bin" "artifacts/$base-COM3.zip" artifacts/heating-rust-link.json "$bundle/"
+          cp -R artifacts/licenses "$bundle/"
+          printf '%s\n' "$GITHUB_SHA" > "$bundle/SOURCE_COMMIT.txt"
+          cd "$bundle"
+          sha256sum "$base-firmware.bin" "$base-COM3.zip" > SHA256SUMS.txt
+      - name: Upload the manual firmware download
+        if: github.workflow == 'GitHub OTA checks and ESP32-P4 build'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: BoilerPanel-ESP32P4-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/panel-download/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
