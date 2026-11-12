@@ -301,6 +301,8 @@ void statusRequest() {
   j+=",\"temperature_targets\":[";
   for(unsigned channel=0;channel<CHANNELS;channel++){
     if(channel)j+=',';
+    // Outdoor telemetry has no editable target, including after upgrades from old NVS.
+    if(channel==panel_targets::OUTDOOR_CHANNEL){j+="null";continue;}
     panel_targets::Setting setting;
     if(!panel_targets::snapshot(channel,setting)){j+="null";continue;}
     j+="{\"configured\":";j+=setting.configured?"true":"false";
@@ -516,7 +518,8 @@ void commandRequest() {
     if(!update.started){errorResponse(503,"update_state_unavailable");return;}
     const String ch=server.arg("channel"),rev=server.arg("revision");
     int value=0;
-    if(!allDigits(ch,1,1)||asUint(ch)>=CHANNELS||!parseTargetC(server.arg("value_c"),value)||
+    if(!allDigits(ch,1,1)||asUint(ch)>=CHANNELS||asUint(ch)==panel_targets::OUTDOOR_CHANNEL||
+       !parseTargetC(server.arg("value_c"),value)||
        !allDigits(rev,1,10)||strtoull(rev.c_str(),nullptr,10)>0xffffffffULL){
       errorResponse(400,"invalid_temperature_target");return;
     }

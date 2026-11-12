@@ -252,10 +252,15 @@ int main(int argc,char** argv){
      for(unsigned k=0;k<lv_obj_get_child_cnt(nodes[n]);k++)nodes.push_back(lv_obj_get_child(nodes[n],k));
    }
    clickAt((pict.x1+pict.x2)/2,(pict.y1+pict.y2)/2);
-   if(i==0){assert(roomGoal&&find(overlay,"В доме: нет данных"));save("room-no-data");touch("Справочная уставка");}
+   if(i==panel_targets::OUTDOOR_CHANNEL){
+     assert(!lv_obj_has_flag(tile,LV_OBJ_FLAG_CLICKABLE));
+     assert(!overlay&&page==0&&targetEditor.channel==-1);
+     save("outside-read-only");continue;
+   }
+   assert(roomGoal&&find(overlay,"В доме: нет данных"));save("room-no-data");touch("Справочная уставка");
    assert(overlay&&targetEditor.channel==int(i));
    assert(find(overlay,SENSOR_NAMES[i])&&find(overlay,"Не задана")&&find(overlay,"Нет данных"));
-   save(i==0?"room-reference":"outside-no-data");touch("Назад");assert(!overlay&&page==0);
+   save("room-reference");touch("Назад");assert(!overlay&&page==0);
  }
  const char* emptyTemperatureScreens[]={"","","supply-no-data","tank-no-data","return-no-data","outlet-no-data"};
  for(unsigned i=2;i<CHANNELS;i++){
@@ -324,11 +329,9 @@ int main(int argc,char** argv){
  for(float value:{-55.0f,0.0f,125.0f}){
    for(unsigned i=0;i<CHANNELS;i++){measurements[i].put(value,millis());}step(1100);check();homeTemperatureChecks();
    save(value<0?"home-font-negative-fixture":value>=100?"home-font-three-digit-fixture":"home-font-zero-fixture");
-   touch("На улице");
-   assert(lv_slider_get_value(targetEditor.slider)==int(value));
-   assert(lv_obj_has_state(targetEditor.decrease,LV_STATE_DISABLED)==(value==panel_targets::MIN_C));
-   assert(lv_obj_has_state(targetEditor.increase,LV_STATE_DISABLED)==(value==panel_targets::MAX_C));
-   touch("Назад");
+   assert(!strcmp(lv_label_get_text(tempValue[1]),value==-55.0f?"-55.0":value==125.0f?"125.0":"0.0"));
+   touch("На улице");assert(!overlay&&targetEditor.slider==nullptr);
+   assert(panel_targets::writes==2);
  }
  for(auto& reading:measurements){reading=Measurement{};}step(1100);check();homeTemperatureChecks();save("home-font-no-data-fixture");save("home-icons-no-data");
  assert(tempValue[3]&&tempValue[5]&&fuelCanister.root);

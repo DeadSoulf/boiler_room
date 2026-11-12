@@ -524,6 +524,7 @@ void saveTarget(){
   updateTargetEditor();
 }
 void openTargetEditor(unsigned channel){
+  if(channel>=CHANNELS||channel==panel_targets::OUTDOOR_CHANNEL)return;
   dismiss();dialogKind=3;overlay=box(lv_layer_top(),0,0,480,800,BG,0);
   auto& editor=targetEditor;editor.channel=int(channel);
   label(overlay,SENSOR_NAMES[channel],24,30,310,&boiler_font_25);
@@ -913,6 +914,8 @@ void updateCanister(){
   lv_label_set_text(fuelCanister.status,status);lv_obj_set_style_text_color(fuelCanister.status,c(ink),0);
 }
 void bindReading(lv_obj_t* object,unsigned channel){
+  // Unlike indoor setpoints, outdoor weather is display-only.
+  if(channel==panel_targets::OUTDOOR_CHANNEL){passive(object);return;}
   const uintptr_t actionId=channel==0?uintptr_t(RoomLimits):uintptr_t(Temp0+channel);
   lv_obj_add_event_cb(object,action,LV_EVENT_CLICKED,reinterpret_cast<void*>(actionId));
 }

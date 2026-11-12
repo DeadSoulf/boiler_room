@@ -5,6 +5,8 @@
 // Independent, user-selected temperature settings. They are not sensor readings.
 namespace panel_targets {
 constexpr int MIN_C=-55, MAX_C=125;
+// Channel 1 is measured outdoor weather, never a user-selectable setpoint.
+constexpr unsigned OUTDOOR_CHANNEL=1;
 struct Setting {
   bool configured=false;
   int valueC=0;

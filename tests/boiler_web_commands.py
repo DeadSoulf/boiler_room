@@ -109,6 +109,7 @@ int main(){
  panel_update::fixture.bootPending=true;targetCheck(409,0);panel_update::fixture.bootPending=false;
  panel_update::fixture.started=false;targetCheck(503,0);panel_update::fixture.started=true;
  for(const char* bad:{"-1","6","99",""}){server.args["channel"]=bad;targetCheck(400,0);}
+ server.args["channel"]="1";targetCheck(400,0);assert(reply=="invalid_temperature_target");
  server.args["channel"]="5";
  for(const char* bad:{"-56","126","2.5","-","+",".7"," 5","", "1x"}){
    server.args["value_c"]=bad;targetCheck(400,0);
@@ -139,9 +140,9 @@ assert electric_save == saved
 assert electric_only["electric_settings"] == dict(revision=1,configured=True,on_c=22,off_c=64)
 assert electric_only["boiler_settings"] is None
 assert electric_unknown["electric_settings"] is None and electric_unknown["boiler_settings"]["on_c"] == 10
-assert empty["temperature_targets"] == [dict(configured=False,revision=0,value_c=None)] * 6
+assert empty["temperature_targets"] == [dict(configured=False,revision=0,value_c=None),None] + [dict(configured=False,revision=0,value_c=None)] * 4
 assert target_save == dict(ok=True,saved=True,revision=1)
 assert target_confirmed["temperature_targets"][:5] == empty["temperature_targets"][:5]
 assert target_confirmed["temperature_targets"][5] == dict(configured=True,revision=1,value_c=-55)
 assert targets_unavailable["temperature_targets"] == [None] * 6
-print("PASS: appliance settings, signed channel targets, authenticated writes, strict bounds, conflict and readback handling")
+print("PASS: appliance settings, five writable targets, outdoor write rejected, authenticated writes and readback")

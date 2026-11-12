@@ -23,8 +23,13 @@ int main(int argc,char** argv){
     const int expectedC[6]={-55,-10,0,25,85,125};
     panel_targets::Setting target;
     for(unsigned ch=0;ch<6;ch++){
-      assert(panel_targets::snapshot(ch,target)&&target.configured&&target.valueC==expectedC[ch]);
-      assert(target.revision==1 && f::targets[ch].writes==0);
+      if(ch==panel_targets::OUTDOOR_CHANNEL){
+        assert(panel_targets::snapshot(ch,target)&&!target.configured&&target.revision==0);
+        assert(panel_targets::save(ch,0,22)==Result::Invalid&&!f::targets[ch].writes);
+      }else{
+        assert(panel_targets::snapshot(ch,target)&&target.configured&&target.valueC==expectedC[ch]);
+        assert(target.revision==1 && f::targets[ch].writes==0);
+      }
     }
     f::electric.key=f::electric.space=true;
     f::dhw.key=f::dhw.space=true;
@@ -82,7 +87,7 @@ int main(int argc,char** argv){
   assert(save(1,10,30,electric)==Result::Unavailable && f::dhw.word==dhwWord);
   f::electric.badRead=false;
   assert(snapshot(settings,electric) && settings.revision==1 && settings.offC==46);
-  // The six targets are separate from each other and from both appliance pairs.
+  // Five writable setpoints and one display-only outdoor channel stay independent of appliance pairs.
   assert(panel_targets::begin());
   panel_targets::Setting target;
   assert(!panel_targets::snapshot(6,target));
@@ -91,6 +96,11 @@ int main(int argc,char** argv){
   const int desiredC[6]={-55,-10,0,25,85,125};
   for(unsigned ch=0;ch<6;ch++){
     assert(panel_targets::snapshot(ch,target)&&!target.configured&&!target.revision&&!f::targets[ch].writes);
+    if(ch==panel_targets::OUTDOOR_CHANNEL){
+      assert(panel_targets::save(ch,0,desiredC[ch])==Result::Invalid);
+      assert(!f::targets[ch].writes&&!f::targets[ch].key);
+      continue;
+    }
     if(ch==0){
       f::targets[ch].failVerifyOnce=true;
       assert(panel_targets::save(ch,0,desiredC[ch])==Result::Unavailable&&!f::targets[ch].key);

@@ -134,7 +134,8 @@ bool snapshot(unsigned channel,Setting& out){
   return true;
 }
 Result save(unsigned channel,uint32_t expectedRevision,int valueC){
-  if(channel>=panel::CHANNELS||valueC<MIN_C||valueC>MAX_C)return Result::Invalid;
+  // Keep legacy NVS bytes intact but refuse new outdoor setpoint writes.
+  if(channel==OUTDOOR_CHANNEL||channel>=panel::CHANNELS||valueC<MIN_C||valueC>MAX_C)return Result::Invalid;
   Guard lock(targetMutex);if(!lock.held)return Result::Unavailable;
   return saveValue(temperatures[channel],expectedRevision,uint16_t(valueC-MIN_C));
 }
