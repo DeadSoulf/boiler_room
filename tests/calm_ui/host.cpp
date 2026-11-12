@@ -330,7 +330,11 @@ int main(int argc,char** argv){
    for(unsigned i=0;i<CHANNELS;i++){measurements[i].put(value,millis());}step(1100);check();homeTemperatureChecks();
    save(value<0?"home-font-negative-fixture":value>=100?"home-font-three-digit-fixture":"home-font-zero-fixture");
    assert(!strcmp(lv_label_get_text(tempValue[1]),value==-55.0f?"-55.0":value==125.0f?"125.0":"0.0"));
-   touch("На улице");assert(!overlay&&targetEditor.slider==nullptr);
+   auto* outside=lv_obj_get_parent(tempValue[1]);
+   assert(!lv_obj_has_flag(outside,LV_OBJ_FLAG_CLICKABLE));
+   lv_area_t outsideArea;lv_obj_get_coords(outside,&outsideArea);
+   clickAt((outsideArea.x1+outsideArea.x2)/2,(outsideArea.y1+outsideArea.y2)/2);
+   assert(!overlay&&targetEditor.slider==nullptr);
    assert(panel_targets::writes==2);
  }
  for(auto& reading:measurements){reading=Measurement{};}step(1100);check();homeTemperatureChecks();save("home-font-no-data-fixture");save("home-icons-no-data");

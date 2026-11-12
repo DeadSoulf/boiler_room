@@ -17,7 +17,8 @@ int main(int argc,char** argv){
     file.read(reinterpret_cast<char*>(&f::electric.word),sizeof(f::electric.word));assert(file.good());
     for(auto& target:f::targets){
       file.read(reinterpret_cast<char*>(&target.word),sizeof(target.word));assert(file.good());
-      target.key=true;
+      // An unset outdoor target has no NVS key, not an invalid zero-valued record.
+      target.key=target.word!=0;
     }
     assert(panel_targets::begin());
     const int expectedC[6]={-55,-10,0,25,85,125};
