@@ -1,6 +1,10 @@
-# Boiler Room Touch Panel — v0.11.1
+# Boiler Room Touch Panel — v0.11.2
 
 [Карта проекта / Project map](docs/project-map.md) · [Алгоритмы отопления и горячей воды](docs/heating-control.md) · [Руководство на русском](README_RU.md)
+
+## v0.11.2 — Outdoor weather is read-only
+
+The outdoor-temperature card on both the physical panel and the paired web page now displays sensor readings only. It no longer opens a setpoint slider. HTTP writes to outdoor target channel 1 are rejected, and the status API returns no editable target for that channel. The sensor measurement, Wi-Fi, existing NVS records, and heating settings are preserved; the other five setpoint channels remain editable. No weather-compensation control is added by this change.
 
 ## v0.11.1 — Rust heating calculations and safe update
 
