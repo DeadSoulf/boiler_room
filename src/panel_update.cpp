@@ -701,7 +701,10 @@ void installRelease(const char* expected){
   vTaskDelay(pdMS_TO_TICKS(30));
   const bool ended=writer.end(error);gate.end(ended);
   if(!ended){gate.fail();transferFailure(error?error:ImageError,true);return;}
-  recordStage(Stage::Verifying);
+  // Persist a distinct verification stage so a watchdog reset can be
+  // distinguished from an interrupted download. Never proceed on NVS failure.
+  Record verifying=next;verifying.stage=uint32_t(Stage::Verifying);
+  if(!writeRecord(verifying)){gate.fail();transferFailure(PersistError,true);return;}
   vTaskDelay(pdMS_TO_TICKS(30));
   if(!readbackImage(target,candidate.size,next.fileHash,next.targetHash)){
     gate.fail();transferFailure(cancelRequested.load()?CancelledError:HashError,true);return;
