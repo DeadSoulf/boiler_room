@@ -631,6 +631,14 @@ int main(int argc,char** argv){
  assert(!strcmp(lv_label_get_text(tempValue[3]),"34.8")&&!strcmp(lv_label_get_text(tempValue[5]),"41.5"));homeTemperatureChecks();
  const char* sampleScreens[]={"room-values-fixture","outside-values-fixture","supply-values-fixture","tank-values-fixture","return-values-fixture","outlet-values-fixture"};
  for(unsigned i=0;i<CHANNELS;i++){
+   if(i==panel_targets::OUTDOOR_CHANNEL){
+     auto* outside=lv_obj_get_parent(tempValue[i]);
+     assert(!lv_obj_has_flag(outside,LV_OBJ_FLAG_CLICKABLE));
+     lv_area_t hit;lv_obj_get_coords(outside,&hit);
+     clickAt((hit.x1+hit.x2)/2,(hit.y1+hit.y2)/2);
+     assert(!overlay&&page==0&&targetEditor.channel==-1);
+     save(sampleScreens[i]);continue;
+   }
    touch(SENSOR_NAMES[i]);assert(overlay);
    if(i==0)assert(roomGoal&&find(overlay,"В доме: 22.4 °C"));else assert(targetEditor.channel==int(i));
    save(sampleScreens[i]);touch("Назад");

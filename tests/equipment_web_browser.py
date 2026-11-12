@@ -213,7 +213,7 @@ try:
                 metrics = page.evaluate("""() => {
                     const box = r => ({left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height});
                     return Array.from(document.querySelectorAll("#home .temp-value")).map(value => {
-                        const card=value.closest(".temp"),target=value.closest("button"),grouped=card!==target;
+                        const card=value.closest(".temp"),target=value.closest("button")||card,grouped=card!==target;
                         const style=getComputedStyle(value);
                         const text=document.createRange();text.selectNodeContents(value);
                         const number=document.createRange();number.setStart(value.firstChild,0);
