@@ -93,7 +93,9 @@ static void cancellationAndCommit(){
     assert(!strcmp(boundary,"end")?otaAborts==0:otaAborts==1);
   }
   reset();offer();cancelRequested.store(true);assert(!install());noSelection();assert(otaBegins==0);
-  reset();offer();persistenceHook=[](unsigned write){if(write==2)assert(!requestCancel());};
+  reset();offer();persistenceHook=[](unsigned write){if(write==2)assert(requestCancel());};
+  assert(!install());noSelection();assert(state.phase==Phase::Cancelled); // verification remains cancellable
+  reset();offer();persistenceHook=[](unsigned write){if(write==3)assert(!requestCancel());};
   assert(install());assert(bootSelections==1&&state.phase==Phase::Rebooting);
   reset();offer();failBoot=true;assert(!install());assert(bootSelections==1&&restarts==0&&bootIndex==0&&record.stage==uint32_t(Stage::Failed));
   reset();offer();failBoot=bootFailureAfterSelect=true;assert(!install());
