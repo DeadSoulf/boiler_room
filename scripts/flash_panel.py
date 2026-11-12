@@ -87,14 +87,15 @@ def partition_records(data: bytes) -> tuple[tuple, ...]:
 
 
 def selected_slot(data: bytes) -> int:
-    """Conservative ESP-IDF OTA selector: only erased, VALID or UNDEFINED entries.
+    """Find an unambiguous confirmed OTA app, without changing otadata.
 
-    NEW/PENDING_VERIFY/INVALID/ABORTED, corrupt CRC and unknown layouts are refused.
-    The CRC seed and max-sequence selection follow ESP-IDF v5.5.2 otatool and
-    bootloader_common_loader.c. This function never changes otadata.
+    An ESP-IDF rollback can leave the latest OTA sequence ABORTED (state 4)
+    while the preceding VALID (state 2) app runs. Accept only this exact
+    single-step fallback; never choose the aborted slot or accept NEW/PENDING.
     """
     require(len(data) == OTA_BYTES, "Не удалось полностью прочитать otadata.")
     valid = []
+    aborted = []
     for offset in (0, 0x1000):
         sector = data[offset:offset + 0x1000]
         if sector == b"\xff" * 0x1000:
@@ -102,18 +103,27 @@ def selected_slot(data: bytes) -> int:
         require(sector[32:] == b"\xff" * (0x1000 - 32), "Неизвестный формат otadata.")
         seq = struct.unpack_from("<I", sector)[0]
         state, crc = struct.unpack_from("<II", sector, 24)
-        # ESP-IDF initial OTA layout: valid seq=1 in sector 0, uninitialized
-        # sector 1 has seq=0 followed by 0xFF. Accept only this exact case.
-        if offset == 0x1000 and seq == 0 and valid == [1]:
+        # Preserve only the exact known ESP-IDF USB-seed placeholder.
+        if offset == 0x1000 and seq == 0 and len(valid) == 1 and valid[0][0] == 1:
             require(sector[:32] == b"\x00" * 4 + b"\xff" * 28,
                     "Неизвестная вторая запись OTA; запись отменена.")
             continue
         require(0 < seq < 0xFFFFFFFF and zlib.crc32(sector[:4], 0xFFFFFFFF) == crc,
                 "Повреждена запись otadata; автоматическая запись отменена.")
-        require(state in (2, 0xFFFFFFFF),
+        require(state in (2, 4, 0xFFFFFFFF),
                 "OTA не в подтверждённом состоянии. Автоматическая запись отменена.")
-        valid.append(seq)
-    return (max(valid) - 1) % 2 if valid else 0
+        if state == 4:
+            aborted.append(seq)
+        else:
+            valid.append((seq, state))
+    if aborted:
+        # Confirmed fallback must be unique, with ABORTED in the opposite
+        # slot and exactly one sequence step after the running VALID app.
+        require(len(aborted) == len(valid) == 1 and valid[0][1] == 2 and
+                aborted[0] == valid[0][0] + 1 and
+                (aborted[0] - valid[0][0]) % 2 == 1,
+                "Неоднозначное состояние отката OTA. Запись отменена.")
+    return (max(seq for seq, _ in valid) - 1) % 2 if valid else 0
 
 
 @dataclass(frozen=True)

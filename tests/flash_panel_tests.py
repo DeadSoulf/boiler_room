@@ -134,6 +134,42 @@ class FlashTests(unittest.TestCase):
         self.assertEqual(flash.selected_slot(ota_entry(5) + ota_entry(6)), 1)
         self.assertEqual(flash.selected_slot(ota_entry(7, 0xFFFFFFFF) + ota_entry(6)), 0)
 
+    def test_confirmed_fallback_with_newer_aborted_slot(self):
+        # Real ESP-IDF rollback: app0 VALID seq17, app1 ABORTED seq18.
+        ota = ota_entry(17, 2) + ota_entry(18, 4)
+        self.assertEqual(flash.selected_slot(ota), 0)
+        self.dev = FakeDevice(self.package, ota)
+        old = bytes(self.dev.memory)
+        saved = self.run_upload(write=True)
+        self.assertIsNotNone(saved)
+        self.assertEqual([offset for offset, _ in self.dev.writes], [flash.APP_OFFSETS[0]])
+        self.assertEqual(bytes(self.dev.memory[flash.OTA_OFFSET:flash.OTA_OFFSET + flash.OTA_BYTES]), ota)
+        self.assertEqual((saved / "otadata.bin").read_bytes(), ota)
+        self.assertEqual((saved / "application.bin").read_bytes(),
+                         old[flash.APP_OFFSETS[0]:flash.APP_OFFSETS[0] + flash.APP_BYTES])
+        self.assertEqual(self.dev.resets, 1)
+        # Same rule works when the confirmed fallback is app1.
+        self.assertEqual(flash.selected_slot(ota_entry(19, 4) + ota_entry(18, 2)), 1)
+
+    def test_aborted_without_unique_confirmed_fallback_is_refused(self):
+        blank = b"\xff" * 0x1000
+        for ota in (
+            ota_entry(18, 4) + blank,
+            ota_entry(17, 4) + ota_entry(18, 4),
+            ota_entry(17, 0xFFFFFFFF) + ota_entry(18, 4),
+            ota_entry(17, 2) + ota_entry(20, 4),
+            ota_entry(17, 2) + ota_entry(18, 1),
+            ota_entry(17, 2) + ota_entry(18, 3),
+            ota_entry(17, 2) + ota_entry(18, 99),
+            ota_entry(17, 2) + ota_entry(19, 4),
+        ):
+            with self.subTest(ota=ota[:32].hex()), self.assertRaises(flash.Refusal):
+                flash.selected_slot(ota)
+        corrupted = bytearray(ota_entry(17, 2) + ota_entry(18, 4))
+        corrupted[0x1000 + 28] ^= 1
+        with self.assertRaises(flash.Refusal):
+            flash.selected_slot(bytes(corrupted))
+
     def test_initial_ota_secondary_placeholder_is_allowed_only_with_valid_primary(self):
         # Real ESP-IDF first-install layout: seq=1 with validated CRC, plus
         # an exact 0x00000000 + 0xFF secondary placeholder.
