@@ -1,6 +1,10 @@
-# Boiler Room Touch Panel — v0.11.0
+# Boiler Room Touch Panel — v0.11.1
 
 [Карта проекта / Project map](docs/project-map.md) · [Алгоритмы отопления и горячей воды](docs/heating-control.md) · [Руководство на русском](README_RU.md)
+
+## v0.11.1 — Rust heating calculations and safe update
+
+The heating calculation core and heating-settings serialization run in Rust (`no_std`) on ESP32-P4; the existing panel, web UI and hardware integration remain in C++. Existing v0.11.0 NVS settings retain their binary format. Native tests compare all 20 outputs across 75,138 steps and cover NVS readback, restart, failed writes and revision conflicts. This OTA candidate needs on-device validation before it is considered hardware accepted.
 
 ## v0.11.0 — Heating and domestic hot water control
 
