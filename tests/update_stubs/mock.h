@@ -73,7 +73,7 @@ inline void makeTable(){
 }
 inline void fakeDigest(const uint8_t* data,size_t size,uint8_t* out);
 inline std::vector<uint8_t> makeImage(size_t n=100000){
-  assert(n>=policy::MIN_FIRMWARE_BYTES+32);
+  assert(n>=65536+32);
   std::vector<uint8_t> image(n,0x5a);memset(image.data(),0,36);image[0]=0xe9;image[1]=4;image[3]=0x40;image[12]=18;
   image[15]=103;image[17]=image[18]=255;image[23]=1;image[29]=1;
   image[32]=0x32;image[33]=0x54;image[34]=0xcd;image[35]=0xab;

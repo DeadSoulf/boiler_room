@@ -567,7 +567,7 @@ bool readbackImage(const esp_partition_t* partition,uint32_t size,const uint8_t 
       memcpy(suffix+(at+start-(size-32)),block+start,n-start);
     }
     at+=n;
-    vTaskDelay(pdMS_TO_TICKS(3));
+    vTaskDelay(pdMS_TO_TICKS(3)+1); // always sleep at least one tick
   }
   uint8_t fileHash[32],calculatedAppHash[32];
   if(!file.finish(fileHash)||!app.finish(calculatedAppHash)||
@@ -687,7 +687,7 @@ void installRelease(const char* expected){
       gate.fail();transferFailure(error?error:ImageError,true);return;
     }
     if(uint32_t(millis()-lastProgress)>=100){progress(gate.received(),candidate.size);lastProgress=millis();}
-    vTaskDelay(pdMS_TO_TICKS(3)); // make progress without monopolizing CPU0 during OTA
+    vTaskDelay(pdMS_TO_TICKS(3)+1); // always leave a tick for IDLE0/TWDT
   }
   stream.close();progress(gate.received(),candidate.size);
   phase(Phase::Verifying,"Проверка размера, SHA-256 и формата прошивки…");
