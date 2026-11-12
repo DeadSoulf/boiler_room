@@ -95,7 +95,7 @@ bool haveOffer=false;
 uint32_t workerStartedAt=0,lastAutomaticAttempt=0;
 bool automaticAttempted=false;
 
-enum class Stage:uint32_t {Empty=0,Receiving=1,Armed=2,Confirmed=3,RolledBack=4,Cancelled=5,Failed=6,Interrupted=7};
+enum class Stage:uint32_t {Empty=0,Receiving=1,Armed=2,Confirmed=3,RolledBack=4,Cancelled=5,Failed=6,Interrupted=7,Verifying=8};
 struct Record {
   uint32_t magic=0,schema=1,stage=0,manual=0;
   uint32_t fromAddress=0,targetAddress=0,size=0;
@@ -113,7 +113,7 @@ uint32_t recordChecksum(const Record& r){
 bool validRecord(const Record& r){
   policy::Version from,to;
   return r.magic==RECORD_MAGIC&&r.schema==1&&r.stage>=uint32_t(Stage::Receiving)&&
-    r.stage<=uint32_t(Stage::Interrupted)&&r.manual<=1&&r.checksum==recordChecksum(r)&&
+    r.stage<=uint32_t(Stage::Verifying)&&r.manual<=1&&r.checksum==recordChecksum(r)&&
     ((r.fromAddress==policy::SLOT0&&r.targetAddress==policy::SLOT1)||
      (r.fromAddress==policy::SLOT1&&r.targetAddress==policy::SLOT0))&&
     policy::terminated(r.fromVersion)&&policy::terminated(r.targetVersion)&&policy::terminated(r.source)&&
@@ -146,14 +146,20 @@ const esp_partition_t* partitionAt(uint32_t address){
 bool imageState(const esp_partition_t* p,esp_ota_img_states_t& result){
   result=ESP_OTA_IMG_UNDEFINED;return p&&esp_ota_get_state_partition(p,&result)==ESP_OK;
 }
-bool validImage(const esp_partition_t* p,uint32_t exactSize=0){
+// esp_image_verify validates the image and its appended SHA-256. Reuse the
+// verified digest returned in metadata instead of rescanning the entire app
+// again with esp_partition_get_sha256.
+bool validImage(const esp_partition_t* p,uint32_t exactSize=0,uint8_t* appDigest=nullptr){
   if(!p)return false;
   esp_partition_pos_t position{};position.offset=p->address;position.size=p->size;
   esp_image_metadata_t image{};
   if(esp_image_verify(ESP_IMAGE_VERIFY,&position,&image)!=ESP_OK)return false;
   uint8_t prefix[36];
-  return (!exactSize||image.image_len==exactSize)&&
-    esp_partition_read(p,0,prefix,sizeof(prefix))==ESP_OK&&policy::validImagePrefix(prefix,sizeof(prefix));
+  if((exactSize&&image.image_len!=exactSize)||
+     esp_partition_read(p,0,prefix,sizeof(prefix))!=ESP_OK||
+     !policy::validImagePrefix(prefix,sizeof(prefix))||!image.image.hash_appended)return false;
+  if(appDigest)memcpy(appDigest,image.image_digest,32);
+  return true;
 }
 bool layoutReady(){
   esp_chip_info_t chip{};esp_chip_info(&chip);
@@ -231,8 +237,8 @@ bool previousReady(){
      running->address!=record.targetAddress||strcmp(panel::VERSION,record.targetVersion))return false;
   const esp_partition_t* previous=partitionAt(record.fromAddress);esp_ota_img_states_t status;
   uint8_t hash[32];
-  return imageState(previous,status)&&status==ESP_OTA_IMG_VALID&&validImage(previous)&&
-    esp_partition_get_sha256(previous,hash)==ESP_OK&&policy::sameHash(hash,record.fromHash);
+  return imageState(previous,status)&&status==ESP_OTA_IMG_VALID&&
+    validImage(previous,0,hash)&&policy::sameHash(hash,record.fromHash);
 }
 void updateCapabilities(){
   const bool canRollback=platformReady&&!pendingBoot&&previousReady();
@@ -272,7 +278,7 @@ void reconcileBoot(){
     uint8_t hash[32];
     pendingIdentityOK=platformReady&&haveRecord&&record.stage==uint32_t(Stage::Armed)&&
       running->address==record.targetAddress&&!strcmp(panel::VERSION,record.targetVersion)&&
-      esp_partition_get_sha256(running,hash)==ESP_OK&&policy::sameHash(hash,record.targetHash)&&
+      validImage(running,0,hash)&&policy::sameHash(hash,record.targetHash)&&
       esp_ota_check_rollback_is_possible();
     if(lock()){
       state.bootPending=true;state.busy=true;state.cancelAllowed=false;state.phase=Phase::Verifying;
@@ -288,7 +294,7 @@ void reconcileBoot(){
   const bool aborted=imageState(target,targetState)&&(targetState==ESP_OTA_IMG_ABORTED||targetState==ESP_OTA_IMG_INVALID);
   uint8_t currentHash[32];
   const bool targetValid=known&&current==ESP_OTA_IMG_VALID&&running->address==record.targetAddress&&
-    !strcmp(panel::VERSION,record.targetVersion)&&esp_partition_get_sha256(running,currentHash)==ESP_OK&&
+    !strcmp(panel::VERSION,record.targetVersion)&&validImage(running,0,currentHash)&&
     policy::sameHash(currentHash,record.targetHash);
   const bool recoveringConfirmation=record.stage==uint32_t(Stage::Armed)&&targetValid;
   const auto observation=policy::observeBoot(running?running->address:0,panel::VERSION,
@@ -308,7 +314,8 @@ void reconcileBoot(){
     }
     finish(record.manual?Phase::RolledBack:Phase::Success,
       record.manual?"Предыдущая версия восстановлена; запуск подтверждён.":"Обновление установлено; запуск подтверждён.");
-  }else if(observation==policy::BootObservation::Interrupted||record.stage==uint32_t(Stage::Receiving)){
+  }else if(observation==policy::BootObservation::Interrupted||
+           record.stage==uint32_t(Stage::Receiving)||record.stage==uint32_t(Stage::Verifying)){
     recordStage(Stage::Interrupted);finish(Phase::Error,"Предыдущее обновление прервано. Рабочая версия сохранена.",Interrupted);
     logEvent("interrupted OTA: running app retained");
   }else if(observation==policy::BootObservation::Mismatch){
@@ -532,6 +539,43 @@ struct Sha256 {
   bool add(const uint8_t* data,size_t n){return ready&&mbedtls_sha256_update(&context,data,n)==0;}
   bool finish(uint8_t (&hash)[32]){return ready&&mbedtls_sha256_finish(&context,hash)==0;}
 };
+// The manifest digest covers the entire firmware file including its 32-byte
+// appended image SHA. esp_ota_end() already runs ESP-IDF image validation.
+// Read the written bytes back in bounded chunks, leaving idle time for the
+// watchdog, and independently validate both digests. Never select an OTA
+// slot when any byte is missing or inconsistent.
+bool readbackImage(const esp_partition_t* partition,uint32_t size,const uint8_t expectedFileHash[32],
+                   uint8_t outAppHash[32]){
+  if(!partition||size<policy::MIN_FIRMWARE_BYTES||size>partition->size||
+     !expectedFileHash||!outAppHash)return false;
+  Sha256 file,app;
+  if(!file.ready||!app.ready)return false;
+  uint8_t block[4096],first[36]={},suffix[32]={};
+  for(uint32_t at=0;at<size;){
+    if(cancelRequested.load())return false;
+    const uint32_t n=size-at<sizeof(block)?size-at:sizeof(block);
+    if(esp_partition_read(partition,at,block,n)!=ESP_OK)return false;
+    if(at==0){memcpy(first,block,sizeof(first));
+      if(!policy::validImagePrefix(first,sizeof(first)))return false;
+    }
+    if(!file.add(block,n))return false;
+    // The ESP image hash covers exactly the image bytes before its SHA footer.
+    const uint32_t bodyBytes=at<size-32?(size-32-at<n?size-32-at:n):0;
+    if(bodyBytes&&!app.add(block,bodyBytes))return false;
+    if(at+n>size-32){
+      const uint32_t start=at<size-32?size-32-at:0;
+      memcpy(suffix+(at+start-(size-32)),block+start,n-start);
+    }
+    at+=n;
+    vTaskDelay(pdMS_TO_TICKS(3));
+  }
+  uint8_t fileHash[32],calculatedAppHash[32];
+  if(!file.finish(fileHash)||!app.finish(calculatedAppHash)||
+     !policy::sameHash(fileHash,expectedFileHash)||
+     !policy::sameHash(calculatedAppHash,suffix))return false;
+  memcpy(outAppHash,suffix,32);return true;
+}
+
 void progress(uint32_t done,uint32_t total){
   if(!lock())return;
   state.done=done;state.total=total;
@@ -544,6 +588,10 @@ bool enterCommit(){
   snprintf(state.message,sizeof(state.message),"%s","Образ проверен. Подготовка безопасного запуска…");
   unlock();return true;
 }
+// Cache the verified digest of the running (known-good) app for the transaction.
+// Its image identity is unchanged until the OTA worker explicitly changes the
+// boot partition, which it only does after complete verification.
+uint8_t runningImageDigest[32]={};
 bool prepareInstall(bool network=true){
   if(network){if(!prerequisites())return false;}
   else if(!platformReady){finish(Phase::Error,"Локальный откат недоступен для этой разметки или загрузчика.",Unsupported);return false;}
@@ -551,9 +599,10 @@ bool prepareInstall(bool network=true){
   if(!layoutReady()||!bootloaderMatches()){
     platformReady=false;updateCapabilities();finish(Phase::Error,"Загрузчик или разметка Flash не совпали с проверенным комплектом.",BootloaderError);return false;
   }
-  if(!currentStateReady(true)||!validImage(running)){
+  if(!currentStateReady(true)||!validImage(running,0,runningImageDigest)){
     finish(Phase::Error,"Текущая прошивка ещё не подтверждена или выбран другой слот запуска.",RunningState);return false;
   }
+  vTaskDelay(pdMS_TO_TICKS(20)); // let CPU0 IDLE service TWDT between full validations
   return true;
 }
 void rebootTo(const esp_partition_t* target){
@@ -614,9 +663,10 @@ void installRelease(const char* expected){
   Record next;next.stage=uint32_t(Stage::Receiving);next.fromAddress=running->address;next.targetAddress=target->address;
   next.size=candidate.size;policy::copy(next.fromVersion,panel::VERSION);policy::copy(next.targetVersion,candidate.version);
   policy::copy(next.source,candidate.source);
-  if(!policy::decodeHash(candidate.sha256,next.fileHash)||esp_partition_get_sha256(running,next.fromHash)!=ESP_OK){
+  if(!policy::decodeHash(candidate.sha256,next.fileHash)){
     transferFailure(ImageError,false);return;
   }
+  memcpy(next.fromHash,runningImageDigest,sizeof(next.fromHash));
   if(cancelRequested.load()){transferFailure(CancelledError,false);return;}
   if(!writeRecord(next)){transferFailure(PersistError,false);return;}
   if(lock()){state.rollbackAvailable=false;state.done=0;state.total=candidate.size;state.percent=0;unlock();}
@@ -637,7 +687,7 @@ void installRelease(const char* expected){
       gate.fail();transferFailure(error?error:ImageError,true);return;
     }
     if(uint32_t(millis()-lastProgress)>=100){progress(gate.received(),candidate.size);lastProgress=millis();}
-    vTaskDelay(1);
+    vTaskDelay(pdMS_TO_TICKS(3)); // make progress without monopolizing CPU0 during OTA
   }
   stream.close();progress(gate.received(),candidate.size);
   phase(Phase::Verifying,"Проверка размера, SHA-256 и формата прошивки…");
@@ -646,10 +696,17 @@ void installRelease(const char* expected){
   gate.digest(actual,next.fileHash);
   if(cancelRequested.load())gate.cancel();
   if(!gate.canEnd()){transferFailure(cancelRequested.load()?CancelledError:HashError,true);return;}
+  // Keep the hardware TWDT enabled: pause before the single ESP-IDF verifier,
+  // then verify readback cooperatively rather than repeating image verification.
+  vTaskDelay(pdMS_TO_TICKS(30));
   const bool ended=writer.end(error);gate.end(ended);
-  if(!ended||!validImage(target,candidate.size)||esp_partition_get_sha256(target,next.targetHash)!=ESP_OK){
-    gate.fail();transferFailure(error?error:ImageError,true);return;
+  if(!ended){gate.fail();transferFailure(error?error:ImageError,true);return;}
+  recordStage(Stage::Verifying);
+  vTaskDelay(pdMS_TO_TICKS(30));
+  if(!readbackImage(target,candidate.size,next.fileHash,next.targetHash)){
+    gate.fail();transferFailure(cancelRequested.load()?CancelledError:HashError,true);return;
   }
+  vTaskDelay(pdMS_TO_TICKS(30));
   if(cancelRequested.load())gate.cancel();
   if(!gate.canSelect()||!enterCommit()){transferFailure(cancelRequested.load()?CancelledError:ImageError,true);return;}
   // Nothing after this point accepts cancellation. A partial/cancelled image can
@@ -670,7 +727,7 @@ void rollback(const char* expected){
   Record next;next.stage=uint32_t(Stage::Armed);next.manual=1;next.fromAddress=running->address;next.targetAddress=target->address;
   policy::copy(next.fromVersion,panel::VERSION);policy::copy(next.targetVersion,record.fromVersion);
   memcpy(next.targetHash,record.fromHash,sizeof(next.targetHash));
-  if(esp_partition_get_sha256(running,next.fromHash)!=ESP_OK){finish(Phase::Error,"Текущий образ не прошёл проверку перед откатом.",ImageError);return;}
+  memcpy(next.fromHash,runningImageDigest,sizeof(next.fromHash));
   if(!enterCommit()){transferFailure(CancelledError,false);return;}
   if(!writeRecord(next)){transferFailure(PersistError,false);return;}
   rebootTo(target);

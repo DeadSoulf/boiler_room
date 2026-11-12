@@ -73,6 +73,12 @@ static void transfers(){
   reset();offer();failBegin=true;assert(!install());noSelection();assert(otaWrites==0);
   reset();offer();failWriteAt=3;assert(!install());noSelection();assert(otaAborts==1&&otaEnds==0);
   reset();offer();failEnd=true;assert(!install());noSelection();assert(otaEnds==1&&otaAborts==0);
+  reset();offer();assert(install());
+  assert(record.stage==uint32_t(Stage::Armed)&&memcmp(record.targetHash,images[1].data()+images[1].size()-32,32)==0);
+  assert(record.fromHash[0]==images[0][images[0].size()-32]);
+  assert(fakeMillis>12000+50); // validation and readback deliberately yield
+  reset();offer();responses[offered.url].body[5000]^=1;
+  assert(!install());noSelection();assert(otaEnds==0); // download digest gate rejects mutation
   reset();offer();failVerifyTarget=true;assert(!install());noSelection();assert(otaEnds==1);
   reset();offer();failNvsWrite=1;assert(!install());noSelection();assert(otaBegins==0);
   reset();offer();failNvsWrite=2;assert(!install());noSelection();assert(otaEnds==1);
@@ -129,7 +135,8 @@ static void pendingFixture(){
   Record r;r.stage=uint32_t(Stage::Armed);r.fromAddress=policy::SLOT0;r.targetAddress=policy::SLOT1;r.size=100000;
   policy::copy(r.fromVersion,"v0.9.1");policy::copy(r.targetVersion,panel::VERSION);
   policy::copy(r.source,"0123456789abcdef0123456789abcdef01234567");
-  fakeDigest(images[0].data(),images[0].size(),r.fromHash);fakeDigest(images[1].data(),images[1].size(),r.targetHash);
+  memcpy(r.fromHash,images[0].data()+images[0].size()-32,32);
+  memcpy(r.targetHash,images[1].data()+images[1].size()-32,32);
   assert(writeRecord(r));assert(verifyRollbackLater());assert(bootDeadline&&bootDeadline->armed&&bootDeadline->delay==60000000);
   heartbeatReady.store(false);reconcileBoot();assert(pendingBoot&&pendingIdentityOK);
 }
@@ -160,7 +167,8 @@ static void bootHealth(){
 static void rollbackAndUsb(){
   reset();Record r;r.stage=uint32_t(Stage::Confirmed);r.manual=1;r.fromAddress=policy::SLOT1;r.targetAddress=policy::SLOT0;
   policy::copy(r.fromVersion,"v0.9.1");policy::copy(r.targetVersion,panel::VERSION);
-  fakeDigest(images[1].data(),images[1].size(),r.fromHash);fakeDigest(images[0].data(),images[0].size(),r.targetHash);
+  memcpy(r.fromHash,images[1].data()+images[1].size()-32,32);
+  memcpy(r.targetHash,images[0].data()+images[0].size()-32,32);
   partitionStates[1]=ESP_OTA_IMG_VALID;assert(writeRecord(r));assert(previousReady());wifi=false;
   try{rollback("v0.9.1");assert(false);}catch(const Restart&){}
   assert(bootIndex==1&&otaBegins==0&&requestedUrls.empty()&&record.manual==1);

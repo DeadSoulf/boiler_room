@@ -71,10 +71,14 @@ inline void makeTable(){
   const uint8_t md5[]={0xb3,0x2d,0xcd,0xb8,0x3b,0x16,0x74,0xaf,0x27,0x76,0x8c,0x92,0xb1,0xf8,0x8a,0x62};
   memcpy(partitionTable.data()+208,md5,sizeof(md5));
 }
+inline void fakeDigest(const uint8_t* data,size_t size,uint8_t* out);
 inline std::vector<uint8_t> makeImage(size_t n=100000){
+  assert(n>=policy::MIN_FIRMWARE_BYTES+32);
   std::vector<uint8_t> image(n,0x5a);memset(image.data(),0,36);image[0]=0xe9;image[1]=4;image[3]=0x40;image[12]=18;
   image[15]=103;image[17]=image[18]=255;image[23]=1;image[29]=1;
-  image[32]=0x32;image[33]=0x54;image[34]=0xcd;image[35]=0xab;return image;
+  image[32]=0x32;image[33]=0x54;image[34]=0xcd;image[35]=0xab;
+  fakeDigest(image.data(),image.size()-32,image.data()+image.size()-32);
+  return image;
 }
 // Deliberately non-cryptographic identity hash; ESP-IDF owns the real SHA-256.
 inline void fakeDigest(const uint8_t* data,size_t size,uint8_t* out){
@@ -121,15 +125,23 @@ inline int esp_partition_read(const esp_partition_t* p,size_t at,void* out,size_
   memcpy(out,data.data()+at,n);return ESP_OK;
 }
 inline int esp_partition_get_sha256(const esp_partition_t* p,uint8_t* out){
-  const auto& data=images[p==&fakePartitions[0]?0:1];if(data.empty())return ESP_FAIL;
-  fakeDigest(data.data(),data.size(),out);return ESP_OK;
+  const auto& data=images[p==&fakePartitions[0]?0:1];if(data.size()<64)return ESP_FAIL;
+  uint8_t digest[32];fakeDigest(data.data(),data.size()-32,digest);
+  if(memcmp(digest,data.data()+data.size()-32,32))return ESP_FAIL;
+  memcpy(out,digest,32);return ESP_OK;
 }
-struct esp_partition_pos_t {uint32_t offset,size;};struct esp_image_metadata_t {uint32_t image_len=0;};
+struct esp_partition_pos_t {uint32_t offset,size;};
+struct esp_image_metadata_t {uint32_t image_len=0;struct {uint8_t hash_appended=0;} image;uint8_t image_digest[32]={};};
 constexpr int ESP_IMAGE_VERIFY=0;
 inline int esp_image_verify(int,const esp_partition_pos_t* p,esp_image_metadata_t* result){
   const unsigned index=p->offset==0x10000?0:1;
-  if(images[index].empty()||images[index][0]!=0xe9||(failVerifyTarget&&index!=runningIndex))return ESP_FAIL;
-  result->image_len=uint32_t(images[index].size());return ESP_OK;
+  if(images[index].size()<64||images[index][0]!=0xe9||(failVerifyTarget&&index!=runningIndex))return ESP_FAIL;
+  uint8_t digest[32];fakeDigest(images[index].data(),images[index].size()-32,digest);
+  if(memcmp(digest,images[index].data()+images[index].size()-32,32))return ESP_FAIL;
+  result->image_len=uint32_t(images[index].size());
+  result->image.hash_appended=images[index][23];
+  memcpy(result->image_digest,digest,32);
+  return ESP_OK;
 }
 inline uint32_t esp_rom_crc32_le(uint32_t crc,const uint8_t* data,uint32_t size){
   for(uint32_t i=0;i<size;i++){crc^=data[i];for(unsigned b=0;b<8;b++)crc=(crc>>1)^((crc&1)?0xedb88320U:0);}return crc;
@@ -146,7 +158,13 @@ inline int esp_ota_write(esp_ota_handle_t,const void* p,size_t n){
   return ESP_OK;
 }
 inline int esp_ota_abort(esp_ota_handle_t){++otaAborts;trace.push_back("abort");return ESP_OK;}
-inline int esp_ota_end(esp_ota_handle_t){++otaEnds;trace.push_back("end");if(faultHook)faultHook("end");return failEnd?ESP_FAIL:ESP_OK;}
+inline int esp_ota_end(esp_ota_handle_t){
+  ++otaEnds;trace.push_back("end");if(faultHook)faultHook("end");
+  if(failEnd||failVerifyTarget)return ESP_FAIL;
+  esp_partition_pos_t pos{fakePartitions[targetIndex].address,fakePartitions[targetIndex].size};
+  esp_image_metadata_t meta{};
+  return esp_image_verify(ESP_IMAGE_VERIFY,&pos,&meta);
+}
 inline int esp_ota_set_boot_partition(const esp_partition_t* p){
   ++bootSelections;trace.push_back("select");if(failBoot&&!bootFailureAfterSelect)return ESP_FAIL;
   bootIndex=p==&fakePartitions[0]?0:1;partitionStates[bootIndex]=ESP_OTA_IMG_NEW;
