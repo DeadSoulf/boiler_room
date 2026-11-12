@@ -1,6 +1,10 @@
-# Boiler Room Touch Panel — v0.11.2
+# Boiler Room Touch Panel — v0.11.3
 
 [Карта проекта / Project map](docs/project-map.md) · [Алгоритмы отопления и горячей воды](docs/heating-control.md) · [Руководство на русском](README_RU.md)
+
+## v0.11.3 — Cooperative OTA verification and safe recovery
+
+The ESP32-P4 OTA worker avoids redundant full-image verification passes. The ESP-IDF `esp_ota_end()` gate validates the app, and an independently paced flash readback checks the complete firmware SHA-256 and the appended app digest before the boot slot can change. The verification stage is persisted in NVS to distinguish a watchdog reset from interrupted downloading; cancellation remains available until the commit gate. The task watchdog, ESP-IDF rollback, HTTPS checks, board/bootloader/partition validation, and the previous app remain in place. This is a hardware-validation candidate; the previous watchdog failure was observed while installing v0.11.2. A one-time checked USB app-only install may be needed to replace the old updater on the panel, with a verified backup.
 
 ## v0.11.2 — Outdoor weather is read-only
 
